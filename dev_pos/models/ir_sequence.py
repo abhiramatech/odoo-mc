@@ -6,6 +6,7 @@ class IrSequence(models.Model):
     _inherit = 'ir.sequence'
 
     is_from_operation_types = fields.Boolean(string="From Operation Types", default=False)
+    warehouse_name = fields.Char(string='Warehouse Name', tracking=True) # , readonly=True
     is_integrated = fields.Boolean(string="Integrated", default=False, readonly=True, tracking=True)
     index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
 

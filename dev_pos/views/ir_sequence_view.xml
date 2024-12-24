@@ -8,6 +8,7 @@
       <field name="arch" type="xml">
         <xpath expr="//field[@name='implementation']" position="after">
             <field name="is_from_operation_types"/>
+            <field name="warehouse_name"/>
             <field name="is_integrated"/>
         </xpath>
       </field>
