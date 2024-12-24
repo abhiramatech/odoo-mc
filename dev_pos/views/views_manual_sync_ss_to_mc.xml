@@ -55,7 +55,7 @@
     <!-- Child Menu -->
     <menuitem
         id="synchronize_ss_to_mcmenu"
-        name="Sync SS To MC"
+        name="Store-Master Console"
         action="action_synchronize_ss_to_mc"
         parent="setting_config_menu_root"
         sequence="1"/>

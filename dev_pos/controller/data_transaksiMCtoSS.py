@@ -12,6 +12,16 @@ class DataTransaksiMCtoSS:
         self.set_log_mc = SetLogMC(self.source_client)
         self.set_log_ss = SetLogSS(self.target_client)
 
+    def get_picking_type_id(self, picking_type_name):
+        picking_type = self.target_client.call_odoo(
+            'object', 'execute_kw', self.target_client.db,
+            self.target_client.uid, self.target_client.password,
+            'stock.picking.type', 'search_read',
+            [[['name', '=', picking_type_name]]],
+            {'fields': ['id'], 'limit': 1}
+        )
+        return picking_type[0]['id'] if picking_type else None
+    
     # Master Console --> Store Server
     # Store Server --> Master Console
     def update_loyalty_point_mc_to_ss(self, model_name, fields, description, date_from, date_to):
@@ -179,7 +189,7 @@ class DataTransaksiMCtoSS:
                                                             self.source_client.uid, self.source_client.password,
                                                             'loyalty.reward', 'search_read',
                                                             [[['program_id', 'in', order_ids]]],
-                                                            {'fields': ['reward_type', 'discount', 'discount_applicability', 'discount_max_amount', 'required_points', 'description', 'discount_mode', 'discount_product_domain', 'discount_product_ids', 'discount_product_category_id', 'vit_trxid', 'program_id']})
+                                                            {'fields': ['reward_type', 'discount', 'discount_applicability', 'discount_max_amount', 'required_points', 'description', 'discount_mode', 'discount_product_domain', 'discount_product_ids', 'discount_product_category_id', 'vit_trxid', 'program_id', 'reward_product_id']})
 
             rule_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
@@ -189,6 +199,7 @@ class DataTransaksiMCtoSS:
 
             # Collect all product and category IDs
             product_ids_reward = [product_id for product in reward_ids_lines for product_id in product.get('discount_product_ids', [])]
+            reward_product_id = [record.get('reward_product_id')[0] if isinstance(record.get('reward_product_id'), list) else record.get('reward_product_id') for record in reward_ids_lines if record.get('reward_product_id')]
             product_ids_rule = [product_id for product in rule_ids_lines for product_id in product.get('product_ids', [])]
             category_ids_reward = [record.get('discount_product_category_id')[0] if isinstance(record.get('discount_product_category_id'), list) else record.get('discount_product_category_id') for record in reward_ids_lines if record.get('discount_product_category_id')]
             category_ids_rule = [record.get('product_category_id')[0] if isinstance(record.get('product_category_id'), list) else record.get('product_category_id') for record in rule_ids_lines if record.get('product_category_id')]
@@ -197,6 +208,20 @@ class DataTransaksiMCtoSS:
             pricelist_ids = [pricelist_id for record in discount_loyalty for pricelist_id in record.get('pricelist_ids', [])]
             pos_config_ids = [config_id for record in discount_loyalty for config_id in record.get('pos_config_ids', [])]
 
+            reward_product_id_source = self.source_client.call_odoo(
+                'object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'product.product', 'search_read',
+                [[['id', 'in', reward_product_id]]],
+                {'fields': ['id', 'default_code']}
+            )
+            products_source_reward = self.source_client.call_odoo(
+                'object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'product.product', 'search_read',
+                [[['id', 'in', product_ids_reward]]],
+                {'fields': ['id', 'default_code']}
+            )
             products_source_reward = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
                 self.source_client.uid, self.source_client.password,
@@ -247,6 +272,13 @@ class DataTransaksiMCtoSS:
                 {'fields': ['id', 'name']}
             )
             # Fetch corresponding data from target
+            reward_product_id_target = self.target_client.call_odoo(
+                'object', 'execute_kw', self.target_client.db,
+                self.target_client.uid, self.target_client.password,
+                'product.product', 'search_read',
+                [[['default_code', 'in', [product['default_code'] for product in reward_product_id_source]]]],
+                {'fields': ['id', 'default_code']}
+            )
             products_target_reward = self.target_client.call_odoo(
                 'object', 'execute_kw', self.target_client.db,
                 self.target_client.uid, self.target_client.password,
@@ -298,6 +330,7 @@ class DataTransaksiMCtoSS:
             )
 
             product_dict_reward = {product['default_code']: product['id'] for product in products_target_reward}
+            reward_product_id_dict = {product['default_code']: product['id'] for product in reward_product_id_target}
             product_dict_rule = {product['default_code']: product['id'] for product in products_target_rule}
             category_dict_reward = {category['complete_name']: category['id'] for category in categories_target_reward}
             category_dict_rule = {category['complete_name']: category['id'] for category in categories_target_rule}
@@ -305,6 +338,7 @@ class DataTransaksiMCtoSS:
             pricelist_dict = {pricelist['name']: pricelist['id'] for pricelist in pricelists_target}
             pos_config_dict = {pos_config['name']: pos_config['id'] for pos_config in pos_configs_target}
 
+            print(reward_product_id_dict)
             def process_create_discount(record):
                 if record['vit_trxid'] in existing_discount_dict:
                     return
@@ -316,6 +350,22 @@ class DataTransaksiMCtoSS:
                     if isinstance(line, dict):
                         reward_product_ids = line.get('discount_product_ids', [])
                         reward_target_product_ids = [product_dict_reward.get(product['default_code']) for product in products_source_reward if product['id'] in reward_product_ids]
+
+                        reward_product_id_field = line.get('reward_product_id')
+                        reward_product_id_field = reward_product_id_field[0] if isinstance(reward_product_id_field, list) else reward_product_id_field
+
+                        # Ambil nama default_code dari reward_product_id_source
+                        if isinstance(reward_product_id_field, list) and len(reward_product_id_field) == 2:
+                            reward_product_default_code = reward_product_id_field[1]
+                        else:
+                            reward_product_default_code = next(
+                                (product['default_code'] for product in reward_product_id_source if product['id'] == reward_product_id_field),
+                                None
+                            )
+
+                        # Ambil ID dari target database berdasarkan default_code
+                        reward_product_id_id = reward_product_id_dict.get(reward_product_default_code)
+                        # print(reward_product_id_id)
 
                         reward_source_category_id = line.get('discount_product_category_id')
                         if isinstance(reward_source_category_id, list) and len(reward_source_category_id) == 2:
@@ -334,6 +384,7 @@ class DataTransaksiMCtoSS:
                         'description': line.get('description'),
                         'discount_mode': line.get('discount_mode'),
                         'discount_product_ids': [(6, 0, reward_target_product_ids)],
+                        'reward_product_id': reward_product_id_id,
                         'discount_product_category_id': reward_target_category_id,
                         'vit_trxid': record.get('name')
                     }
@@ -495,7 +546,7 @@ class DataTransaksiMCtoSS:
                                                             self.source_client.uid, self.source_client.password,
                                                             'loyalty.reward', 'search_read',
                                                             [[['program_id', 'in', order_ids]]],
-                                                            {'fields': ['reward_type', 'discount', 'discount_applicability', 'discount_max_amount', 'required_points', 'description', 'discount_mode', 'discount_product_domain', 'discount_product_ids', 'discount_product_category_id', 'vit_trxid', 'program_id']})
+                                                            {'fields': ['reward_type', 'discount', 'discount_applicability', 'discount_max_amount', 'required_points', 'description', 'discount_mode', 'discount_product_domain', 'discount_product_ids', 'discount_product_category_id', 'vit_trxid', 'program_id', 'reward_product_id']})
 
             rule_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
@@ -505,6 +556,7 @@ class DataTransaksiMCtoSS:
 
             # Collect all product and category IDs
             product_ids_reward = [product_id for product in reward_ids_lines for product_id in product.get('discount_product_ids', [])]
+            reward_product_id = [record.get('reward_product_id')[0] if isinstance(record.get('reward_product_id'), list) else record.get('reward_product_id') for record in reward_ids_lines if record.get('reward_product_id')]
             product_ids_rule = [product_id for product in rule_ids_lines for product_id in product.get('product_ids', [])]
             category_ids_reward = [record.get('discount_product_category_id')[0] if isinstance(record.get('discount_product_category_id'), list) else record.get('discount_product_category_id') for record in reward_ids_lines if record.get('discount_product_category_id')]
             category_ids_rule = [record.get('product_category_id')[0] if isinstance(record.get('product_category_id'), list) else record.get('product_category_id') for record in rule_ids_lines if record.get('product_category_id')]
@@ -520,7 +572,13 @@ class DataTransaksiMCtoSS:
                 [[['id', 'in', product_ids_reward]]],
                 {'fields': ['id', 'default_code']}
             )
-
+            reward_product_id_source = self.source_client.call_odoo(
+                'object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'product.product', 'search_read',
+                [[['id', 'in', reward_product_id]]],
+                {'fields': ['id', 'default_code']}
+            )
             products_source_rule = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
                 self.source_client.uid, self.source_client.password,
@@ -568,6 +626,13 @@ class DataTransaksiMCtoSS:
                 {'fields': ['id', 'name']}
             )
             # Fetch corresponding data from target
+            reward_product_id_target = self.target_client.call_odoo(
+                'object', 'execute_kw', self.target_client.db,
+                self.target_client.uid, self.target_client.password,
+                'product.product', 'search_read',
+                [[['default_code', 'in', [product['default_code'] for product in reward_product_id_source]]]],
+                {'fields': ['id', 'default_code']}
+            )
             products_target_reward = self.target_client.call_odoo(
                 'object', 'execute_kw', self.target_client.db,
                 self.target_client.uid, self.target_client.password,
@@ -626,6 +691,7 @@ class DataTransaksiMCtoSS:
 
             # Create mapping dictionaries
             product_dict_reward = {product['default_code']: product['id'] for product in products_target_reward}
+            reward_product_id_dict = {product['default_code']: product['id'] for product in reward_product_id_target}
             product_dict_rule = {product['default_code']: product['id'] for product in products_target_rule}
             category_dict_reward = {category['complete_name']: category['id'] for category in categories_target_reward}
             category_dict_rule = {category['complete_name']: category['id'] for category in categories_target_rule}
@@ -640,7 +706,7 @@ class DataTransaksiMCtoSS:
                                                                     self.target_client.uid, self.target_client.password,
                                                                     'loyalty.reward', 'search_read',
                                                                     [[['program_id', '=', program_id]]],
-                                                                    {'fields': ['id', 'reward_type', 'discount', 'discount_applicability', 'discount_max_amount', 'required_points', 'description', 'discount_product_ids', 'discount_product_category_id', 'vit_trxid']})
+                                                                    {'fields': ['id', 'reward_type', 'discount', 'discount_applicability', 'discount_max_amount', 'required_points', 'description', 'discount_product_ids', 'discount_product_category_id', 'vit_trxid', 'reward_product_id']})
                 existing_rule_lines = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'loyalty.rule', 'search_read',
@@ -656,6 +722,20 @@ class DataTransaksiMCtoSS:
                     if isinstance(line, dict):
                         reward_product_ids = line.get('discount_product_ids', [])
                         reward_target_product_ids = [product_dict_reward.get(product['default_code']) for product in products_source_reward if product['id'] in reward_product_ids]
+
+                        reward_product_id_field = line.get('reward_product_id')
+                        reward_product_id_field = reward_product_id_field[0] if isinstance(reward_product_id_field, list) else reward_product_id_field
+
+                        # Ambil nama default_code dari reward_product_id_source
+                        if isinstance(reward_product_id_field, list) and len(reward_product_id_field) == 2:
+                            reward_product_default_code = reward_product_id_field[1]
+                        else:
+                            reward_product_default_code = next(
+                                (product['default_code'] for product in reward_product_id_source if product['id'] == reward_product_id_field),
+                                None
+                            )
+                        # Ambil ID dari target database berdasarkan default_code
+                        reward_product_id_id = reward_product_id_dict.get(reward_product_default_code)
 
                         reward_source_category_id = line.get('product_category_id')
                         if isinstance(reward_source_category_id, list) and len(reward_source_category_id) == 2:
@@ -674,7 +754,8 @@ class DataTransaksiMCtoSS:
                                 existing_line['required_points'] != line['required_points'] or
                                 existing_line['description'] != line['description'] or
                                 existing_line['discount_product_ids'] != [(6, 0, reward_target_product_ids)] or
-                                existing_line['discount_product_category_id'] != reward_target_category_id):
+                                existing_line['discount_product_category_id'] != reward_target_category_id or
+                                existing_line['reward_product_id'] != reward_product_id_id):
                                 discount_line_data = (1, existing_line['id'], {
                                     'reward_type': line.get('reward_type'),
                                     'discount': line.get('discount'),
@@ -685,6 +766,7 @@ class DataTransaksiMCtoSS:
                                     'vit_trxid': record.get('name'),
                                     'discount_mode': line.get('discount_mode'),
                                     'discount_product_ids': [(6, 0, reward_target_product_ids)],
+                                    'reward_product_id': reward_product_id_id,  # Add rewards_product_id
                                     'discount_product_category_id': reward_target_category_id,
                                 })
                                 discount_loyalty_line_ids.append(discount_line_data)
@@ -699,6 +781,7 @@ class DataTransaksiMCtoSS:
                                 'vit_trxid': record.get('name'),
                                 'discount_mode': line.get('discount_mode'),
                                 'discount_product_ids': [(6, 0, reward_target_product_ids)],
+                                'reward_product_id': reward_product_id_id,  # Add rewards_product_id
                                 'discount_product_category_id': reward_target_category_id,
                             })
                             discount_loyalty_line_ids.append(discount_line_data)
@@ -818,14 +901,14 @@ class DataTransaksiMCtoSS:
                         'object', 'execute_kw', self.source_client.db,
                         self.source_client.uid, self.source_client.password,
                         'loyalty.program', 'write',
-                        [[record['id']], {'is_integrated': True, 'is_updated': True, 'index_store': [(5, 0, 0)]}])
+                        [[record['id']], {'is_integrated': True, 'is_updated': True, 'index_store': [(6, 0, setting_config_ids)]}])
 
                     else:
                         self.source_client.call_odoo(
                         'object', 'execute_kw', self.source_client.db,
                         self.source_client.uid, self.source_client.password,
                         'loyalty.program', 'write',
-                        [[record['id']], {'is_integrated': False}])
+                        [[record['id']], {'is_integrated': False, 'index_store': [(5, 0, 0)]}])
 
                     write_date = self.get_write_date(model_name, gr['id'])
 
@@ -858,7 +941,7 @@ class DataTransaksiMCtoSS:
         id_program = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                     self.source_client.uid, self.source_client.password,
                                                     model_name, 'search_read',
-                                                    [[['active', '=', True], ['is_integrated', '=', True], ['program_type', '=', 'coupons']]],
+                                                    [[['active', '=', True], ['is_integrated', '=', False], ['program_type', '=', 'coupons']]],
                                                     {'fields': fields})
         
         if not id_program:
@@ -1230,22 +1313,29 @@ class DataTransaksiMCtoSS:
                     tsin_transfer_inventory_lines_dict[picking_id].append(line)
 
             product_ids = [line['product_id'][0] for line in ts_in_inventory_lines if line.get('product_id')]
+            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'name', 'taxes_id', 'default_code']})
-            product_source_dict = {product['id']: product for product in product_source}
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'product.product', 'search_read',
+                                                            [[['id', 'in', product_ids]]],
+                                                            {'fields': ['id', 'product_tmpl_id', 'default_code']})
+            print(product_source)
+            # Step 2: Create a dictionary to map product_id to default_code
+            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
+            print(product_source_dict)
+            # Step 3: Create a mapping from default_code to product_tmpl_id
+            default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
-
-            # Pre-fetch products in target by default_code
-            default_codes = [product['default_code'] for product in product_source if product.get('default_code')]
-            target_products_by_code = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+            # Step 4: Fetch product.template data from target_client using default_code
+            # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
+            product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'product.product', 'search_read',
-                                                                [[['default_code', 'in', default_codes], ['active', '=', True]]],
+                                                                [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
                                                                 {'fields': ['id', 'default_code']})
-            target_products_by_code_dict = {product['default_code']: product['id'] for product in target_products_by_code}
+
+            # Step 5 (baru): Mapping dari default_code ke product.product.id
+            default_code_to_target_product_id = {product['default_code']: product['id'] for product in product_target_source}
             
             existing_ts_in_dict = {}
             for record in transaksi_ts_in:
@@ -1281,36 +1371,35 @@ class DataTransaksiMCtoSS:
                 print(location_id, location_dest_id, picking_type_id)
                 missing_products = []
                 ts_in_inventory_line_ids = []
+                should_skip_create = False
                 for line in ts_in_inventory_lines:
-                    product_id_info = line.get('product_id')
-                    if product_id_info:
-                        product_id = product_id_info[0]  # Get the id part
-                        product = product_source_dict.get(product_id)
-                        if product:
-                            default_code = product.get('default_code')
-                            product_target_id = None
-                            if default_code:
-                                product_target_id = target_products_by_code_dict.get(default_code)
-                            if not product_target_id:
-                                missing_products.append(product['name'])
+                    source_product_code = product_source_dict.get(line.get('product_id')[0])
 
-                        ts_in_inventory_line_data = {
-                            'product_id': product_target_id,
-                            'product_uom_qty': line.get('product_uom_qty'),
-                            'name': line.get('name'),
-                            'quantity': line.get('quantity'),
-                            'location_dest_id': int(location_dest_id),
-                            'location_id': int(location_id)
-                        }
-                        ts_in_inventory_line_ids.append((0, 0, ts_in_inventory_line_data))
+                    # Step 7: Get the target product ID using the default_code mapping
+                    target_product_id = default_code_to_target_product_id.get(source_product_code)
 
-                    if missing_products:
-                        missing_products_str = ", ".join(missing_products)
-                        message = f"Terdapat produk tidak aktif dalam Goods Receipt: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Goods Receipts', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Goods Receipts', message, write_date)
+                    if not target_product_id:
+                        missing_products.append(source_product_code)
+                        should_skip_create = True
+                        continue
+
+                    ts_in_inventory_line_data = {
+                        'product_id': int(target_product_id),
+                        'product_uom_qty': line.get('product_uom_qty'),
+                        'name': line.get('name'),
+                        'quantity': line.get('quantity'),
+                        'location_dest_id': int(location_dest_id),
+                        'location_id': int(location_id)
+                    }
+                    ts_in_inventory_line_ids.append((0, 0, ts_in_inventory_line_data))
+
+                if should_skip_create:
+                    missing_products_str = ", ".join(missing_products)
+                    message = f"Terdapat produk tidak aktif dalam TS Out/TS In: {missing_products_str}"
+                    print(message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'TS Out/TS In', message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'TS Out/TS In', message, write_date)
 
                 target_location = record.get('target_location')
 
@@ -1351,7 +1440,7 @@ class DataTransaksiMCtoSS:
                             'object', 'execute_kw', self.source_client.db,
                             self.source_client.uid, self.source_client.password,
                             'stock.picking', 'write',
-                            [[record['id']], {'is_integrated': True, 'vit_trxid': vit_trxid}]
+                            [[record['id']], {'vit_trxid': vit_trxid}]
                         )
                         end_time = time.time()
                         duration = end_time - start_time
@@ -1380,7 +1469,7 @@ class DataTransaksiMCtoSS:
             'stock.picking', 'search_read',
             [[
                 ['picking_type_id.name', '=', 'TS Out'], 
-                ['is_integrated', '=', True], 
+                ['is_integrated', '=', False], 
                 ['state', '=', 'assigned'],
                 ['write_date', '>=', date_from], 
                 ['write_date', '<=', date_to]
@@ -1424,7 +1513,6 @@ class DataTransaksiMCtoSS:
             'stock.picking', 'search_read',
             [[
                 ['picking_type_id.name', '=', 'Goods Receipts'], 
-                ['is_integrated', '=', True], 
                 ['state', '=', 'assigned'],
             ]],
             {'fields': ['id', 'name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'vit_trxid', 'move_ids_without_package']}
@@ -1465,8 +1553,7 @@ class DataTransaksiMCtoSS:
             self.source_client.db, self.source_client.uid, self.source_client.password,
             'stock.picking', 'search_read',
             [[
-                ['picking_type_id.name', '=', 'Goods Issue'], 
-                ['is_integrated', '=', True], 
+                ['picking_type_id.name', '=', 'Goods Issue'],
                 ['state', '=', 'assigned'],
             ]],
             {'fields': ['id', 'name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'vit_trxid', 'move_ids_without_package']}
@@ -1603,183 +1690,197 @@ class DataTransaksiMCtoSS:
                         # self.set_log_ss.create_log_note_failed(rec, 'GRPO', message_exception, write_date)
                         # self.set_log_mc.create_log_note_failed(rec, 'GRPO', message_exception, write_date)
 
-    def transfer_internal_transfers(self, model_name, fields, description, date_from, date_to):
+    def transfer_internal_transfers_mc_to_ss(self, model_name, fields, description, date_from, date_to):
         try:
             # Ambil data dari sumber
-            transaksi_internal_transfers = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                            self.source_client.uid, self.source_client.password,
-                                                            model_name, 'search_read',
-                                                            [[['picking_type_id.name', '=', 'Internal Transfers'], ['is_integrated', '=', False], ['state', '=', 'done'], ['create_date', '>=', date_from], ['create_date', '<=', date_to]]],
-                                                            {'fields': fields})
+            Ts_Out_data_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                self.source_client.uid, self.source_client.password,
+                                                                model_name, 'search_read',
+                                                                [[['picking_type_id.name', '=', 'Internal Transfers'], 
+                                                                ['is_integrated', '=', False], 
+                                                                ['state', '=', 'done'], 
+                                                                ['create_date', '>=', date_from], 
+                                                                ['create_date', '<=', date_to]]],
+                                                                {'fields': fields})
 
-            if not transaksi_internal_transfers:
+            if not Ts_Out_data_source:
                 print("Semua transaksi telah diproses.")
                 return
-            
-            location_ids = [record.get('location_id')[0] if isinstance(record.get('location_id'), list) else record.get('location_id') for record in transaksi_internal_transfers]
-            location_dest_id = [record.get('location_dest_id')[0] if isinstance(record.get('location_dest_id'), list) else record.get('location_dest_id') for record in transaksi_internal_transfers]
-            picking_type_ids = [record.get('picking_type_id')[0] if isinstance(record.get('picking_type_id'), list) else record.get('picking_type_id') for record in transaksi_internal_transfers]
 
+            # Prepare data for processing
+            target_location_ids = [record.get('target_location')[0] if isinstance(record.get('target_location'), list) else record.get('target_location') for record in Ts_Out_data_source]
+            location_ids = [str(record.get('location_id')[0]) if isinstance(record.get('location_id'), list) else str(record.get('location_id')) for record in Ts_Out_data_source]
+            location_dest_id = [str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')) for record in Ts_Out_data_source]
 
+            # Fetch locations from Server A
             location_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_ids]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
-            location_source_dict = {location['id']: location['id'] for location in location_source}
+                                                            self.target_client.uid, self.target_client.password,
+                                                            'stock.location', 'search_read',
+                                                            [[['id_mc', 'in', location_ids]]],
+                                                            {'fields': ['id', 'id_mc', 'complete_name'], 'limit': 1})
+            location_source_dict = {location['id_mc']: location['id'] for location in location_source}
 
+            # Fetch destination locations from Server B
             location_dest_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'stock.location', 'search_read',
                                                                 [[['id_mc', 'in', location_dest_id]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
-            location_dest_source_dict = {location_dest['id']: location_dest['id'] for location_dest in location_dest_source}
+                                                                {'fields': ['id', 'id_mc', 'complete_name'], 'limit': 1})
+            location_dest_source_dict = {location_dest['id_mc']: location_dest['id'] for location_dest in location_dest_source}
 
-            picking_type_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                    self.target_client.uid, self.target_client.password,
-                                                                    'stock.picking.type', 'search_read',
-                                                                    [[['id_mc', 'in', picking_type_ids]]],
-                                                                    {'fields': ['id', 'id_mc'] , 'limit': 1})
-            picking_type_source_dict = {type['id_mc']: type['id'] for type in picking_type_source}
-
-            picking_ids = [record['id'] for record in transaksi_internal_transfers]
+            # Fetch internal transfers inventory lines
+            picking_ids = [record['id'] for record in Ts_Out_data_source]
             internal_transfers_inventory_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                                        self.source_client.uid, self.source_client.password,
-                                                                        'stock.move', 'search_read',
-                                                                        [[['picking_id', 'in', picking_ids]]],
-                                                                        {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
-            
-            existing_internal_transfers_dict = {}
-            for record in transaksi_internal_transfers:
-                existing_it = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                            self.target_client.uid, self.target_client.password,
-                                                            'stock.picking', 'search_read',
-                                                            [[['vit_trxid', '=', record.get('name')]]],
-                                                            {'fields': ['id'], 'limit': 1})
-                if existing_it:
-                    existing_internal_transfers_dict[record['id']] = existing_it[0]['id']
-
-            internal_transfer_lines_dict = {}
-            for line in internal_transfers_inventory_lines:
-                if 'picking_id' in line:
-                    picking_id = line['picking_id'][0]
-                    if picking_id not in internal_transfer_lines_dict:
-                        internal_transfer_lines_dict[picking_id] = []
-                    internal_transfer_lines_dict[picking_id].append(line)
+                                                                                self.source_client.uid, self.source_client.password,
+                                                                                'stock.move', 'search_read',
+                                                                                [[['picking_id', 'in', picking_ids]]],
+                                                                                {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
 
             product_ids = [line['product_id'][0] for line in internal_transfers_inventory_lines if line.get('product_id')]
+            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'name', 'taxes_id', 'default_code']})
-            product_source_dict = {product['id']: product for product in product_source}
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'product.product', 'search_read',
+                                                            [[['id', 'in', product_ids]]],
+                                                            {'fields': ['id', 'product_tmpl_id', 'default_code']})
 
-            # Pre-fetch products in target by default_code
-            default_codes = [product['default_code'] for product in product_source if product.get('default_code')]
-            target_products_by_code = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'product.product', 'search_read',
-                                                                [[['default_code', 'in', default_codes], ['active', '=', True]]],
-                                                                {'fields': ['id', 'default_code']})
-            target_products_by_code_dict = {product['default_code']: product['id'] for product in target_products_by_code}
+            # Step 2: Create a dictionary to map product_id to default_code
+            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
 
-            new_internal_transfer_ids = []
-            def proces_internal_transfer_record_from_mc(record):
-                if record['id'] in existing_internal_transfers_dict:
-                    return
-        
-                internal_transfers_inventory_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                                        self.source_client.uid, self.source_client.password,
-                                                                        'stock.move', 'search_read',
-                                                                        [[['picking_id', '=', record['id']]]],
-                                                                        {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
-                
-                location_id = location_source_dict.get(record.get('location_id')[0] if isinstance(record.get('location_id'), list) else record.get('location_id'))
-                location_dest_id = location_dest_source_dict.get(record.get('location_dest_id')[0] if isinstance(record.get('location_dest_id'), list) else record.get('location_dest_id'))
-                picking_type_id = picking_type_source_dict.get(record.get('picking_type_id')[0] if isinstance(record.get('picking_type_id'), list) else record.get('picking_type_id'))
-                
-                if location_id is None or location_dest_id is None or picking_type_id is None:
-                    print(f"Data tidak lengkap untuk transaksi dengan ID {record.get('id')}. Tidak membuat dokumen.")
-                    return
-                
-                missing_products = []
-                internal_transfers_inventory_line_ids = []
-                for line in internal_transfers_inventory_lines:    
-                    product_id_info = line.get('product_id')
-                    if product_id_info:
-                        product_id = product_id_info[0]  # Get the id part
-                        product = product_source_dict.get(product_id)
-                        if product:
-                            default_code = product.get('default_code')
-                            product_target_id = None
-                            if default_code:
-                                product_target_id = target_products_by_code_dict.get(default_code)
+            # Step 3: Create a mapping from default_code to product_tmpl_id
+            default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
-                            if not product_target_id:
-                                missing_products.append(product['name'])
+            # Step 4: Fetch product.template data from target_client using default_code
+            product_template_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                            self.target_client.uid, self.target_client.password,
+                                                                            'product.template', 'search_read',
+                                                                            [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
+                                                                            {'fields': ['id', 'default_code']})
 
-                        internal_transfers_inventory_line_data = {
-                            'product_id': int(product_target_id),
+            # Step 5: Create a mapping from default_code to id in target_client
+            default_code_to_target_id = {template['default_code']: template['id'] for template in product_template_target_source}
+
+            # Process each record for Goods Issue
+            for record in Ts_Out_data_source:
+                try:
+                    # Create Goods Issue on Server A
+                    location_id = location_source_dict.get(str(record.get('location_id')[0]) if isinstance(record.get('location_id'), list) else str(record.get('location_id')))
+                    if not location_id:
+                        print(f"Missing location_id for record ID {record['id']}. Skipping.")
+                        continue
+
+                    tsout_transfer_inventory_line_ids = []
+                    tsout_transfer_inventory_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                                self.source_client.uid, self.source_client.password,
+                                                                                'stock.move', 'search_read',
+                                                                                [[['picking_id', '=', record['id']]]],
+                                                                                {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
+
+                    missing_products = []
+                    should_skip_create = False
+                    for line in tsout_transfer_inventory_lines:
+                        source_product_code = product_source_dict.get(line.get('product_id')[0])
+                        # Step 7: Get the target product ID using the default_code mapping
+                        target_product_template_id = default_code_to_target_id.get(source_product_code)
+
+                        if not target_product_template_id:
+                            missing_products.append(source_product_code)
+                            should_skip_create = True
+                            continue
+
+                        tsout_transfer_inventory_line_data = {
+                            'product_id': int(target_product_template_id),
                             'product_uom_qty': line.get('product_uom_qty'),
                             'name': line.get('name'),
                             'quantity': line.get('quantity'),
-                            'location_dest_id': int(location_dest_id),
+                            'location_dest_id': 5,  # Assuming this is the correct destination for Goods Issue
                             'location_id': int(location_id)
                         }
-                        internal_transfers_inventory_line_ids.append((0, 0, internal_transfers_inventory_line_data))
+                        tsout_transfer_inventory_line_ids.append((0, 0, tsout_transfer_inventory_line_data))
 
-                    if missing_products:
-                        missing_products_str = ", ".join(missing_products)
-                        message = f"Terdapat produk tidak aktif dalam Internal Transfers: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Internal Transfers', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Internal Transfers', message, write_date)
+                    tsout_transfer_data = {
+                        'scheduled_date': record.get('scheduled_date', False),
+                        'date_done': record.get('date_done', False),
+                        'location_id': int(location_id),
+                        'location_dest_id': 5,  # Destination for Goods Issue
+                        'picking_type_id': self.get_picking_type_id('Goods Issue'),  # Implement this method to get the picking type ID
+                        'is_integrated': True,
+                        'vit_trxid': record.get('name', False),
+                        'move_ids_without_package': tsout_transfer_inventory_line_ids,
+                    }
 
-                internal_transfer_data = {
-                    # 'name': record.get('name', False) + ' - ' + datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d %H:%M:%S"),
-                    # 'partner_id': customer_target_id,
-                    'scheduled_date': record.get('scheduled_date', False),
-                    'date_done': record.get('date_done', False),
-                    'vit_trxid': record.get('name', False),
-                    'is_integrated': True,
-                    'location_id': int(location_id),
-                    'location_dest_id': int(location_dest_id),
-                    'picking_type_id': picking_type_id,
-                    'move_ids_without_package': internal_transfers_inventory_line_ids,
-                }
-
-                try:
-                    new_internal_transfers = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                    self.target_client.uid, self.target_client.password,
-                                                                    'stock.picking', 'create',
-                                                                    [internal_transfer_data])
-                    print(f"Internal Transfers baru telah dibuat dengan ID: {new_internal_transfers}")
-
-                    start_time = time.time()
-                    self.source_client.call_odoo(
-                        'object', 'execute_kw', self.source_client.db,
-                        self.source_client.uid, self.source_client.password,
-                        'stock.picking', 'write',
-                        [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]
-                    )
-                    end_time = time.time()
-                    duration = end_time - start_time
-
-                    write_date = self.get_write_date(model_name, record['id'])
-                    self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Internal Transfers', write_date)
-                    self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Internal Transfers', write_date)
+                    new_tsout_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'stock.picking', 'create',
+                                                                [tsout_transfer_data])
+                    
+                    print(f"Internal Transfers baru telah dibuat di target dengan ID: {new_tsout_id}")
+                    
                 except Exception as e:
-                    message_exception = f"Gagal membuat atau memposting Goods Receipt baru: {e}"
-                    self.set_log_ss.create_log_note_failed(record, 'Internal Transfer', message_exception, write_date)
-                    self.set_log_mc.create_log_note_failed(record, 'Internal Transfer', message_exception, write_date)
+                    print(f"Gagal membuat Internal Transfers untuk record ID {record['id']}: {e}")
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                futures = [executor.submit([proces_internal_transfer_record_from_mc], record) for record in transaksi_internal_transfers]
-                concurrent.futures.wait(futures)
+            # Now process each record for Goods Receipts on Server B
+            for record in Ts_Out_data_source:
+                try:
+                    # Create Goods Receipts on Server B
+                    location_dest_id = location_dest_source_dict.get(str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')))
+                    if not location_dest_id:
+                        print(f"Missing location_dest_id for record ID {record['id']}. Skipping.")
+                        continue
+
+                    tsin_transfer_inventory_line_ids = []
+                    tsin_transfer_inventory_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                                self.source_client.uid, self.source_client.password,
+                                                                                'stock.move', 'search_read',
+                                                                                [[['picking_id', '=', record['id']]]],
+                                                                                {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
+
+                    missing_products = []
+                    for line in tsin_transfer_inventory_lines:
+                        source_product_code = product_source_dict.get(line.get('product_id')[0])
+                        # Step 7: Get the target product ID using the default_code mapping
+                        target_product_template_id = default_code_to_target_id.get(source_product_code)
+
+                        if not target_product_template_id:
+                            missing_products.append(source_product_code)
+                            continue
+
+                        tsin_transfer_inventory_line_data = {
+                            'product_id': int(target_product_template_id),
+                            'product_uom_qty': line.get('product_uom_qty'),
+                            'name': line.get('name'),
+                            'quantity': line.get('quantity'),
+                            'location_dest_id': int(location_dest_id),  # Destination for Goods Receipts
+                            'location_id': 4,  # Assuming this is the correct source for Goods Receipts
+                        }
+                        tsin_transfer_inventory_line_ids.append((0, 0, tsin_transfer_inventory_line_data))
+
+                    ts_in_transfer_data = {
+                        'scheduled_date': record.get('scheduled_date', False),
+                        'date_done': record.get('date_done', False),
+                        'location_id': 4,  # Assuming this is the correct source for Goods Receipts
+                        'location_dest_id': int(location_dest_id),
+                        'origin': record.get('name', False),
+                        'picking_type_id': self.get_picking_type_id('Goods Receipts'),  # Implement this method to get the picking type ID
+                        'move_ids_without_package': tsin_transfer_inventory_line_ids,
+                    }
+
+                    new_ts_in_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'stock.picking', 'create',
+                                                                [ts_in_transfer_data])
+                    print(f"Internal Transfers baru telah dibuat di target dengan ID: {new_ts_in_id}")
+
+                    self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                self.source_client.uid, self.source_client.password,
+                                                model_name, 'write', [[record['id']], {'is_integrated': True}])
+                    print(f"Record ID {record['id']} berhasil diperbarui sebagai is_integrated = True di source.")
+
+                except Exception as e:
+                    print(f"Gagal membuat Internal Transfers untuk record ID {record['id']}: {e}")
+
         except Exception as e:
-            print(f"Gagal membuat atau memposting Internal Transfer di Source baru: {e}")
+            print(f"Gagal memproses Internal Transfers: {e}")
 
     def transfer_goods_receipt(self, model_name, fields, description, date_from, date_to):
         try:
@@ -1795,23 +1896,26 @@ class DataTransaksiMCtoSS:
                 return
             
             location_ids = [str(record.get('location_id')[0]) if isinstance(record.get('location_id'), list) else str(record.get('location_id')) for record in transaksi_goods_receipt]
-            location_dest_id = [str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')) for record in transaksi_goods_receipt]
+            location_dest_ids = [str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')) for record in transaksi_goods_receipt]
             picking_type_ids = [str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')) for record in transaksi_goods_receipt]
 
 
             location_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_ids]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
+                                              self.target_client.uid, self.target_client.password,
+                                              'stock.location', 'search_read',
+                                              [[['id_mc', 'in', location_ids]]],
+                                              {'fields': ['id', 'id_mc', 'complete_name']})
             location_source_dict = {location['id_mc']: location['id'] for location in location_source}
+            print("Location Source Dict:", location_source_dict)
 
+            # Ambil data location_dest dari target_client
             location_dest_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_dest_id]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
+                                                                [[['id_mc', 'in', location_dest_ids]]],
+                                                                {'fields': ['id', 'id_mc', 'complete_name']})
             location_dest_source_dict = {location_dest['id_mc']: location_dest['id'] for location_dest in location_dest_source}
+            print("Location Dest Source Dict:", location_dest_source_dict)
 
             picking_type_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
@@ -1846,23 +1950,32 @@ class DataTransaksiMCtoSS:
                     goods_receipts_lines_dict[picking_id].append(line)
 
             product_ids = [line['product_id'][0] for line in goods_receipt_inventory_lines if line.get('product_id')]
+            print(product_ids)
+            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'name', 'taxes_id', 'default_code']})
-            product_source_dict = {product['id']: product for product in product_source}
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'product.product', 'search_read',
+                                                            [[['id', 'in', product_ids]]],
+                                                            {'fields': ['id', 'product_tmpl_id', 'default_code']})
+            print(product_source)
+            # Step 2: Create a dictionary to map product_id to default_code
+            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
+            print(product_source_dict)
+            # Step 3: Create a mapping from default_code to product_tmpl_id
+            default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
-
-            # Pre-fetch products in target by default_code
-            default_codes = [product['default_code'] for product in product_source if product.get('default_code')]
-            target_products_by_code = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+            # Step 4: Fetch product.template data from target_client using default_code
+            # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
+            product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'product.product', 'search_read',
-                                                                [[['default_code', 'in', default_codes], ['active', '=', True]]],
+                                                                [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
                                                                 {'fields': ['id', 'default_code']})
-            target_products_by_code_dict = {product['default_code']: product['id'] for product in target_products_by_code}
-            
+
+            # Step 5 (baru): Mapping dari default_code ke product.product.id
+            default_code_to_target_product_id = {product['default_code']: product['id'] for product in product_target_source}
+
+            # print(default_code_to_target_id)
             new_goods_receipts_ids = []
             def proces_goods_receipts_record_from_mc(record):
                 if record['id'] in existing_goods_receipts_dict:
@@ -1881,42 +1994,39 @@ class DataTransaksiMCtoSS:
                 picking_type_id = picking_type_source_dict.get(str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')))
                 
                 if location_id is None or location_dest_id is None or picking_type_id is None:
-                    print(f"Data tidak lengkap untuk transaksi dengan ID {record.get('id')}. Tidak membuat dokumen.")
+                    # print(f"Data tidak lengkap untuk transaksi dengan ID {record.get('id')}. Tidak membuat dokumen.")
                     return
 
                 missing_products = []
                 goods_receipt_inventory_line_ids = []
+                should_skip_create = False
                 for line in goods_receipt_inventory_lines:
-                    product_id_info = line.get('product_id')
-                    if product_id_info:
-                        product_id = product_id_info[0]  # Get the id part
-                        product = product_source_dict.get(product_id)
-                        if product:
-                            default_code = product.get('default_code')
-                            product_target_id = None
-                            if default_code:
-                                product_target_id = target_products_by_code_dict.get(default_code)
-                                print(product_target_id)
-                            if not product_target_id:
-                                missing_products.append(product['name'])
+                    source_product_code = product_source_dict.get(line.get('product_id')[0])
+                    print(source_product_code)
+                    # Step 7: Get the target product ID using the default_code mapping
+                    target_product_id = default_code_to_target_product_id.get(source_product_code)
+                    if not target_product_id:
+                        missing_products.append(source_product_code)
+                        should_skip_create = True
+                        continue
 
-                        goods_receipt_inventory_line_data = {
-                            'product_id': product_target_id,
-                            'product_uom_qty': line.get('product_uom_qty'),
-                            'name': line.get('name'),
-                            'quantity': line.get('quantity'),
-                            'location_dest_id': int(location_id),
-                            'location_id': int(location_dest_id)
-                        }
-                        goods_receipt_inventory_line_ids.append((0, 0, goods_receipt_inventory_line_data))
-
-                    if missing_products:
-                        missing_products_str = ", ".join(missing_products)
-                        message = f"Terdapat produk tidak aktif dalam Goods Receipt: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Goods Receipts', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Goods Receipts', message, write_date)
+                    goods_receipt_inventory_line_data = {
+                        'product_id': int(target_product_id),  # perbaikan di sini
+                        'product_uom_qty': line.get('product_uom_qty'),
+                        'name': line.get('name'),
+                        'quantity': line.get('quantity'),
+                        'location_dest_id': int(location_id),
+                        'location_id': int(location_dest_id)
+                    }
+                    goods_receipt_inventory_line_ids.append((0, 0, goods_receipt_inventory_line_data))
+                    # print(goods_receipt_inventory_line_ids)
+                if should_skip_create:
+                    missing_products_str = ", ".join(missing_products)
+                    message = f"Terdapat produk tidak aktif dalam Goods Receipt: {missing_products_str}"
+                    print(message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Goods Receipts', message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Goods Receipts', message, write_date)
 
                 goods_receipts_transfer_data = {
                     # 'name': record.get('name', False) + ' - ' + datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d %H:%M:%S"),
@@ -1931,7 +2041,6 @@ class DataTransaksiMCtoSS:
                     'picking_type_id': int(picking_type_id),
                     'move_ids_without_package': goods_receipt_inventory_line_ids,
                 }
-
                 try:
                     new_gr_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
@@ -1976,24 +2085,27 @@ class DataTransaksiMCtoSS:
                 print("Semua transaksi telah diproses.")
                 return
 
-            location_ids = [record.get('location_id')[0] if isinstance(record.get('location_id'), list) else record.get('location_id') for record in transaksi_receipt]
-            location_dest_id = [record.get('location_dest_id')[0] if isinstance(record.get('location_dest_id'), list) else record.get('location_dest_id') for record in transaksi_receipt]
-            picking_type_ids = [record.get('picking_type_id')[0] if isinstance(record.get('picking_type_id'), list) else record.get('picking_type_id') for record in transaksi_receipt]
+            location_ids = [str(record.get('location_id')[0]) if isinstance(record.get('location_id'), list) else str(record.get('location_id')) for record in transaksi_goods_receipt]
+            location_dest_ids = [str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')) for record in transaksi_goods_receipt]
+            picking_type_ids = [str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')) for record in transaksi_goods_receipt]
 
 
             location_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_ids]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
-            location_source_dict = {location['id']: location['id'] for location in location_source}
+                                              self.target_client.uid, self.target_client.password,
+                                              'stock.location', 'search_read',
+                                              [[['id_mc', 'in', location_ids]]],
+                                              {'fields': ['id', 'id_mc', 'complete_name']})
+            location_source_dict = {location['id_mc']: location['id'] for location in location_source}
+            print("Location Source Dict:", location_source_dict)
 
+            # Ambil data location_dest dari target_client
             location_dest_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_dest_id]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
-            location_dest_source_dict = {location_dest['id']: location_dest['id'] for location_dest in location_dest_source}
+                                                                [[['id_mc', 'in', location_dest_ids]]],
+                                                                {'fields': ['id', 'id_mc', 'complete_name']})
+            location_dest_source_dict = {location_dest['id_mc']: location_dest['id'] for location_dest in location_dest_source}
+            print("Location Dest Source Dict:", location_dest_source_dict)
 
             picking_type_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
@@ -2029,21 +2141,30 @@ class DataTransaksiMCtoSS:
                     grpo_lines_dict[picking_id].append(line)
 
             product_ids = [line['product_id'][0] for line in receipt_inventory_lines if line.get('product_id')]
+            # Step 1: Fetch product.product data from source_client using product_ids
+            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'name', 'taxes_id', 'default_code']})
-            product_source_dict = {product['id']: product for product in product_source}
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'product.product', 'search_read',
+                                                            [[['id', 'in', product_ids]]],
+                                                            {'fields': ['id', 'product_tmpl_id', 'default_code']})
+            print(product_source)
+            # Step 2: Create a dictionary to map product_id to default_code
+            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
+            print(product_source_dict)
+            # Step 3: Create a mapping from default_code to product_tmpl_id
+            default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
-            # Pre-fetch products in target by default_code
-            default_codes = [product['default_code'] for product in product_source if product.get('default_code')]
-            target_products_by_code = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+            # Step 4: Fetch product.template data from target_client using default_code
+            # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
+            product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'product.product', 'search_read',
-                                                                [[['default_code', 'in', default_codes], ['active', '=', True]]],
+                                                                [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
                                                                 {'fields': ['id', 'default_code']})
-            target_products_by_code_dict = {product['default_code']: product['id'] for product in target_products_by_code}
+
+            # Step 5 (baru): Mapping dari default_code ke product.product.id
+            default_code_to_target_product_id = {product['default_code']: product['id'] for product in product_target_source}
             
             new_grpo_ids = []
             def proces_receipts_record_from_mc(record):
@@ -2065,22 +2186,19 @@ class DataTransaksiMCtoSS:
                 
                 missing_products = []
                 receipt_inventory_line_ids = []
+                should_skip_create = False
                 for line in receipt_inventory_lines:
-                    product_id_info = line.get('product_id')
-                    if product_id_info:
-                        product_id = product_id_info[0]  # Get the id part
-                        product = product_source_dict.get(product_id)
-                        if product:
-                            default_code = product.get('default_code')
-                            product_target_id = None
-                            if default_code:
-                                product_target_id = target_products_by_code_dict.get(default_code)
+                    source_product_code = product_source_dict.get(line.get('product_id')[0])
 
-                            if not product_target_id:
-                                missing_products.append(product['name'])
+                    # Step 7: Get the target product ID using the default_code mapping
+                    target_product_id = default_code_to_target_product_id.get(source_product_code)
+                    if not target_product_id:
+                        missing_products.append(source_product_code)
+                        should_skip_create = True
+                        continue
 
                     receipt_inventory_line_data = {
-                        'product_id': int(product_target_id),
+                        'product_id': int(target_product_id),
                         'product_uom_qty': line.get('product_uom_qty'),
                         'name': line.get('name'),
                         'quantity': line.get('quantity'),
@@ -2089,13 +2207,13 @@ class DataTransaksiMCtoSS:
                     }
                     receipt_inventory_line_ids.append((0, 0, receipt_inventory_line_data))
 
-                    if missing_products:
-                        missing_products_str = ", ".join(missing_products)
-                        message = f"Terdapat produk tidak aktif dalam Receipt: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Receipts', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Receipts', message, write_date)
+                if should_skip_create:
+                    missing_products_str = ", ".join(missing_products)
+                    message = f"Terdapat produk tidak aktif dalam Receipt: {missing_products_str}"
+                    print(message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Receipts', message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Receipts', message, write_date)
 
                 receipt_transfer_data = {
                     # 'name': record.get('name', False) + ' - ' + datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d %H:%M:%S"),
@@ -2155,24 +2273,27 @@ class DataTransaksiMCtoSS:
                 print("Semua transaksi telah diproses.")
                 return
             
-            location_ids = [str(record.get('location_id')[0]) if isinstance(record.get('location_id'), list) else str(record.get('location_id')) for record in transaksi_goods_issue]
-            location_dest_id = [str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')) for record in transaksi_goods_issue]
-            picking_type_ids = [str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')) for record in transaksi_goods_issue]
+            location_ids = [str(record.get('location_id')[0]) if isinstance(record.get('location_id'), list) else str(record.get('location_id')) for record in transaksi_goods_receipt]
+            location_dest_ids = [str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')) for record in transaksi_goods_receipt]
+            picking_type_ids = [str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')) for record in transaksi_goods_receipt]
 
 
             location_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_ids]]],
-                                                                {'fields': ['id', 'id_mc', 'complete_name'] , 'limit': 1})
+                                              self.target_client.uid, self.target_client.password,
+                                              'stock.location', 'search_read',
+                                              [[['id_mc', 'in', location_ids]]],
+                                              {'fields': ['id', 'id_mc', 'complete_name']})
             location_source_dict = {location['id_mc']: location['id'] for location in location_source}
+            print("Location Source Dict:", location_source_dict)
 
+            # Ambil data location_dest dari target_client
             location_dest_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'stock.location', 'search_read',
-                                                                [[['id_mc', 'in', location_dest_id]]],
-                                                                {'fields': ['id', 'id_mc', 'complete_name'] , 'limit': 1})
+                                                                [[['id_mc', 'in', location_dest_ids]]],
+                                                                {'fields': ['id', 'id_mc', 'complete_name']})
             location_dest_source_dict = {location_dest['id_mc']: location_dest['id'] for location_dest in location_dest_source}
+            print("Location Dest Source Dict:", location_dest_source_dict)
 
             picking_type_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
@@ -2211,21 +2332,30 @@ class DataTransaksiMCtoSS:
 
             # Pre-fetch product and tax data
             product_ids = [line['product_id'][0] for line in goods_issue_inventory_lines if line.get('product_id')]
+            print(product_ids)
+            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'name', 'taxes_id', 'default_code']})
-            product_source_dict = {product['id']: product for product in product_source}
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'product.product', 'search_read',
+                                                            [[['id', 'in', product_ids]]],
+                                                            {'fields': ['id', 'product_tmpl_id', 'default_code']})
+            print(product_source)
+            # Step 2: Create a dictionary to map product_id to default_code
+            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
+            print(product_source_dict)
+            # Step 3: Create a mapping from default_code to product_tmpl_id
+            default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
-            # Pre-fetch products in target by default_code
-            default_codes = [product['default_code'] for product in product_source if product.get('default_code')]
-            target_products_by_code = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+            # Step 4: Fetch product.template data from target_client using default_code
+            # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
+            product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'product.product', 'search_read',
-                                                                [[['default_code', 'in', default_codes], ['active', '=', True]]],
+                                                                [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
                                                                 {'fields': ['id', 'default_code']})
-            target_products_by_code_dict = {product['default_code']: product['id'] for product in target_products_by_code}
+
+            # Step 5 (baru): Mapping dari default_code ke product.product.id
+            default_code_to_target_product_id = {product['default_code']: product['id'] for product in product_target_source}
 
             new_goods_issue_ids = []
             def proces_goods_issue_record_from_mc(record):
@@ -2248,22 +2378,20 @@ class DataTransaksiMCtoSS:
                 
                 missing_products = []
                 goods_issue_inventory_line_ids = []
+                should_skip_create = False
                 for line in goods_issue_inventory_lines:
-                    product_id_info = line.get('product_id')
-                    if product_id_info:
-                        product_id = product_id_info[0]  # Get the id part
-                        product = product_source_dict.get(product_id)
-                        if product:
-                            default_code = product.get('default_code')
-                            product_target_id = None
-                            if default_code:
-                                product_target_id = target_products_by_code_dict.get(default_code)
+                    source_product_code = product_source_dict.get(line.get('product_id')[0])
 
-                            if not product_target_id:
-                                missing_products.append(product['name'])
+                    # Step 7: Get the target product ID using the default_code mapping
+                    target_product_id = default_code_to_target_product_id.get(source_product_code)
+
+                    if not target_product_id:
+                        missing_products.append(source_product_code)
+                        should_skip_create = True
+                        continue
 
                     goods_issue_inventory_line_data = {
-                        'product_id': product_target_id,
+                        'product_id': int(target_product_id),
                         'product_uom_qty': line.get('product_uom_qty'),
                         'name': line.get('name'),
                         'quantity': line.get('quantity'),
@@ -2272,14 +2400,14 @@ class DataTransaksiMCtoSS:
                     }
                     goods_issue_inventory_line_ids.append((0, 0, goods_issue_inventory_line_data))
 
-                    if missing_products:
-                        missing_products_str = ", ".join(missing_products)
-                        message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Goods Issue', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Goods Issue', message, write_date)
-                        return
+                if should_skip_create:
+                    missing_products_str = ", ".join(missing_products)
+                    message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
+                    print(message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Goods Issue', message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Goods Issue', message, write_date)
+                    return
 
                 goods_issue_transfer_data = {
                     # 'name': record.get('name', False) + ' - ' + datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d %H:%M:%S"),
@@ -2435,30 +2563,54 @@ class DataTransaksiMCtoSS:
 
             # Pre-fetch product and tax data
             product_ids = [line['product_id'][0] for line in purchase_order_lines if line.get('product_id')]
+            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'name', 'taxes_id', 'default_code']})
-            product_source_dict = {product['id']: product for product in product_source}
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'product.product', 'search_read',
+                                                            [[['id', 'in', product_ids]]],
+                                                            {'fields': ['id', 'product_tmpl_id', 'default_code']})
+            print(product_source)
+            # Step 2: Create a dictionary to map product_id to default_code
+            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
+            print(product_source_dict)
+            # Step 3: Create a mapping from default_code to product_tmpl_id
+            default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
-            # Pre-fetch products in target by default_code
-            default_codes = [product['default_code'] for product in product_source if product.get('default_code')]
-            target_products_by_code = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+            # Step 4: Fetch product.template data from target_client using default_code
+            # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
+            product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'product.product', 'search_read',
-                                                                [[['default_code', 'in', default_codes], ['active', '=', True]]],
+                                                                [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
                                                                 {'fields': ['id', 'default_code']})
-            target_products_by_code_dict = {product['default_code']: product['id'] for product in target_products_by_code}
+
+            # Step 5 (baru): Mapping dari default_code ke product.product.id
+            default_code_to_target_product_id = {product['default_code']: product['id'] for product in product_target_source}
             
-            # print(product_template_source_dict)
-            tax_ids = [tax_id for product in product_source for tax_id in product.get('taxes_id', [])]
-            source_taxes = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                        self.target_client.uid, self.target_client.password,
+            all_tax_ids = set()
+            for line in purchase_order_lines:
+                all_tax_ids.update(line.get('taxes_id', []))
+
+            # Create a mapping for tax IDs from source to target
+            tax_id_mapping = {}
+            for tax_id in all_tax_ids:
+                # Fetch the tax from source_client
+                tax_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                        self.source_client.uid, self.source_client.password,
                                                         'account.tax', 'search_read',
-                                                        [[['id_mc', 'in', tax_ids]]],
-                                                        {'fields': ['id', 'id_mc']})
-            source_taxes_dict = {tax['id']: tax['id_mc'] for tax in source_taxes}
+                                                        [[['id', '=', tax_id]]],
+                                                        {'fields': ['id']})
+                if tax_source:
+                    # Get the id_mc from source_client
+                    tax_id_mc = tax_source[0]['id']
+                    # Now fetch the corresponding id from target_client
+                    tax_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                            self.target_client.uid, self.target_client.password,
+                                                            'account.tax', 'search_read',
+                                                            [[['id_mc', '=', tax_id_mc]]],
+                                                            {'fields': ['id']})
+                    if tax_target:
+                        tax_id_mapping[tax_id] = tax_target[0]['id']
 
             def process_purchase_order_record(record):
                 if record['id'] in existing_purchase_order_dict:
@@ -2474,46 +2626,44 @@ class DataTransaksiMCtoSS:
                 
                 purchase_order_line_ids = []
                 missing_products = []
+                should_skip_create = False
                 total_tax = 0  # Initialize total tax
 
                 # Check if all products exist in the target database
                 for line in purchase_order_lines:
-                    product_id_info = line.get('product_id')
-                    if product_id_info:
-                        product_id = product_id_info[0]  # Get the id part
-                        product = product_source_dict.get(product_id)
-                        if product:
-                            default_code = product.get('default_code')
-                            product_target_id = None
-                            if default_code:
-                                product_target_id = target_products_by_code_dict.get(default_code)
+                    source_product_code = product_source_dict.get(line.get('product_id')[0])
 
-                            if not product_target_id:
-                                missing_products.append(product['name'])  # Append missing product name
+                    # Step 7: Get the target product ID using the default_code mapping
+                    target_product_id = default_code_to_target_product_id.get(source_product_code)
 
-                        product_uom = product_uom_source_dict.get(line.get('product_uom')[0] if isinstance(line.get('product_uom'), list) else line.get('product_uom'))
-                        tax_ids_mc = [source_taxes_dict.get(tax_id) for tax_id in line.get('taxes_id', []) if tax_id in source_taxes_dict]
+                    if not target_product_id:
+                        missing_products.append(source_product_code)
+                        should_skip_create = True
+                        continue  # Append missing product name
 
-                        purchase_order_line_data = {
-                            'product_id': product_target_id,
-                            'product_qty': line.get('product_qty'),
-                            'qty_received': line.get('qty_received'),
-                            'qty_invoiced': line.get('qty_invoiced'),
-                            # 'product_uom': product_uom,
-                            'price_unit': line.get('price_unit'),
-                            # 'taxes_id': [(6, 0, [int(tax_id) for tax_id in tax_ids_mc if tax_id is not None])],
-                        }
-                        purchase_order_line_ids.append((0, 0, purchase_order_line_data))
+                    tax_ids = line.get('taxes_id', [])
+                    target_tax_ids = [tax_id_mapping.get(tax_id) for tax_id in tax_ids if tax_id in tax_id_mapping]
 
-                    # Check for missing products after processing all lines
-                    if missing_products:
-                        missing_products_str = ", ".join(missing_products)
-                        message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Purchase Order', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Purchase Order', message, write_date)
-                        return
+                    purchase_order_line_data = {
+                        'product_id': int(target_product_id),
+                        'product_qty': line.get('product_qty'),
+                        'qty_received': line.get('qty_received'),
+                        'qty_invoiced': line.get('qty_invoiced'),
+                        # 'product_uom': product_uom,
+                        'price_unit': line.get('price_unit'),
+                        'taxes_id': [(6, 0, target_tax_ids)]
+                    }
+                    purchase_order_line_ids.append((0, 0, purchase_order_line_data))
+
+                # Check for missing products after processing all lines
+                if should_skip_create:
+                    missing_products_str = ", ".join(missing_products)
+                    message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
+                    print(message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Purchase Order', message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Purchase Order', message, write_date)
+                    return
 
                 purchase_order_data = {
                     'partner_id': int(partner_id),
@@ -2740,7 +2890,10 @@ class DataTransaksiMCtoSS:
                             self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Payment Method', write_date)
                             self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Payment Method', write_date)
                         except Exception as e:
-                            print(f"Gagal membuat atau memposting Payment Method baru: {e}")
+                            message_exception = f"Gagal memperbarui atau membuat Payment Method: {e}"
+                            write_date = self.get_write_date(model_name, record['id'])
+                            self.set_log_mc.create_log_note_failed(record, 'Payment Method', message_exception, write_date)    
+                            self.set_log_ss.create_log_note_failed(record, 'Payment Method', message_exception, write_date)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(process_payment_method_record_from_mc, record) for record in payment_method]
@@ -2824,6 +2977,7 @@ class DataTransaksiMCtoSS:
                                 'id_mc': record.get('id', False),
                                 'module_pos_hr': record.get('module_pos_hr', False)
                             }
+                            start_time = time.time()
 
                             # Create new POS Config in target client
                             new_pos_config = self.target_client.call_odoo(
@@ -2833,17 +2987,26 @@ class DataTransaksiMCtoSS:
                                 [pos_config_data]
                             )
                             print(f"PoS Config baru telah dibuat dengan ID: {new_pos_config}")
+                            end_time = time.time()
+                            duration = end_time - start_time
+
+                            write_date = self.get_write_date(model_name, record['id'])
+                            self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'TS Out/TS In', write_date)
+                            self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'TS Out/TS In', write_date)
 
                             # Fixed: Corrected the write method call - removed extra list nesting
                             self.source_client.call_odoo(
-                                'object', 'execute_kw', self.source_client.db,
-                                self.source_client.uid, self.source_client.password,
-                                'pos.config', 'write',
-                                [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]  # Fixed here
-                        )
+                                    'object', 'execute_kw', self.source_client.db,
+                                    self.source_client.uid, self.source_client.password,
+                                    'pos.config', 'write',
+                                    [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]  # Fixed here
+                            )
                         print(f"Record dengan ID {record['id']} tidak cocok dengan setting_config_id")
                 except Exception as e:
-                    print(f"Gagal memproses record dengan ID {record['id']}: {e}")
+                    message_exception = f"Gagal memperbarui atau membuat PoS Config: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'PoS Config', message_exception, write_date)    
+                    self.set_log_ss.create_log_note_failed(record, 'PoS Config', message_exception, write_date)
 
             # Process records in parallel
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
@@ -3034,6 +3197,8 @@ class DataTransaksiMCtoSS:
                             'profit_account_id': int(profit_account_id) if profit_account_id else None,
                             'loss_account_id': int(loss_account_id) if loss_account_id else None,
                         }
+
+                        start_time = time.time()
                         # Create new journal account
                         new_journal_id = self.target_client.call_odoo(
                             'object', 'execute_kw',
@@ -3051,8 +3216,17 @@ class DataTransaksiMCtoSS:
                             [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]
                         )
                         print(f"Journal baru telah dibuat dengan kode: {new_code} dan ID: {new_journal_id}")
+                        end_time = time.time()
+                        duration = end_time - start_time
+
+                        write_date = self.get_write_date(model_name, record['id'])
+                        self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Journal', write_date)
+                        self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Journal', write_date)
                 except Exception as e:
-                    print(f"Gagal memperbarui atau membuat Journal: {e}")
+                    message_exception = f"Gagal memperbarui atau membuat Journal: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Journal', message_exception, write_date)    
+                    self.set_log_ss.create_log_note_failed(record, 'Journal', message_exception, write_date)
 
             # Use ThreadPoolExecutor to process records concurrently
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
@@ -3164,7 +3338,10 @@ class DataTransaksiMCtoSS:
                             self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Chart of Account', write_date)
                             self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Chart of Account', write_date)
                 except Exception as e:
-                    print(f"Gagal memperbarui atau membuat Chart Account: {e}")
+                    message_exception = f"Gagal memperbarui atau membuat Chart Account: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Chart of Account', message_exception, write_date)    
+                    self.set_log_ss.create_log_note_failed(record, 'Chart of Account', message_exception, write_date)
 
             # Use ThreadPoolExecutor to process records concurrently
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:

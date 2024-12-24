@@ -9,11 +9,11 @@
               decoration-warning="state == 'in_progress'" 
               decoration-danger="state == 'closed'" 
               decoration-success="state == 'finished'">
-          <field name="doc_num"/> 
           <field name="cashier_id" string="Cashier"/>
           <field name="session_id" string="Session"/>
           <field name="start_date" string="Start Date"/>
           <field name="end_date" string="End Date"/>
+          <field name="is_integrated" string="Integrated"/>
           <field name="state" string="Status" widget="badge"/>
         </tree>
       </field>
@@ -46,7 +46,8 @@
                 <field name="cashier_id" readonly="state in ('finished')"/>   
                 <field name="session_id" readonly="state in ('finished')"/>    
                 <field name="start_date" readonly="state in ('finished')"/>    
-                <field name="end_date" readonly="state in ('finished')"/>                   
+                <field name="end_date" readonly="state in ('finished')"/> 
+                <field name="is_integrated" string="Integrated"/>                  
               </group>
             </group>
             <notebook>
