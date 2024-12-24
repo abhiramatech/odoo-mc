@@ -7,6 +7,7 @@ import pytz
 import re
 import decimal
 from .api_utils import check_authorization, paginate_records, serialize_response, serialize_error_response
+import base64
 
 class PaymentAPI(http.Controller):
     @http.route(['/api/payment_invoice/'], type='http', auth='public', methods=['GET'], csrf=False)
@@ -180,8 +181,8 @@ class PaymentReturnCreditMemoAPI(http.Controller):
                     ('origin', '=', order_pos.name)
                 ], limit=1)
 
-                location_id = picking.location_id.id if picking else False
-                location = picking.location_id.complete_name if picking else ''
+                location_id = picking.location_dest_id.id if picking else False
+                location = picking.location_dest_id.complete_name if picking else ''
 
                 # Get payment details
                 for payment_line in order_pos.payment_ids:
@@ -640,14 +641,13 @@ class MasterCustomerAPI(http.Controller):
                     is_integrated_bool = str(is_integrated).lower() == 'true'
                     domain += [('is_integrated', '=', is_integrated_bool)]
 
-
                 pageSize = int(pageSize) if pageSize else 200
 
-            if not q:  # Check if q is provided
-                customers_data, total_records = paginate_records('res.partner', domain, pageSize, page)
-            else:
-                customers_data = request.env['res.partner'].sudo().search(domain)
-                total_records = len(customers_data)
+                if not q:  # Check if q is provided
+                    customers_data, total_records = paginate_records('res.partner', domain, pageSize, page)
+                else:
+                    customers_data = request.env['res.partner'].sudo().search(domain)
+                    total_records = len(customers_data)
 
             data_master_customer = []
             jakarta_tz = pytz.timezone('Asia/Jakarta')
@@ -903,6 +903,8 @@ class MasterProductItemAPI(http.Controller):
                 create_date_utc = product.create_date
                 create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
                 pos_categ_ids = [{'id': pos_categ.id, 'name': pos_categ.name} for pos_categ in product.pos_categ_ids]
+                vendor_taxes_ids = [{'id': vendor_taxes.id, 'name': vendor_taxes.name} for vendor_taxes in product.supplier_taxes_id]
+                taxes_ids = [{'id': taxes.id, 'name': taxes.name} for taxes in product.taxes_id]
                 categ_id = [{'id': product.categ_id.id, 'name': product.categ_id.complete_name}]
 
                 product_data = {
@@ -920,9 +922,12 @@ class MasterProductItemAPI(http.Controller):
                     'categ_id': product.categ_id.id,
                     'categ': product.categ_id.complete_name,
                     'pos_categ_ids': pos_categ_ids,
+                    'taxes_id': taxes_ids,
+                    'supplier_taxes_id': vendor_taxes_ids,
                     # 'pos_categ_name': product.pos_categ_ids.name,
                     'create_date': str(create_date_jakarta),
-                    'is_integrated': product.is_integrated
+                    'is_integrated': product.is_integrated,
+                    # 'image_1920': base64.b64encode(product.image_1920).decode('utf-8') if product.image_1920 else None
                 }
                 data_master_product.append(product_data)
 
@@ -1419,6 +1424,276 @@ class POSOrder(http.Controller):
 
         except Exception as e:
             return serialize_error_response(str(e))
+
+class UnbuildOrder(http.Controller):
+    @http.route(['/api/unbuild_order/'], type='http', auth='public', methods=['GET'], csrf=False)
+    def get_unbuild_order(self, createdDateFrom=None, createdDateTo=None, pageSize=200, page=1, q=None, is_integrated=None,**params):
+        try:
+            check_authorization()
+
+            if int(page) == 0:
+                return serialize_response([], 0, 0)
+
+            date_format = '%Y-%m-%d'
+            domain = [('state', '=', 'done')]
+
+            if q:
+                domain += [('name', 'ilike', str(q), ('state', '=', 'done'))]
+
+            if createdDateFrom or createdDateTo:
+                created_date_from = fields.Date.from_string(createdDateFrom) if createdDateFrom else fields.Date.today()
+                created_date_to = fields.Date.from_string(createdDateTo) if createdDateTo else fields.Date.today()
+
+                domain += [('create_date', '>=', created_date_from.strftime(date_format)),
+                           ('create_date', '<=', created_date_to.strftime(date_format)),
+                           ('state', '=', 'done')]
+                
+            if is_integrated is not None:
+                is_integrated_bool = str(is_integrated).lower() == 'true'
+                domain += [('is_integrated', '=', is_integrated_bool)]
+
+            pageSize = int(pageSize) if pageSize else 200
+
+            unbuild_order, total_records = paginate_records('mrp.unbuild', domain, pageSize, page)
+
+            data_unbuild_order = []
+            jakarta_tz = pytz.timezone('Asia/Jakarta')
+            for order in unbuild_order:
+                create_date_utc = order.create_date
+                create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
+                order_data = {
+                    'id': order.id,
+                    'doc_num': order.name,
+                    'source_document': order.vit_trxid,
+                    'product_id': order.product_id.id,
+                    'product_code': order.product_id.default_code,
+                    'product_qty': order.product_qty,
+                    'bom_id': order.bom_id.id,
+                    'location_id': order.location_id.id,
+                    'location_name': order.location_id.complete_name,
+                    'location_dest_id': order.location_dest_id.id,
+                    'location_dest': order.location_dest_id.complete_name,
+                    'create_date': str(create_date_jakarta),
+                    'state': order.state,
+                    'is_integrated': order.is_integrated
+                }
+                data_unbuild_order.append(order_data)
+
+            total_pages = (total_records + pageSize - 1) // pageSize
+
+            return serialize_response(data_unbuild_order, total_records, total_pages)
+
+        except ValidationError as ve:
+            # If any required parameter is missing, return HTTP 500 error
+            error_response = {
+                'error': 'One or more required parameters are missing.',
+                'status': 500
+            }
+            return http.Response(json.dumps(error_response), content_type='application/json', status=500)
+
+        except Exception as e:
+            return serialize_error_response(str(e))
+
+    @http.route(['/api/unbuild_order_line/<int:order_id>'], type='http', auth='public', methods=['GET'], csrf=False)
+    def get_unbuild_order_lines(self, order_id, **params):
+        try:
+            check_authorization()
+
+            unbuild_order = request.env['mrp.unbuild'].sudo().browse(order_id)
+            if not unbuild_order:
+                raise werkzeug.exceptions.NotFound(_("Unbuild Order not found"))
+
+            unbuild_order_lines = unbuild_order.unbuild_line_ids
+            doc_num = unbuild_order.name,
+
+            jakarta_tz = pytz.timezone('Asia/Jakarta')
+            create_date_utc = unbuild_order.create_date
+            create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
+            created_date = str(create_date_jakarta)
+
+            data_unbuild_order_lines = []
+            for line_number, line in enumerate(unbuild_order_lines, start=1):
+                line_data = {
+                    'line_number': line_number,
+                    'id': line.id,
+                    'doc_no': doc_num,
+                    'product_id': line.product_id.id,
+                    'product_code': line.product_id.default_code,
+                    'location_id': line.location_id.id,
+                    'location': line.location_id.complete_name,
+                    'product_uom_qty': line.product_uom_qty,
+                }
+                data_unbuild_order_lines.append(line_data)
+
+            response_data = {
+                'status': 200,
+                'message': 'success',
+                'doc_num':  unbuild_order.name,
+                'source_document': unbuild_order.vit_trxid,
+                'product_id': unbuild_order.product_id.id,
+                'product_code': unbuild_order.product_id.default_code,
+                'product_qty': unbuild_order.product_qty,
+                'bom_id': unbuild_order.bom_id.id,
+                'location_id': unbuild_order.location_src_id.id,
+                'location_name': unbuild_order.location_src_id.complete_name,
+                'location_dest_id': unbuild_order.location_dest_id.id,
+                'location_dest': unbuild_order.location_dest_id.complete_name,
+                'picking_type_id': unbuild_order.picking_type_id.id,
+                'picking_type': unbuild_order.picking_type_id.name,
+                'create_date': str(create_date_jakarta),
+                'user_id': unbuild_order.user_id.id,
+                'user_name': unbuild_order.user_id.name,
+                'unbuild_lines': data_unbuild_order_lines
+            }
+            return werkzeug.wrappers.Response(
+                status=200,
+                content_type='application/json; charset=utf-8',
+                response=json.dumps(response_data)
+            )
+
+        except Exception as e:
+            return serialize_error_response(str(e))
+        
+class ManufactureOrder(http.Controller):
+    @http.route(['/api/manufacture_order/'], type='http', auth='public', methods=['GET'], csrf=False)
+    def get_manufacture_order(self, createdDateFrom=None, createdDateTo=None, pageSize=200, page=1, q=None, is_integrated=None,**params):
+        try:
+            check_authorization()
+
+            if int(page) == 0:
+                return serialize_response([], 0, 0)
+
+            date_format = '%Y-%m-%d'
+            domain = [('state', '=', 'done')]
+
+            if q:
+                domain += [('name', 'ilike', str(q), ('state', '=', 'done'))]
+
+            if createdDateFrom or createdDateTo:
+                created_date_from = fields.Date.from_string(createdDateFrom) if createdDateFrom else fields.Date.today()
+                created_date_to = fields.Date.from_string(createdDateTo) if createdDateTo else fields.Date.today()
+
+                domain += [('create_date', '>=', created_date_from.strftime(date_format)),
+                           ('create_date', '<=', created_date_to.strftime(date_format)),
+                           ('state', '=', 'done')]
+                
+            if is_integrated is not None:
+                is_integrated_bool = str(is_integrated).lower() == 'true'
+                domain += [('is_integrated', '=', is_integrated_bool)]
+
+            pageSize = int(pageSize) if pageSize else 200
+
+            manufacture_order, total_records = paginate_records('mrp.production', domain, pageSize, page)
+
+            data_manufacture_order = []
+            jakarta_tz = pytz.timezone('Asia/Jakarta')
+            for order in manufacture_order:
+                create_date_utc = order.create_date
+                create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
+                order_data = {
+                    'id': order.id,
+                    'doc_num': order.name,
+                    'source_document': order.vit_trxid,
+                    'product_id': order.product_id.id,
+                    'product_code': order.product_id.default_code,
+                    'product_qty': order.product_qty,
+                    'bom_id': order.bom_id.id,
+                    'location_id': order.location_src_id.id,
+                    'location_name': order.location_src_id.complete_name,
+                    'location_dest_id': order.location_dest_id.id,
+                    'location_dest': order.location_dest_id.complete_name,
+                    'picking_type_id': order.picking_type_id.id,
+                    'picking_type': order.picking_type_id.name,
+                    'create_date': str(create_date_jakarta),
+                    'date_start': str(order.date_start),
+                    'date_finished': str(order.date_finished),
+                    'user_id': order.user_id.id,
+                    'user_name': order.user_id.name,
+                    'state': order.state,
+                    'is_integrated': order.is_integrated
+                }
+                data_manufacture_order.append(order_data)
+
+            total_pages = (total_records + pageSize - 1) // pageSize
+
+            return serialize_response(data_manufacture_order, total_records, total_pages)
+
+        except ValidationError as ve:
+            # If any required parameter is missing, return HTTP 500 error
+            error_response = {
+                'error': 'One or more required parameters are missing.',
+                'status': 500
+            }
+            return http.Response(json.dumps(error_response), content_type='application/json', status=500)
+
+        except Exception as e:
+            return serialize_error_response(str(e))
+
+    @http.route(['/api/manufacture_order_line/<int:order_id>'], type='http', auth='public', methods=['GET'], csrf=False)
+    def get_manufacture_order_lines(self, order_id, **params):
+        try:
+            check_authorization()
+
+            manufacture_order = request.env['mrp.production'].sudo().browse(order_id)
+            if not manufacture_order:
+                raise werkzeug.exceptions.NotFound(_("Manufacture Order not found"))
+
+            manufacture_order_lines = manufacture_order.move_raw_ids
+            doc_num = manufacture_order.name,
+
+            jakarta_tz = pytz.timezone('Asia/Jakarta')
+            create_date_utc = manufacture_order.create_date
+            create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
+            created_date = str(create_date_jakarta)
+            date_done = str(manufacture_order.date_start)
+            date_done = str(manufacture_order.date_finished)
+
+            data_manufacture_order_lines = []
+            for line_number, line in enumerate(manufacture_order_lines, start=1):
+                line_data = {
+                    'line_number': line_number,
+                    'id': line.id,
+                    'doc_no': doc_num,
+                    'product_id': line.product_id.id,
+                    'product_code': line.product_id.default_code,
+                    'location_id': line.location_id.id,
+                    'location': line.location_id.complete_name,
+                    'product_uom_qty': line.product_uom_qty,
+                    'quantity': line.quantity,
+                    'picked': line.picked,
+                }
+                data_manufacture_order_lines.append(line_data)
+
+            response_data = {
+                'status': 200,
+                'message': 'success',
+                'doc_num':  manufacture_order.name,
+                'source_document': manufacture_order.vit_trxid,
+                'product_id': manufacture_order.product_id.id,
+                'product_code': manufacture_order.product_id.default_code,
+                'product_qty': manufacture_order.product_qty,
+                'bom_id': manufacture_order.bom_id.id,
+                'location_id': manufacture_order.location_src_id.id,
+                'location_name': manufacture_order.location_src_id.complete_name,
+                'location_dest_id': manufacture_order.location_dest_id.id,
+                'location_dest': manufacture_order.location_dest_id.complete_name,
+                'picking_type_id': manufacture_order.picking_type_id.id,
+                'picking_type': manufacture_order.picking_type_id.name,
+                'create_date': str(create_date_jakarta),
+                'date_start': str(manufacture_order.date_start),
+                'date_finished': str(manufacture_order.date_finished),
+                'user_id': manufacture_order.user_id.id,
+                'user_name': manufacture_order.user_id.name,
+                'manufacture_lines': data_manufacture_order_lines
+            }
+            return werkzeug.wrappers.Response(
+                status=200,
+                content_type='application/json; charset=utf-8',
+                response=json.dumps(response_data)
+            )
+
+        except Exception as e:
+            return serialize_error_response(str(e))
         
 class InvoiceOrder(http.Controller):
     @http.route(['/api/invoice_order/'], type='http', auth='public', methods=['GET'], csrf=False)
@@ -1449,7 +1724,7 @@ class InvoiceOrder(http.Controller):
 
                 if is_integrated is not None:
                     is_integrated_bool = str(is_integrated).lower() == 'true'
-                    domain += [('is_integrated', '=', is_integrated_bool)]
+                    domain += [('state', '=', 'posted'), ('payment_state', '=', 'paid'), ('move_type', '=', 'out_invoice'), ('partner_id.customer_code', '!=', False), ('is_integrated', '=', is_integrated_bool)]
 
                 pageSize = int(pageSize) if pageSize else 200
 
@@ -1481,13 +1756,14 @@ class InvoiceOrder(http.Controller):
                     'id': order.id,
                     'pos_order_id': order.pos_order_ids[0].id if order.pos_order_ids else None,
                     'doc_num': order.name,
+                    'ref_num': order.ref,
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
-                    'location_id': location_id,
-                    'location': location,
-                    'location_dest_id': location_dest_id,
-                    'location_dest': location_dest,
+                    'location_id': location_id or int(-1),
+                    'location': location or int(-1),
+                    'location_dest_id': location_dest_id or int(-1),
+                    'location_dest': location_dest or int(-1),
                     'is_integrated': order.is_integrated,
                     'create_date': str(create_date_jakarta),
                     'invoice_date': str(order.invoice_date),
@@ -1653,7 +1929,7 @@ class ReturOrderAPI(http.Controller):
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id,
                     'location_id': order.location_id.id,
-                    'location_name': order.location_id.name,
+                    'location': order.location_id.name,
                     'location_destination_id': order.location_dest_id.id,
                     'location_destination': order.location_dest_id.name,
                     'picking_type_id': order.picking_type_id.id,
@@ -1791,7 +2067,7 @@ class CrediNoteAPI(http.Controller):
 
                 if is_integrated is not None:
                     is_integrated_bool = str(is_integrated).lower() == 'true'
-                    domain += [('is_integrated', '=', is_integrated_bool)]
+                    domain += [('state', '=', 'posted'), ('payment_state', 'in', ['paid', 'in_payment', 'reversed', 'partial']), ('move_type', '=', 'out_refund'), ('partner_id.customer_code', '!=', False), ('is_integrated', '=', is_integrated_bool)]
 
                 pageSize = int(pageSize) if pageSize else 200
 
@@ -1827,6 +2103,7 @@ class CrediNoteAPI(http.Controller):
                 order_data = {
                     'id': order.id,
                     'doc_num': order.name,
+                    'ref_num': order.ref.split(": ")[-1] if order.ref else None,
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
@@ -2171,12 +2448,12 @@ class GoodsReceiptAPI(http.Controller):
                     'doc_num': order.name,
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id,
-                    'stock_type_id': order.stock_type.id or int(-1),
-                    'stock_type': order.stock_type.type_code or '',
+                    'stock_type_id': order.stock_type.type_code or int(-1),
+                    'stock_type': order.stock_type.type_name or '',
                     # 'location_id': order.location_id.id,
-                    # 'location_name': order.location_id.name,
+                    # 'location': order.location_id.name,
                     'location_id': order.location_dest_id.id,
-                    'location': order.location_dest_id.complete_name,
+                    'location_name': order.location_dest_id.complete_name,
                     'location_dest_id': order.location_id.id,
                     'location_dest': order.location_id.complete_name,
                     'picking_type_id': order.picking_type_id.id,
@@ -2221,8 +2498,8 @@ class GoodsReceiptAPI(http.Controller):
             doc_num = goods_receipt.name
             customer_name = goods_receipt.partner_id.name
             customer_id = goods_receipt.partner_id.id
-            stock_type_id = goods_receipt.stock_type.id
-            stock_type = goods_receipt.stock_type.type_code
+            stock_type_id = goods_receipt.stock_type.type_code
+            stock_type = goods_receipt.stock_type.type_name
             location_id = goods_receipt.location_id.id
             location = goods_receipt.location_id.complete_name
             location_dest_id = goods_receipt.location_dest_id.id
@@ -2329,8 +2606,8 @@ class GoodsIssueAPI(http.Controller):
                     'doc_num': order.name,
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id or "",
-                    'stock_type_id': order.stock_type.id,
-                    'stock_type': order.stock_type.type_code,
+                    'stock_type_id': order.stock_type.type_code or int(-1),
+                    'stock_type': order.stock_type.type_name or '',
                     'location_id': order.location_id.id,
                     'location_name': order.location_id.complete_name,
                     'location_dest_id': order.location_dest_id.id,
@@ -2377,8 +2654,8 @@ class GoodsIssueAPI(http.Controller):
             doc_num = goods_issue.name
             customer_name = goods_issue.partner_id.name
             customer_id = goods_issue.partner_id.id
-            stock_type_id = goods_issue.stock_type.id
-            stock_type = goods_issue.stock_type.type_code
+            stock_type_id = goods_issue.stock_type.type_code or int(-1)
+            stock_type = goods_issue.stock_type.type_name or ''
             location_id = goods_issue.location_id.id
             location = goods_issue.location_id.complete_name
             location_dest_id = goods_issue.location_dest_id.id
@@ -2422,8 +2699,8 @@ class GoodsIssueAPI(http.Controller):
                 'stock_type': stock_type,
                 'location_id': location_id,
                 'location': location,
-                'location_destination_id': location_dest_id,
-                'location_destination': location_dest,
+                'location_dest_id': location_dest_id,
+                'location_dest': location_dest,
                 'picking_type_id': picking_type_id,
                 'picking_type': picking_type,
                 'created_date': created_date,
@@ -2486,8 +2763,8 @@ class GRPO(http.Controller):
                     'source_document': order.origin or '',
                     'vit_trxid': order.vit_trxid or '',
                     'customer_id': order.partner_id.id,
-                    'stock_type_id': order.stock_type.id or int(-1),
-                    'stock_type': order.stock_type.type_code or '',
+                    # 'stock_type_id': order.stock_type.code or int(-1),
+                    # 'stock_type': order.stock_type.type_code or '',
                     'location_id': order.location_id.id or int(-1),
                     'location_name': order.location_id.complete_name or '',
                     'location_id': order.location_dest_id.id,
@@ -2563,8 +2840,8 @@ class GRPO(http.Controller):
                     'vit_trxid': vit_trxid,
                     'location_id': line.location_id.id,
                     'location': line.location_id.complete_name,
-                    'location_id': line.location_dest_id.id,
-                    'location': line.location_dest_id.complete_name,
+                    'location_dest_id': line.location_dest_id.id,
+                    'location_dest': line.location_dest_id.complete_name,
                     'product_id': line.product_id.id,
                     'product_code': line.product_id.default_code or "",
                     'product_name': line.product_id.name,
@@ -2582,12 +2859,12 @@ class GRPO(http.Controller):
                 'vit_trxid': vit_trxid,
                 'customer_id': customer_id,
                 'customer_name': customer_name,
-                'stock_type_id': stock_type_id or int(-1),
-                'stock_type': stock_type or '',
+                # 'stock_type_id': stock_type_id or int(-1),
+                # 'stock_type': stock_type or '',
                 'location_id': location_id or int(-1),
                 'location': location or '',
-                'location_id': location_dest_id or int(-1),
-                'location': location_dest or '',
+                'location_dest_id': location_dest_id or int(-1),
+                'location_dest': location_dest or '',
                 'picking_type_id': picking_type_id,
                 'picking_type': picking_type,
                 'created_date': created_date,
@@ -2659,9 +2936,9 @@ class InternalTransferAPI(http.Controller):
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id or "",
                     'location_id': order.location_id.id,
-                    'location_name': order.location_id.complete_name,
-                    'location_destination_id': order.location_dest_id.id,
-                    'location_destination': order.location_dest_id.complete_name,
+                    'location': order.location_id.complete_name,
+                    'location_dest_id': order.location_dest_id.id,
+                    'location_dest': order.location_dest_id.complete_name,
                     'picking_type_id': order.picking_type_id.id,
                     'picking_type': order.picking_type_id.name,
                     'create_date': str(create_date_jakarta),
@@ -2745,8 +3022,8 @@ class InternalTransferAPI(http.Controller):
                 'customer_name': customer_name,
                 'location_id': location_id,
                 'location': location,
-                'location_destination_id': location_dest_id,
-                'location_destination': location_dest,
+                'location_dest_id': location_dest_id,
+                'location_dest': location_dest,
                 'picking_type_id': picking_type_id,
                 'picking_type': picking_type,
                 'created_date': created_date,
@@ -2819,9 +3096,9 @@ class TsOutAPI(http.Controller):
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id or "",
                     'location_id': order.location_id.id,
-                    'location_name': order.location_id.complete_name,
-                    'location_destination_id': order.location_dest_id.id,
-                    'location_destination': order.location_dest_id.complete_name,
+                    'location': order.location_id.complete_name,
+                    'location_dest_id': order.location_dest_id.id,
+                    'location_dest': order.location_dest_id.complete_name,
                     'picking_type_id': order.picking_type_id.id,
                     'picking_type': order.picking_type_id.name,
                     'create_date': str(create_date_jakarta),
@@ -2888,7 +3165,7 @@ class TsOutAPI(http.Controller):
                     'id': line.id,
                     'doc_no': doc_num,
                     'location_id': line.location_id.id,
-                    'location': line.location_id.complete_name,
+                    'location_name': line.location_id.complete_name,
                     'location_dest_id': line.location_dest_id.id,
                     'location_dest': line.location_dest_id.complete_name,
                     'product_id': line.product_id.id,
@@ -2909,8 +3186,8 @@ class TsOutAPI(http.Controller):
                 'customer_name': customer_name,
                 'location_id': location_id,
                 'location': location,
-                'location_destination_id': location_dest_id,
-                'location_destination': location_dest,
+                'location_dest_id': location_dest_id,
+                'location_dest': location_dest,
                 'picking_type_id': picking_type_id,
                 'picking_type': picking_type,
                 'created_date': created_date,
@@ -2982,8 +3259,8 @@ class TsInAPI(http.Controller):
                     'customer_id': order.partner_id.id or "",
                     'location_id': order.location_id.id,
                     'location_name': order.location_id.complete_name,
-                    'location_destination_id': order.location_dest_id.id,
-                    'location_destination': order.location_dest_id.complete_name,
+                    'location_dest_id': order.location_dest_id.id,
+                    'location_dest': order.location_dest_id.complete_name,
                     'picking_type_id': order.picking_type_id.id,
                     'picking_type': order.picking_type_id.name,
                     'create_date': str(create_date_jakarta),
@@ -3071,8 +3348,8 @@ class TsInAPI(http.Controller):
                 'customer_name': customer_name,
                 'location_id': location_id,
                 'location': location,
-                'location_destination_id': location_dest_id,
-                'location_destination': location_dest,
+                'location_dest_id': location_dest_id,
+                'location_dest': location_dest,
                 'picking_type_id': picking_type_id,
                 'picking_type': picking_type,
                 'created_date': created_date,

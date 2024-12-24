@@ -19,6 +19,7 @@
                     <group string="Master Console To Store Server">
                         <field name="master_item_utils"/>    
                         <field name="master_item"/>    
+                        <field name="master_bom_to_ss"/>    
                         <field name="master_customer"/>    
                         <field name="master_location"/>    
                         <field name="master_pricelist"/>    
@@ -30,6 +31,7 @@
                         <field name="update_voucher_store"/>    
                         <field name="master_pos_utility"/>    
                         <field name="list_warehouse"/>    
+                        <field name="config_print_timbangan"/>    
                         <field name="vit_internal_transfers"/>            
                         <field name="vit_goods_issue"/>                      
                         <field name="vit_goods_receipts"/>            
@@ -57,7 +59,7 @@
     <!-- Child Menu -->
     <menuitem
         id="synchronize_mc_to_ss_menu"
-        name="Sync MC To SS"
+        name="Master Console-Store"
         action="action_synchronize_mc_to_ss"
         parent="setting_config_menu_root"
         sequence="2"/>

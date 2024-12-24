@@ -20,6 +20,7 @@
                         <field name="master_customer_to_mc"/>    
                         <field name="master_employee_to_mc"/>    
                         <field name="vit_session"/>    
+                        <field name="vit_end_shift"/>    
                         <field name="vit_invoice"/>    
                         <field name="vit_invoice_rescue"/>    
                         <field name="vit_internal_transfers_to_mc"/>    
@@ -27,11 +28,13 @@
                         <field name="vit_goods_issue_to_mc"/>            
                         <field name="vit_receipts_to_mc"/>            
                         <field name="vit_inventory_adjustment_to_mc"/> 
+                        <field name="vit_inventory_counting"/> 
                         <field name="vit_ts_out"/>         
                         <field name="vit_val_ts_in"/>         
                         <field name="vit_val_grpo"/>         
                         <field name="vit_val_goods_receipts"/>         
                         <field name="vit_val_goods_issue"/>         
+                        <field name="vit_manufacture_order"/>         
                     </group>
                 </group>
             </sheet>          
@@ -55,7 +58,7 @@
     <!-- Child Menu -->
     <menuitem
         id="synchronize_ss_to_mcmenu"
-        name="Sync SS To MC"
+        name="Store-Master Console"
         action="action_synchronize_ss_to_mc"
         parent="setting_config_menu_root"
         sequence="1"/>

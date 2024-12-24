@@ -133,6 +133,7 @@ class MasterItemPATCH(http.Controller):
             pos_categ_ids = data.get('pos_categ_ids', [])
             category_name = data.get('category_name')
             taxes_names = data.get('taxes_names', [])
+            supplier_taxes_id = data.get('supplier_taxes_id', [])
             available_in_pos = data.get('available_in_pos')
             
             # Retrieve the master item from the database
@@ -152,8 +153,7 @@ class MasterItemPATCH(http.Controller):
                     'message': f"Failed to update Item. Category not found: {category_name}.",
                 }
             
-            # Find all taxes based on the provided names
-            tax_command = []
+            tax_command = [(5, 0, 0)]  # Hapus semua pajak sebelumnya
             for tax_name in data.get('taxes_names', []):
                 tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
                 if tax:
@@ -161,6 +161,14 @@ class MasterItemPATCH(http.Controller):
                 else:
                     return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_name}' not found."}
 
+            tax_command_vendor = [(5, 0, 0)]  # Hapus semua pajak vendor sebelumnya
+            for tax_vendor in data.get('supplier_taxes_id', []):
+                vendor_tax = env['account.tax'].sudo().search([('name', '=', tax_vendor)], limit=1)
+                if vendor_tax:
+                    tax_command_vendor.append((4, vendor_tax.id))
+                else:
+                    return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_vendor}' not found."}
+                
             # Prepare the update data
             update_data = {
                 'name': product_name,
@@ -175,7 +183,10 @@ class MasterItemPATCH(http.Controller):
                 'categ_id': name_categ.id,
                 'pos_categ_ids': [(6, 0, pos_categ_ids)],
                 'taxes_id': tax_command,
+                'supplier_taxes_id': tax_command_vendor,
                 'available_in_pos': available_in_pos,
+                'image_1920': data.get('image_1920'),
+                'barcode': data.get('barcode'),
                 'write_uid': uid,
             }
 
@@ -185,6 +196,17 @@ class MasterItemPATCH(http.Controller):
 
             # Update the master item
             master_item.sudo().write(update_data)
+
+            multi_barcodes = data.get('multi_barcodes')
+            if multi_barcodes is not None:
+                env['multiple.barcode'].sudo().search([
+                    ('product_tmpl_id', '=', master_item.id)
+                ]).unlink()
+                for barcode in multi_barcodes:
+                    env['multiple.barcode'].sudo().create({
+                        'barcode': barcode,
+                        'product_tmpl_id': master_item.id
+                    })
 
             # Return success response
             return {
@@ -669,84 +691,83 @@ class InternalTransferPATCH(http.Controller):
 class TsOutPATCH(http.Controller):
     @http.route(['/api/transfer_stock_out/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)
     def update_transit_out_order(self, return_id, **kwargs):
-        return self._update_stock_picking(return_id, 'TS Out', 'Transit Out')
+        return update_stock_picking(return_id, 'TS Out', 'Transfer Stock Out')
 
 class TsInPATCH(http.Controller):
     @http.route(['/api/transfer_stock_in/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)
     def update_transit_in_order(self, return_id, **kwargs):
-        return self._update_stock_picking(return_id, 'TS In', 'Transit In')
+        return update_stock_picking(return_id, 'TS In', 'Transfer Stock In')
 
-    @staticmethod
-    def _update_stock_picking(return_id, picking_type_name, operation_name):
-        try:
-            # Get configuration
-            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
-            if not config:
-                return {
-                    'status': "Failed",
-                    'code': 500,
-                    'message': "Configuration not found.",
-                }
-            
-            username = config.vit_config_username
-            password = config.vit_config_password_api
-
-            # Manual authentication
-            uid = request.session.authenticate(request.session.db, username, password)
-            if not uid:
-                return {
-                    'status': "Failed",
-                    'code': 401,
-                    'message': "Authentication failed.",
-                }
-
-            # Use superuser environment
-            env = request.env(user=request.env.ref('base.user_admin').id)
-
-            data = request.get_json_data()
-            is_integrated = data.get('is_integrated')
-
-            if not isinstance(is_integrated, bool):
-                return {
-                    'code': 400,
-                    'status': 'error',
-                    'message': f'Invalid data: is_integrated must be a boolean',
-                    'id': return_id
-                }
-
-            stock_picking = env['stock.picking'].sudo().search([
-                ('id', '=', return_id),
-                ('picking_type_id.name', '=', picking_type_name)
-            ], limit=1)
-
-            if not stock_picking.exists():
-                return {
-                    'code': 404,
-                    'status': 'error',
-                    'message': f'{operation_name} not found',
-                    'id': return_id
-                }
-
-            stock_picking.write({
-                'is_integrated': is_integrated,
-                'write_uid': uid
-            })
-
+def update_stock_picking(return_id, picking_type_name, operation_name):
+    try:
+        # Get configuration
+        config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+        if not config:
             return {
-                'code': 200,
-                'status': 'success',
-                'message': f'{operation_name} updated successfully',
-                'id': return_id
-            }
-
-        except Exception as e:
-            _logger.error(f"Error updating {operation_name}: {str(e)}")
-            return {
+                'status': "Failed",
                 'code': 500,
+                'message': "Configuration not found.",
+            }
+
+        username = config.vit_config_username
+        password = config.vit_config_password_api
+
+        # Manual authentication
+        uid = request.session.authenticate(request.session.db, username, password)
+        if not uid:
+            return {
+                'status': "Failed",
+                'code': 401,
+                'message': "Authentication failed.",
+            }
+
+        # Use superuser environment
+        env = request.env(user=request.env.ref('base.user_admin').id)
+
+        data = request.get_json_data()
+        is_integrated = data.get('is_integrated')
+
+        if not isinstance(is_integrated, bool):
+            return {
+                'code': 400,
                 'status': 'error',
-                'message': str(e),
+                'message': f'Invalid data: is_integrated must be a boolean',
                 'id': return_id
             }
+
+        stock_picking = env['stock.picking'].sudo().search([
+            ('id', '=', return_id),
+            ('picking_type_id.name', '=', picking_type_name)
+        ], limit=1)
+
+        if not stock_picking.exists():
+            return {
+                'code': 404,
+                'status': 'error',
+                'message': f'{operation_name} not found',
+                'id': return_id
+            }
+
+        stock_picking.write({
+            'is_integrated': is_integrated,
+            'write_uid': uid
+        })
+
+        return {
+            'code': 200,
+            'status': 'success',
+            'message': f'{operation_name} updated successfully',
+            'id': return_id
+        }
+
+    except Exception as e:
+        _logger.error(f"Error updating {operation_name}: {str(e)}")
+        return {
+            'code': 500,
+            'status': 'error',
+            'message': str(e),
+            'id': return_id
+        }
 
 class AccountMovePATCH(http.Controller):
     @http.route(['/api/invoice_order/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)

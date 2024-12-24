@@ -10,6 +10,15 @@
             <field name="is_integrated"/>
             <field name="index_store" widget="many2many_tags"/>
         </xpath>
+        <xpath expr="//page[@name='invoicing']" position="after">
+            <page string="Barcodes">
+                <field name="multi_barcode_ids">
+                    <tree editable="bottom">
+                        <field name="barcode"/>
+                    </tree>
+                </field>
+            </page>
+        </xpath>
         <xpath expr="//field[@name='is_integrated']" position="attributes">
           <attribute name="force_save">1</attribute>
           <attribute name="readonly">True</attribute>

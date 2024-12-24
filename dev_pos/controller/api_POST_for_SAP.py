@@ -8,6 +8,92 @@ import base64
 
 _logger = logging.getLogger(__name__)
 
+class POSTMasterBoM(http.Controller):
+    @http.route('/api/master_bom', type='json', auth='none', methods=['POST'], csrf=False)
+    def post_master_bom(self, **kw):
+        try:
+            # Authentication
+            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            if not config:
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
+            
+            uid = request.session.authenticate(request.session.db, config.vit_config_username, config.vit_config_password_api)
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            env = request.env(user=request.env.ref('base.user_admin').id)
+            
+            data = request.get_json_data()
+            product_tmpl_id = data.get('product_tmpl_id')
+            product_id = data.get('product_id')
+            quantity = data.get('quantity')
+            reference = data.get('reference')
+            type = data.get('type')
+            move_lines = data.get('move_lines', [])
+
+            # Validate picking type
+            product_tmpl = env['product.template'].sudo().search([('default_code', '=', product_tmpl_id)], limit=1)
+            if not product_tmpl:
+                return {
+                    'status': "Failed", 
+                    'code': 400, 
+                    'message': f"Product Template '{product_tmpl.name}' not found."
+                }
+            
+            product_variant = env['product.product'].sudo().search([('default_code', '=', product_id)], limit=1)
+            if not product_variant:
+                return {
+                    'status': "Failed", 
+                    'code': 400, 
+                    'message': f"Product Variant '{product_variant.name}' not found."
+                }
+
+            # Validate all products first before creating Goods Receipt
+            missing_products = []
+            for line in move_lines:
+                product_code = line.get('product_code')
+                product_id = env['product.product'].sudo().search([('default_code', '=', product_code)], limit=1)
+                if not product_id:
+                    missing_products.append(product_code)
+
+            if missing_products:
+                return {
+                    'status': "Failed",
+                    'code': 400,
+                    'message': f"Products with codes {', '.join(missing_products)} not found. Goods Receipt creation cancelled."
+                }
+
+            # Create BoM
+            bom_master = env['mrp.bom'].sudo().create({
+                'product_tmpl_id': product_tmpl.id,
+                'product_id': product_variant.id,
+                'product_qty': quantity,
+                'code': reference,
+                'type': type,
+            })
+
+            # Update goods receipt with move lines
+            bom_master.write({
+                'bom_line_ids': [(0, 0, line) for line in move_lines]
+            })
+
+            return {
+                'code': 200,
+                'status': 'success',
+                'message': 'BoM created and validated successfully',
+                'id': bom_master.id,
+                'doc_num': bom_master.product_id.name
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Failed to create BoM: {str(e)}", exc_info=True)
+            return {
+                'status': "Failed", 
+                'code': 500, 
+                'message': f"Failed to create BoM: {str(e)}"
+            }
+
 class POSTMasterItem(http.Controller):
     @http.route('/api/master_item', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_item(self, **kw):
@@ -23,7 +109,7 @@ class POSTMasterItem(http.Controller):
 
             env = request.env(user=request.env.ref('base.user_admin').id)
             
-            data = data = request.get_json_data()
+            data = request.get_json_data()
             product_code = data.get('product_code')
 
             if env['product.template'].sudo().search([('default_code', '=', product_code)], limit=1):
@@ -33,21 +119,47 @@ class POSTMasterItem(http.Controller):
             if not category:
                 return {'status': "Failed", 'code': 400, 'message': f"Category not found: {data.get('category_name')}."}
             
+            # Handle pos_categ_id or pos_categ_ids - mendukung kedua format
             pos_categ_command = []
-            for categ_id in data.get('pos_categ_ids', []):
+            pos_categ_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
+            
+            # Pastikan dalam bentuk list
+            if not isinstance(pos_categ_data, list):
+                pos_categ_data = [pos_categ_data]
+                
+            for categ_id in pos_categ_data:
                 if env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1):
                     pos_categ_command.append((4, categ_id))
                 else:
                     return {'status': "Failed", 'code': 400, 'message': f"POS category with ID {categ_id} not found."}
 
+            # Handle taxes - mendukung taxes_name atau taxes_names
             tax_command = []
-            for tax_name in data.get('taxes_names', []):
+            tax_names = data.get('taxes_names', [])
+            if 'taxes_name' in data:
+                if isinstance(data['taxes_name'], list):
+                    tax_names = data['taxes_name']
+                else:
+                    tax_names = [data['taxes_name']]
+                    
+            for tax_name in tax_names:
                 tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
                 if tax:
                     tax_command.append((4, tax.id))
                 else:
                     return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_name}' not found."}
 
+            tax_command_vendor = []
+            for tax_vendor in data.get('supplier_taxes_id', []):
+                vendor_tax = env['account.tax'].sudo().search([('name', '=', tax_vendor)], limit=1)
+                if vendor_tax:
+                    tax_command_vendor.append((4, vendor_tax.id))
+                else:
+                    return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_vendor}' not found."}
+
+            # Mendukung standard_price atau cost
+            cost = data.get('standard_price', data.get('cost', 0.0))
+                
             item_data = {
                 'name': data.get('product_name'),
                 'active': data.get('active'),
@@ -56,17 +168,28 @@ class POSTMasterItem(http.Controller):
                 'invoice_policy': data.get('invoice_policy'),
                 'create_date': data.get('create_date'),
                 'list_price': data.get('sales_price'),
-                'standard_price': data.get('cost'),
+                'standard_price': cost,
                 'uom_id': data.get('uom_id'),
                 'uom_po_id': data.get('uom_po_id'),
                 'pos_categ_ids': pos_categ_command,
                 'categ_id': category.id,
                 'taxes_id': tax_command,
+                'supplier_taxes_id': tax_command_vendor,
                 'available_in_pos': data.get('available_in_pos'),
+                'image_1920': data.get('image_1920'),
+                'barcode': data.get('barcode'),
                 'create_uid': uid
             }
 
             item = env['product.template'].sudo().create(item_data)
+
+             # Handle multi barcodes
+            multi_barcodes = data.get('multi_barcodes', [])
+            for barcode in multi_barcodes:
+                env['multiple.barcode'].sudo().create({
+                    'barcode': barcode,
+                    'product_tmpl_id': item.id
+                })
             
             return {
                 'code': 200,
@@ -76,6 +199,7 @@ class POSTMasterItem(http.Controller):
             }
         
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Item: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Item: {str(e)}"}
 
@@ -220,6 +344,7 @@ class POSTMasterPricelist(http.Controller):
                 pricelist = env['product.pricelist'].sudo().create(pricelist_data)
 
             except Exception as create_error:
+                request.env.cr.rollback()
                 _logger.error(f"Failed to create pricelist: {str(create_error)}", exc_info=True)
                 return {
                     'status': "Failed", 
@@ -236,6 +361,7 @@ class POSTMasterPricelist(http.Controller):
             }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Pricelist: {str(e)}", exc_info=True)
             return {
                 'status': "Failed", 
@@ -284,6 +410,7 @@ class POSTMasterCustomer(http.Controller):
                 'id': customer.id,
             }
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Customer: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Customer: {str(e)}"}
     
@@ -323,6 +450,7 @@ class POSTMasterWarehouse(http.Controller):
                 'id': warehouse.id,
             }
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Warehouse: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Warehouse: {str(e)}"}
     
@@ -365,6 +493,7 @@ class POSTItemCategory(http.Controller):
             }
         
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Category: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Category: {str(e)}"}
 
@@ -405,6 +534,7 @@ class POSTItemPoSCategory(http.Controller):
             }
         
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create PoS Category: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create PoS Category: {str(e)}"}
         
@@ -514,8 +644,8 @@ class POSTGoodsReceipt(http.Controller):
                     'name': product_id.name,
                     'product_id': product_id.id,
                     'product_uom': product_id.uom_id.id,  # Added product UOM
-                    'product_uom_qty': product_uom_qty,
-                    'quantity': product_uom_qty,  # Added to ensure validation
+                    'product_uom_qty': float(product_uom_qty),
+                    'quantity': float(product_uom_qty),  # Added to ensure validation
                     'picking_id': goods_receipt.id,
                     'location_id': location_id,
                     'location_dest_id': location_dest_id,
@@ -532,6 +662,7 @@ class POSTGoodsReceipt(http.Controller):
                 # Validate the goods receipt
                 goods_receipt.button_validate()
             except Exception as validate_error:
+                env.cr.rollback()
                 # If validation fails, delete the goods receipt and return error
                 goods_receipt.sudo().unlink()
                 raise Exception(f"Failed to validate Goods Receipt: {str(validate_error)}")
@@ -545,6 +676,7 @@ class POSTGoodsReceipt(http.Controller):
             }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Goods Receipt: {str(e)}", exc_info=True)
             return {
                 'status': "Failed", 
@@ -676,6 +808,7 @@ class POSTGoodsIssue(http.Controller):
                 # Validate the goods issue
                 goods_issue.button_validate()
             except Exception as validate_error:
+                env.cr.rollback()
                 # If validation fails, delete the goods issue and return error
                 goods_issue.sudo().unlink()
                 raise Exception(f"Failed to validate Goods Issue: {str(validate_error)}")
@@ -689,6 +822,7 @@ class POSTGoodsIssue(http.Controller):
             }
             
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Goods Issue: {str(e)}", exc_info=True)
             return {
                 'status': "Failed", 
@@ -842,6 +976,7 @@ class POSTPurchaseOrderFromSAP(http.Controller):
             }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Purchase Order: {str(e)}", exc_info=True)
             return {
                 'status': "Failed",

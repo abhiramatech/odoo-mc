@@ -187,7 +187,7 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
             # raise ValidationError(_(f"{mc_client}, {ss_client}, {ss_clients}, {mc}, {ss}, {datefrom}, {dateto}, {date_from}, {date_to}")) # buat check debug ya
-            integrator_master.transfer_data('product.template', ['name', 'sale_ok', 'purchase_ok', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id', 'list_price', 'standard_price', 'categ_id', 'default_code', 'pos_categ_ids', 'available_in_pos', 'taxes_id', 'active', 'create_date', 'write_date'], 'Master Item', date_from, date_to)
+            integrator_master.transfer_data('product.template', ['name', 'sale_ok', 'purchase_ok', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id', 'list_price', 'standard_price', 'categ_id', 'default_code', 'pos_categ_ids', 'available_in_pos', 'taxes_id', 'active', 'create_date', 'write_date', 'image_1920', 'barcode'], 'Master Item', date_from, date_to)
 
     def create_location(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -231,10 +231,10 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.payment_method_from_mc('pos.payment.method', ['id', 'name', 'is_online_payment', 'is_store', 'split_transactions', 'journal_id', 'config_ids'], 'Transaksi PoS Payment Method', datefrom, dateto)
+            integrator_transaksiMCtoSS.account_account_from_mc('account.account', ['id', 'name', 'code', 'account_type', 'reconcile'], 'Transaksi COA', datefrom, dateto)
             integrator_transaksiMCtoSS.journal_account_from_mc('account.journal', ['id', 'name', 'type', 'refund_sequence', 'is_store', 'code', 'account_control_ids', 'invoice_reference_type', 'invoice_reference_model' ], 'Transaksi Journal', datefrom, dateto)
             integrator_transaksiMCtoSS.pos_config_from_mc('pos.config', ['id', 'name', 'module_pos_hr', 'is_store', 'is_posbox', 'other_devices'], 'Transaksi PoS Config', datefrom, dateto)
-            integrator_transaksiMCtoSS.account_account_from_mc('account.account', ['id', 'name', 'code', 'account_type', 'reconcile'], 'Transaksi COA', datefrom, dateto)
+            integrator_transaksiMCtoSS.payment_method_from_mc('pos.payment.method', ['id', 'name', 'is_online_payment', 'is_store', 'split_transactions', 'journal_id', 'config_ids'], 'Transaksi PoS Payment Method', datefrom, dateto)
 
     def create_master_pricelist(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -303,7 +303,7 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksiMCtoSS.transfer_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
+            integrator_transaksiMCtoSS.transfer_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids', 'schedule_ids', 'member_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
             # integrator_transaksiMCtoSS.update_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
 
     def update_master_discount(self, mc, ss, datefrom, dateto):
@@ -326,8 +326,54 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.update_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
+            integrator_transaksiMCtoSS.update_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids', 'schedule_ids', 'member_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
     
+    def create_manufacture_unbuild(self, mc, ss, datefrom, dateto):
+        if mc and ss:
+            mc_client = mc
+            ss_clients = ss
+        else:
+            mc_client, ss_clients = self.get_config(False)
+
+        if datefrom and dateto:
+            date_from = datefrom
+            date_to = dateto
+            # Format date_from and date_to to include time
+            date_from = date_from.strftime("%Y-%m-%d %H:%M:%S.%f")
+            date_to = date_to.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            date_from, date_to = self.get_date(False, False)
+
+        date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
+
+        for ss_client in ss_clients:
+            integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksi.transfer_manufacture_order('mrp.production', ['id', 'name', 'state', 'is_integrated', 'create_date', 'location_src_id', 'location_dest_id', 'picking_type_id', 'product_id', 'product_qty', 'bom_id', 'user_id', 'date_start', 'date_finished', 'move_raw_ids'], 'Transaksi Manufacture Order Inventory', datefrom, dateto)
+            integrator_transaksi.transfer_unbuild_order('mrp.unbuild', ['id', 'name', 'state', 'is_integrated', 'create_date', 'location_id', 'location_dest_id', 'product_id', 'product_qty', 'bom_id', 'mo_id', 'unbuild_line_ids'], 'Transaksi Unbuild Order Inventory', datefrom, dateto)
+
+
+    def create_master_bom(self, mc, ss, datefrom, dateto):
+        if mc and ss:
+            mc_client = mc
+            ss_clients = ss
+        else:
+            mc_client, ss_clients = self.get_config(False)
+
+        if datefrom and dateto:
+            date_from = datefrom
+            date_to = dateto
+            # Format date_from and date_to to include time
+            date_from = date_from.strftime("%Y-%m-%d %H:%M:%S.%f")
+            date_to = date_to.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            date_from, date_to = self.get_date(False, False)
+
+        date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
+
+        for ss_client in ss_clients:
+            integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
+            integrator_transaksiMCtoSS.transfer_bom_master('mrp.bom', ['id', 'product_tmpl_id', 'product_id', 'code', 'type', 'product_qty', 'consumption', 'produce_delay', 'days_to_prepare_mo', 'create_date', 'is_integrated', 'bom_line_ids'], 'Transaksi Manufacture Order Inventory', datefrom, dateto)
+            
     def create_voucher_loyalty(self, mc, ss, datefrom, dateto):
         if mc and ss:
             mc_client = mc
@@ -374,6 +420,7 @@ class SettingConfig(models.Model):
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
             integrator_transaksi.update_loyalty_point_ss_to_mc('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'reward_ids', 'rule_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
+            integrator_transaksi.create_loyalty_point_ss_to_mc('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'reward_ids', 'rule_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
 
     def update_voucher_loyalty_mc_to_store(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -444,7 +491,7 @@ class SettingConfig(models.Model):
             # raise ValidationError(_(f"{mc_client}, {ss_client}, {ss_clients}, {mc}, {ss}, {datefrom}, {dateto}, {date_from}, {date_to}")) buat check debug ya
             integrator_master.transfer_data_mc('res.partner.title', ['name', 'shortcut', 'create_date', 'write_date'], 'Master Customer Title', date_from, date_to)
             integrator_master.transfer_data_mc('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
-            # integrator_master.transfer_data_mc('loyalty.card', ['code', 'points_display', 'expiration_date', 'partner_id', 'points', 'program_id'], 'Master Loyalty', date_from, date_to)
+            integrator_master.transfer_data_mc('loyalty.card', ['code', 'points_display', 'expiration_date', 'partner_id', 'points', 'program_id'], 'Master Loyalty', date_from, date_to)
 
     def create_master_employee_from_ss_to_mc(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -583,6 +630,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksi.transfer_pos_order_invoice_ss_to_mc_session_closed_before_inv('pos.order', ['id', 'name', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
             integrator_transaksi.update_session_status('pos.session', ['name', 'state', 'start_at', 'stop_at', 'config_id', 'cash_register_balance_start', 'cash_register_balance_end_real'], 'Update Session PoS Order', date_from, date_to)
             integrator_transaksi.transfer_pos_order_session('pos.session', ['name', 'config_id', 'user_id', 'start_at', 'stop_at', 'state'], 'Master Session PoS Order Invoice', date_from, date_to)
 
@@ -606,6 +654,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksi.transfer_pos_order_invoice_ss_to_mc('pos.order', ['id', 'name', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
             integrator_transaksi.update_session_status('pos.ses?sion', ['name', 'id','state', 'is_store', 'start_at', 'stop_at', 'cash_register_balance_start', 'cash_register_balance_end_real'], "Session Updated", date_from, date_to)
             integrator_transaksi.transfer_pos_order_session('pos.session', ['name', 'config_id', 'is_store', 'user_id', 'start_at', 'stop_at', 'state'], 'Master Session PoS Order Invoice', date_from, date_to)
 
@@ -739,7 +788,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksi.transfer_internal_transfers('stock.picking', ['name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'move_ids_without_package'], 'Transaksi Goods Issue', date_from, date_to)
+            integrator_transaksi.transfer_internal_transfers_ss_to_mc('stock.picking', ['name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'target_location', 'move_ids_without_package'], 'Transaksi TS Out', date_from, date_to)
 
     def transfer_receipts_ss_to_mc(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -784,7 +833,29 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
             integrator_transaksi.transfer_stock_adjustment('stock.move.line', ['reference', 'quantity', 'product_id', 'location_id', 'location_dest_id', 'company_id', 'state'], 'Transaksi Adjustment Stock', date_from, date_to)
-            
+
+    def transfer_inventory_counting(self, mc, ss, datefrom, dateto):
+        if mc and ss:
+            mc_client = mc
+            ss_clients = ss
+        else:
+            mc_client, ss_clients = self.get_config(False)
+
+        if datefrom and dateto:
+            date_from = datefrom
+            date_to = dateto
+            # Format date_from and date_to to include time
+            date_from = date_from.strftime("%Y-%m-%d %H:%M:%S.%f")
+            date_to = date_to.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            date_from, date_to = self.get_date(False, False)
+
+        date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
+
+        for ss_client in ss_clients:
+            integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksi.transfer_inventory_stock('inventory.stock', ['id', 'doc_num', 'warehouse_id', 'location_id', 'company_id', 'create_date', 'from_date', 'to_date', 'inventory_date', 'state'], 'Transaksi Inventory Counting', date_from, date_to)
+
     def transfer_ts_out(self, mc, ss, datefrom, dateto):
         if mc and ss:
             mc_client = mc
@@ -1012,6 +1083,28 @@ class SettingConfig(models.Model):
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
             integrator_transaksiMCtoSS.transfer_goods_issue('stock.picking', ['name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'vit_trxid', 'move_ids_without_package'], 'Transaksi Goods Issue', date_from, date_to)        
 
+    def transfer_config_timbangan(self, mc, ss, datefrom, dateto):
+        if mc and ss:
+            mc_client = mc
+            ss_clients = ss
+        else:
+            mc_client, ss_clients = self.get_config(False)
+
+        if datefrom and dateto:
+            date_from = datefrom
+            date_to = dateto
+            # Format date_from and date_to to include time
+            date_from = date_from.strftime("%Y-%m-%d %H:%M:%S.%f")
+            date_to = date_to.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            date_from, date_to = self.get_date(False, False)
+
+        date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
+
+        for ss_client in ss_clients:
+            integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
+            integrator_transaksiMCtoSS.config_timbangan('barcode.config', ['id', 'prefix_timbangan', 'digit_awal', 'digit_akhir', 'panjang_barcode'], 'Transaksi Goods Issue', date_from, date_to)        
+
     def transfer_internal_transfers_from_mc_to_store(self, mc, ss, datefrom, dateto):
         if mc and ss:
             mc_client = mc
@@ -1032,7 +1125,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.transfer_internal_transfers('stock.picking', ['name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'move_ids_without_package'], 'Transaksi Internal Transfers', date_from, date_to)
+            integrator_transaksiMCtoSS.transfer_internal_transfers_mc_to_ss('stock.picking', ['id','name', 'partner_id', 'location_id', 'picking_type_id', 'location_dest_id', 'scheduled_date', 'date_done', 'origin', 'target_location', 'move_ids_without_package'], 'Transaksi PoS Order Inventory', date_from, date_to)
     
     def create(self, vals):
         if vals:
@@ -1054,10 +1147,10 @@ class SettingConfig(models.Model):
                 vals['vit_linked_server'] = False
                 vals['vit_state'] = 'failed'
 
-        if vals.get('vit_config_url'):
-            existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
-            if existing_record:
-                raise UserError(_("URL already exists"))
+        # if vals.get('vit_config_url'):
+        #     existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
+        #     if existing_record:
+        #         raise UserError(_("URL already exists"))
             
         if vals.get('vit_config_server_name'):
             existing_record = self.env['setting.config'].search([('vit_config_server_name', '=', vals['vit_config_server_name'])])
@@ -1067,10 +1160,10 @@ class SettingConfig(models.Model):
         return super(SettingConfig, self).create(vals)
 
     def write(self, vals):
-        if 'vit_config_url' in vals:
-             existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
-             if existing_record:
-                 raise UserError(_("URL already exists"))
+        # if 'vit_config_url' in vals:
+        #      existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
+        #      if existing_record:
+        #          raise UserError(_("URL already exists"))
         
         if vals.get('vit_config_server_name'):
              existing_record = self.env['setting.config'].search([('vit_config_server_name', '=', vals['vit_config_server_name'])])

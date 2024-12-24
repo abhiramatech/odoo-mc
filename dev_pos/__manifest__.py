@@ -1,5 +1,5 @@
 {
-    'name': 'VIT Demo POS',
+    'name': 'VIT POS MC',
     'version': '17.0.1.0.0',
     'category': 'Point of Sale',
     'summary': """Belong to VIT""",
@@ -7,7 +7,7 @@
     'company': 'Visi Intech',
     'maintainer': 'Visi Intech',
     'website': "https://www.Visi-Intech.com",
-    'depends': ['base', 'sale', 'stock', 'point_of_sale', 'account'],
+    'depends': ['base', 'sale', 'stock', 'point_of_sale', 'account', 'mrp'],
     'data': [
         # 'security/hr_security.xml',
         'security/ir.model.access.csv',
@@ -53,15 +53,18 @@
         'views/account_account_view.xml',
         'views/end_shift_view.xml',
         'views/pos_cashier_log_view.xml',
+        'views/favicon.xml',
+        'views/pos_orderline_views.xml',
+        'views/inventory_stock_view.xml',
+        'views/barcode_config_views.xml',
+        'views/print_barcode_view.xml',
+        'views/product_product_view.xml',
+        'views/mrp_unbuild_line_view.xml',
     ],
     'assets': {
-        'point_of_sale._assets_pos': [
-            # 'dev_pos/static/src/css/pop_up.css',
-            # 'dev_pos/static/src/xml/button.xml',
-            # # 'dev_pos/static/src/xml/button_screen.xml',
-            # 'dev_pos/static/src/js/button.js',
-            'dev_pos/static/src/js/custom_invoice.js',
-            # 'dev_pos/static/src/js/pop_up_card.js',
+        'web.assets_backend': [
+            'dev_pos/static/src/js/web_title.js',
+            'dev_pos/static/src/css/theme_custom.css',
         ],
     },
     'license': 'LGPL-3',

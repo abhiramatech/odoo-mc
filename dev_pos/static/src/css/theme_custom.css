@@ -1,0 +1,295 @@
+/* static/src/css/custom_theme.css */
+
+:root {
+    --primary: #8dc63f;
+    --primary-dark: #719f32;
+    --primary-light: #9ed154;
+    --o-primary: #8dc63f !important;
+    --o-primary-hover: #719f32 !important;
+    --o-primary-active: #5c8229 !important;
+}
+
+/* Warna Background */
+.o_main_navbar {
+    background-color: var(--primary) !important;
+}
+
+.btn-primary, 
+.btn-fill-primary,
+.bg-primary {
+    background-color: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+.btn-primary:hover,
+.btn-fill-primary:hover {
+    background-color: var(--primary-dark) !important;
+    border-color: var(--primary-dark) !important;
+}
+
+/* Warna Text */
+.text-primary,
+.o_main_navbar .o_menu_brand,
+.o_main_navbar .dropdown .dropdown-toggle,
+.o_main_navbar .o_nav_entry {
+    color: #ffffff !important;
+}
+
+.btn-primary,
+.btn-fill-primary {
+    color: #ffffff !important;
+}
+
+/* Links */
+a {
+    color: var(--primary);
+}
+
+a:hover {
+    color: var(--primary-dark);
+}
+
+/* Form Elements */
+.custom-control-input:checked ~ .custom-control-label::before,
+.custom-checkbox .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+/* Sidebar */
+.o_main_navbar .o_menu_sections,
+.o_main_navbar .o_menu_systray {
+    background-color: var(--primary) !important;
+}
+
+/* Buttons in Kanban */
+.o_kanban_view .oe_kanban_card .oe_kanban_action_button,
+.o_kanban_view .oe_kanban_card .o_dropdown_kanban {
+    background-color: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+/* Form View */
+.o_form_view .o_form_statusbar > .o_statusbar_status > .o_arrow_button.btn-primary {
+    background-color: var(--primary) !important;
+}
+
+/* Search Panel */
+.o_search_panel .o_search_panel_category .o_search_panel_section_icon {
+    color: var(--primary) !important;
+}
+
+/* Chatter */
+.o_ChatterTopbar_button.o-active {
+    background-color: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+/* Progress Bars */
+.progress-bar {
+    background-color: var(--primary) !important;
+}
+
+/* Selected Items */
+.o_selected_row {
+    background-color: var(--primary-light) !important;
+}
+
+/* Control Panel */
+.o_cp_buttons .btn-primary {
+    background-color: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+/* Dropdown Menus */
+.dropdown-item.active, 
+.dropdown-item:active {
+    background-color: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+/* Calendar View */
+.o_calendar_view .fc-event {
+    background-color: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+/* Settings Menu */
+.o_base_settings .o_setting_container .settings_tab .tab.selected {
+    background-color: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+/* Mobile View */
+@media (max-width: 767.98px) {
+    .o_main_navbar {
+        background-color: var(--primary) !important;
+    }
+}
+
+/* Header Menu Bar */
+.o_main_navbar,
+.o_menu_brand,
+.o_menu_sections,
+nav.o_main_navbar,
+.o_main_navbar > ul > li > a,
+.o_main_navbar > ul > li.o_extra_menu_items > a {
+    background-color: #8dc63f !important;
+    border-color: #8dc63f !important;
+    color: #ffffff !important;
+}
+
+/* Active/Selected Menu Item */
+.o_main_navbar > ul > li.show > a,
+.o_main_navbar > ul > li > a:hover,
+.o_main_navbar > ul > li.o_extra_menu_items.show > a {
+    background-color: #ffffff !important;
+}
+
+/* Sub-menu items */
+.o_main_navbar .dropdown-menu,
+.o_main_navbar .dropdown-menu > a {
+    background-color: #ffffff !important;
+    color: #1e1d1d !important;
+}
+
+/* Sub-menu hover state */
+.o_main_navbar .dropdown-menu > a:hover {
+    background-color: #8dc63f !important;
+}
+
+/* Specific menu items */
+.o_menu_sections,
+.o_menu_sections > a,
+.o_menu_sections .dropdown-toggle {
+    background-color: #8dc63f !important;
+    color: #ffffff !important;
+}
+
+/* Menu brand/logo area */
+.o_menu_brand {
+    background-color: #8dc63f !important;
+    color: #ffffff !important;
+}
+
+/* Switch view buttons - active state only */
+.o_cp_switch_buttons.btn-group .btn-secondary.active {
+    background-color: #8dc63f !important;
+    border-color: #8dc63f !important;
+    color: #ffffff !important;
+}
+
+/* Normal state */
+.o_cp_switch_buttons.btn-group .btn-secondary {
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+    color: #212529 !important;
+}
+
+/* Hover state */
+.o_cp_switch_buttons.btn-group .btn-secondary:hover:not(.active) {
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
+}
+
+/* Top navigation bar - more specific selector */
+header > nav.o_main_navbar {
+    background-color: #8dc63f !important;
+}
+
+/* Additional specificity for menu items */
+.o_main_navbar .o_menu_sections > div,
+.o_main_navbar .o_menu_sections > a {
+    background-color: #8dc63f !important;
+}
+
+/* POS Specific Styles */
+.pos .pos-topheader {
+    background-color: #8dc63f !important;
+}
+
+.pos .button {
+    background: #8dc63f !important;
+    color: white !important;
+}
+
+.pos .button:hover {
+    background: #719f32 !important;
+}
+
+.pos .payment-screen .button {
+    background: #8dc63f !important;
+}
+
+.pos .payment-screen .button:hover {
+    background: #719f32 !important;
+}
+
+.pos .numpad button {
+    background: #8dc63f !important;
+    color: white !important;
+}
+
+.pos .numpad button:hover {
+    background: #719f32 !important;
+}
+
+.pos .control-button {
+    background: #8dc63f !important;
+    color: white !important;
+}
+
+.pos .control-button:hover {
+    background: #719f32 !important;
+}
+
+.pos .product.selected {
+    border-color: #8dc63f !important;
+}
+
+.pos .category-button {
+    background: #8dc63f !important;
+    color: white !important;
+}
+
+.pos .category-button:hover {
+    background: #719f32 !important;
+}
+
+.pos .paymentmethod {
+    background: #8dc63f !important;
+    color: white !important;
+}
+
+.pos .paymentmethod:hover {
+    background: #719f32 !important;
+}
+
+.pos .pos-rightheader > * {
+    background: #8dc63f !important;
+    color: white !important;
+}
+
+.pos .actionpad .button {
+    background: #8dc63f !important;
+}
+
+.pos .payment-screen .payment-buttons .button {
+    background: #8dc63f !important;
+}
+
+.pos *::-webkit-scrollbar-thumb {
+    background: #8dc63f !important;
+}
+
+.pos .category-button.selected {
+    background: #719f32 !important;
+}
+
+.pos .order .orderline.selected {
+    background: rgba(141, 198, 63, 0.2) !important;
+}
+
+.pos .modal-header {
+    background: #8dc63f !important;
+}

@@ -15,7 +15,7 @@ class ManualSyncSSToMCIntegratiion(models.Model):
     master_customer_to_mc = fields.Boolean(string="Master Customer", default=False)
     master_employee_to_mc = fields.Boolean(string="Master Employee", default=False)
     vit_session = fields.Boolean(string="Session", default=False)
-    vit_end_shift = fields.Boolean(string="End of Shift", default=False)
+    vit_end_shift = fields.Boolean(string="Shift", default=False)
     vit_invoice = fields.Boolean(string="PoS Order", default=False)
     vit_invoice_rescue = fields.Boolean(string="PoS Order Rescue", default=False)
     vit_internal_transfers_to_mc = fields.Boolean(string="Internal Transfers", default=False)
@@ -23,14 +23,16 @@ class ManualSyncSSToMCIntegratiion(models.Model):
     vit_goods_issue_to_mc = fields.Boolean(string="Goods Issue", default=False)
     vit_receipts_to_mc = fields.Boolean(string="GRPO", default=False)
     vit_inventory_adjustment_to_mc = fields.Boolean(string="Inventory Adjustment", default=False)
+    vit_inventory_counting = fields.Boolean(string="Inventory Counting", default=False)
     vit_ts_out = fields.Boolean(string="TS Out", default=False)
     vit_val_ts_in = fields.Boolean(string="Validate TS In", default=False)
     vit_val_grpo = fields.Boolean(string="Validate GRPO", default=False)
     vit_val_goods_receipts = fields.Boolean(string="Validate Goods Receipts", default=False)
     vit_val_goods_issue = fields.Boolean(string="Validate Goods Issue", default=False)
+    vit_manufacture_order = fields.Boolean(string="Manufacture Order/Unbuild", default=False)
 
     def action_start(self):
-        store, date_from, date_to, master_customer_to_mc, master_employee_to_mc, vit_session, vit_end_shift, vit_invoice, vit_invoice_rescue, vit_internal_transfers_to_mc, vit_goods_receipts_to_mc, vit_goods_issue_to_mc, vit_receipts_to_mc, inventory_adjustment_to_mc, vit_ts_out, vit_val_ts_in, vit_val_grpo, vit_val_goods_receipts, vit_val_goods_issue = self.search_manual_sync()
+        store, date_from, date_to, master_customer_to_mc, master_employee_to_mc, vit_session, vit_end_shift, vit_invoice, vit_invoice_rescue, vit_internal_transfers_to_mc, vit_goods_receipts_to_mc, vit_goods_issue_to_mc, vit_receipts_to_mc, vit_inventory_adjustment_to_mc, vit_inventory_counting, vit_ts_out, vit_val_ts_in, vit_val_grpo, vit_val_goods_receipts, vit_val_goods_issue, vit_manufacture_order = self.search_manual_sync()
         store_id = store.id
         mc_client, ss_clients = self.get_config(store_id)
         datefrom, dateto = self.get_date(date_from, date_to)
@@ -55,8 +57,10 @@ class ManualSyncSSToMCIntegratiion(models.Model):
             self.transfer_goods_issue(mc_client, ss_clients, datefrom, dateto)
         if vit_receipts_to_mc:
             self.transfer_receipts_ss_to_mc(mc_client, ss_clients, datefrom, dateto)
-        if inventory_adjustment_to_mc:
+        if vit_inventory_adjustment_to_mc:
             self.transfer_inventory_adjustment(mc_client, ss_clients, datefrom, dateto)
+        if vit_inventory_counting:
+            self.transfer_inventory_counting(mc_client, ss_clients, datefrom, dateto)
         if vit_ts_out:
             self.transfer_ts_out(mc_client, ss_clients, datefrom, dateto)
         if vit_val_ts_in:
@@ -67,6 +71,8 @@ class ManualSyncSSToMCIntegratiion(models.Model):
             self.validate_goods_receipts_store(mc_client, ss_clients, datefrom, dateto)
         if vit_val_goods_issue:
             self.validate_goods_issue_store(mc_client, ss_clients, datefrom, dateto)
+        if vit_manufacture_order:
+            self.create_manufacture_unbuild(mc_client, ss_clients, datefrom, dateto)
 
         message = _("Sync Finished")
         return {'type': 'ir.actions.client',
@@ -96,12 +102,14 @@ class ManualSyncSSToMCIntegratiion(models.Model):
             goods_issue_to_mc = configs.vit_goods_issue_to_mc
             receipts_to_mc = configs.vit_receipts_to_mc
             inventory_adjustment_to_mc = configs.vit_inventory_adjustment_to_mc
+            inventory_counting = configs.vit_inventory_counting
             ts_out = configs.vit_ts_out
             ts_in = configs.vit_val_ts_in
             grpo = configs.vit_val_grpo
             vit_val_goods_receipts = configs.vit_val_goods_receipts
             vit_val_goods_issue = configs.vit_val_goods_issue
-        return store, date_from, date_to, master_customer_to_mc, master_employee_to_mc, session, end_shift, invoice, invoice_rescue,internal_transfers_to_mc, goods_receipts_to_mc, goods_issue_to_mc, receipts_to_mc, inventory_adjustment_to_mc, ts_out, ts_in, grpo, vit_val_goods_receipts, vit_val_goods_issue
+            vit_manufacture_order = configs.vit_manufacture_order
+        return store, date_from, date_to, master_customer_to_mc, master_employee_to_mc, session, end_shift, invoice, invoice_rescue,internal_transfers_to_mc, goods_receipts_to_mc, goods_issue_to_mc, receipts_to_mc, inventory_adjustment_to_mc, inventory_counting, ts_out, ts_in, grpo, vit_val_goods_receipts, vit_val_goods_issue, vit_manufacture_order
 
     def create(self, vals):
         if vals.get('store_sync'):
