@@ -56,12 +56,9 @@
     ],
     'assets': {
         'point_of_sale._assets_pos': [
-            # 'dev_pos/static/src/css/pop_up.css',
-            # 'dev_pos/static/src/xml/button.xml',
-            # # 'dev_pos/static/src/xml/button_screen.xml',
-            # 'dev_pos/static/src/js/button.js',
-            'dev_pos/static/src/js/custom_invoice.js',
-            # 'dev_pos/static/src/js/pop_up_card.js',
+        ],
+        'web.assets_backend': [
+            'dev_pos/static/src/css/theme_custom.css',
         ],
     },
     'license': 'LGPL-3',

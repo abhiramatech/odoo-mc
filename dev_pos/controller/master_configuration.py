@@ -231,10 +231,10 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.payment_method_from_mc('pos.payment.method', ['id', 'name', 'is_online_payment', 'is_store', 'split_transactions', 'journal_id', 'config_ids'], 'Transaksi PoS Payment Method', datefrom, dateto)
+            integrator_transaksiMCtoSS.account_account_from_mc('account.account', ['id', 'name', 'code', 'account_type', 'reconcile'], 'Transaksi COA', datefrom, dateto)
             integrator_transaksiMCtoSS.journal_account_from_mc('account.journal', ['id', 'name', 'type', 'refund_sequence', 'is_store', 'code', 'account_control_ids', 'invoice_reference_type', 'invoice_reference_model' ], 'Transaksi Journal', datefrom, dateto)
             integrator_transaksiMCtoSS.pos_config_from_mc('pos.config', ['id', 'name', 'module_pos_hr', 'is_store', 'is_posbox', 'other_devices'], 'Transaksi PoS Config', datefrom, dateto)
-            integrator_transaksiMCtoSS.account_account_from_mc('account.account', ['id', 'name', 'code', 'account_type', 'reconcile'], 'Transaksi COA', datefrom, dateto)
+            integrator_transaksiMCtoSS.payment_method_from_mc('pos.payment.method', ['id', 'name', 'is_online_payment', 'is_store', 'split_transactions', 'journal_id', 'config_ids'], 'Transaksi PoS Payment Method', datefrom, dateto)
 
     def create_master_pricelist(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -583,6 +583,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksi.transfer_pos_order_invoice_ss_to_mc('pos.order', ['id', 'name', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
             integrator_transaksi.update_session_status('pos.session', ['name', 'state', 'start_at', 'stop_at', 'config_id', 'cash_register_balance_start', 'cash_register_balance_end_real'], 'Update Session PoS Order', date_from, date_to)
             integrator_transaksi.transfer_pos_order_session('pos.session', ['name', 'config_id', 'user_id', 'start_at', 'stop_at', 'state'], 'Master Session PoS Order Invoice', date_from, date_to)
 
@@ -606,6 +607,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksi.transfer_pos_order_invoice_ss_to_mc('pos.order', ['id', 'name', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
             integrator_transaksi.update_session_status('pos.ses?sion', ['name', 'id','state', 'is_store', 'start_at', 'stop_at', 'cash_register_balance_start', 'cash_register_balance_end_real'], "Session Updated", date_from, date_to)
             integrator_transaksi.transfer_pos_order_session('pos.session', ['name', 'config_id', 'is_store', 'user_id', 'start_at', 'stop_at', 'state'], 'Master Session PoS Order Invoice', date_from, date_to)
 
@@ -1054,10 +1056,10 @@ class SettingConfig(models.Model):
                 vals['vit_linked_server'] = False
                 vals['vit_state'] = 'failed'
 
-        if vals.get('vit_config_url'):
-            existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
-            if existing_record:
-                raise UserError(_("URL already exists"))
+        # if vals.get('vit_config_url'):
+        #     existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
+        #     if existing_record:
+        #         raise UserError(_("URL already exists"))
             
         if vals.get('vit_config_server_name'):
             existing_record = self.env['setting.config'].search([('vit_config_server_name', '=', vals['vit_config_server_name'])])
@@ -1067,10 +1069,10 @@ class SettingConfig(models.Model):
         return super(SettingConfig, self).create(vals)
 
     def write(self, vals):
-        if 'vit_config_url' in vals:
-             existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
-             if existing_record:
-                 raise UserError(_("URL already exists"))
+        # if 'vit_config_url' in vals:
+        #      existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
+        #      if existing_record:
+        #          raise UserError(_("URL already exists"))
         
         if vals.get('vit_config_server_name'):
              existing_record = self.env['setting.config'].search([('vit_config_server_name', '=', vals['vit_config_server_name'])])

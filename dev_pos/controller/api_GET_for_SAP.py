@@ -180,8 +180,8 @@ class PaymentReturnCreditMemoAPI(http.Controller):
                     ('origin', '=', order_pos.name)
                 ], limit=1)
 
-                location_id = picking.location_id.id if picking else False
-                location = picking.location_id.complete_name if picking else ''
+                location_id = picking.location_dest_id.id if picking else False
+                location = picking.location_dest_id.complete_name if picking else ''
 
                 # Get payment details
                 for payment_line in order_pos.payment_ids:
@@ -1481,6 +1481,7 @@ class InvoiceOrder(http.Controller):
                     'id': order.id,
                     'pos_order_id': order.pos_order_ids[0].id if order.pos_order_ids else None,
                     'doc_num': order.name,
+                    'ref_num': order.ref,
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
@@ -1827,6 +1828,7 @@ class CrediNoteAPI(http.Controller):
                 order_data = {
                     'id': order.id,
                     'doc_num': order.name,
+                    'ref_num': order.ref.split(": ")[-1] if order.ref else None,
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
@@ -2171,8 +2173,8 @@ class GoodsReceiptAPI(http.Controller):
                     'doc_num': order.name,
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id,
-                    'stock_type_id': order.stock_type.id or int(-1),
-                    'stock_type': order.stock_type.type_code or '',
+                    'stock_type_id': order.stock_type.type_code or int(-1),
+                    'stock_type': order.stock_type.type_name or '',
                     # 'location_id': order.location_id.id,
                     # 'location_name': order.location_id.name,
                     'location_id': order.location_dest_id.id,
@@ -2221,8 +2223,8 @@ class GoodsReceiptAPI(http.Controller):
             doc_num = goods_receipt.name
             customer_name = goods_receipt.partner_id.name
             customer_id = goods_receipt.partner_id.id
-            stock_type_id = goods_receipt.stock_type.id
-            stock_type = goods_receipt.stock_type.type_code
+            stock_type_id = goods_receipt.stock_type.type_code
+            stock_type = goods_receipt.stock_type.type_name
             location_id = goods_receipt.location_id.id
             location = goods_receipt.location_id.complete_name
             location_dest_id = goods_receipt.location_dest_id.id
@@ -2329,8 +2331,8 @@ class GoodsIssueAPI(http.Controller):
                     'doc_num': order.name,
                     'source_document': order.origin,
                     'customer_id': order.partner_id.id or "",
-                    'stock_type_id': order.stock_type.id,
-                    'stock_type': order.stock_type.type_code,
+                    'stock_type_id': order.stock_type.type_code or int(-1),
+                    'stock_type': order.stock_type.type_name or '',
                     'location_id': order.location_id.id,
                     'location_name': order.location_id.complete_name,
                     'location_dest_id': order.location_dest_id.id,
@@ -2377,8 +2379,8 @@ class GoodsIssueAPI(http.Controller):
             doc_num = goods_issue.name
             customer_name = goods_issue.partner_id.name
             customer_id = goods_issue.partner_id.id
-            stock_type_id = goods_issue.stock_type.id
-            stock_type = goods_issue.stock_type.type_code
+            stock_type_id = goods_issue.stock_type.type_code or int(-1)
+            stock_type = goods_issue.stock_type.type_name or ''
             location_id = goods_issue.location_id.id
             location = goods_issue.location_id.complete_name
             location_dest_id = goods_issue.location_dest_id.id
@@ -2486,7 +2488,7 @@ class GRPO(http.Controller):
                     'source_document': order.origin or '',
                     'vit_trxid': order.vit_trxid or '',
                     'customer_id': order.partner_id.id,
-                    'stock_type_id': order.stock_type.id or int(-1),
+                    'stock_type_id': order.stock_type.code or int(-1),
                     'stock_type': order.stock_type.type_code or '',
                     'location_id': order.location_id.id or int(-1),
                     'location_name': order.location_id.complete_name or '',
