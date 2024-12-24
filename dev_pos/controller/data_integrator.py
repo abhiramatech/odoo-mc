@@ -94,7 +94,21 @@ class DataIntegrator:
                                                     {'fields': fields})
             elif model == 'ir.sequence':
                 data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-                                                    self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['is_from_operation_types', '=', True], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
+                                                    self.source_client.password, model, 'search_read', 
+                                                    [[  '&',  # Mulai grouping dengan AND untuk semua kondisi
+                                                        '|',  # OR untuk kondisi warehouse_name
+                                                        ['warehouse_name', '=', self.target_client.server_name], ['warehouse_name', '=', False],
+                                                        '&',  # AND untuk kondisi lainnya
+                                                        [field_uniq, '!=', False], ['is_integrated', '=', False], ['is_from_operation_types', '=', True], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
+                                                    {'fields': fields})
+            elif model == 'stock.picking.type':
+                data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                    self.source_client.password, model, 'search_read', 
+                                                    [[  '&',  # Mulai grouping dengan AND untuk semua kondisi
+                                                        '|',  # OR untuk kondisi warehouse_name
+                                                        ['warehouse_id.name', '=', self.target_client.server_name], ['warehouse_id', '=', False],
+                                                        '&',  # AND untuk kondisi lainnya
+                                                        [field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
                                                     {'fields': fields})
             else:
                 data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
@@ -181,6 +195,98 @@ class DataIntegrator:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", e, None)
             self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, e, None)
     
+    def update_id_mc_operation_types(self, model, record, record_target):
+        try:
+            id_mc = record.get('id')
+            id_record_target = {data['id'] for data in record_target if data['name'] == record.get('name')}
+            id_data_operation_types, = id_record_target
+            updated_operation_types = {'id_mc' : id_mc }
+
+            start_time = time.time()
+            update_operation_types = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
+                                                        self.target_client.password, model, 'write', [id_data_operation_types, updated_operation_types])
+            end_time = time.time()
+            duration = end_time - start_time
+
+            if update_operation_types:
+                self.update_isintegrated_source(model, [id_mc])
+                write_date = record.get('write_date')
+                log_record_updated = self.set_log_mc.log_update_record_success(record, id_data_operation_types, updated_operation_types, start_time, end_time, duration, 'Update Operation Types', write_date, self.source_client.server_name, self.target_client.server_name)
+                self.set_log_mc.create_log_note_update_success(log_record_updated)
+                self.set_log_ss.create_log_note_update_success(log_record_updated)
+
+        except Exception as e:
+            self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred when update operation types: {e}", None)
+            self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, f"Error occurred when update operation types: {e}", None)
+
+    def update_operation_types(self, model, fields, modul, date_from, date_to):
+        try:
+            # Update nama ke GRPO
+            data_list_GRPO = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                    self.source_client.password, model, 'search_read', 
+                                                    [[  '&',  # Mulai grouping dengan AND untuk semua kondisi
+                                                        '|',  # OR untuk kondisi warehouse_name
+                                                        ['warehouse_id.name', '=', self.target_client.server_name], ['warehouse_id', '=', False],
+                                                        '&',  # AND untuk kondisi lainnya 
+                                                        ['name', '=', 'GRPO'], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
+                                                    {'fields': fields})
+            if data_list_GRPO:
+                id_data_list_GRPO = data_list_GRPO[0]['id']
+                data_operation_types = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
+                                                    self.target_client.password, model, 'search_read', [[['name', '=', 'Receipts']]],
+                                                    {'fields': ['id']})
+                if data_operation_types:
+                    id_data_operation_types = data_operation_types[0]['id']
+                    updated_operation_types = { 'name' : 'GRPO',
+                                                'id_mc' : id_data_list_GRPO}
+                    
+                    start_time = time.time()
+                    update_operation_types = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
+                                                                self.target_client.password, model, 'write', [id_data_operation_types, updated_operation_types])
+                    end_time = time.time()
+                    duration = end_time - start_time
+
+                    if update_operation_types:
+                        self.update_isintegrated_source(model, [id_data_list_GRPO])
+                        write_date = data_list_GRPO[0]['write_date']
+                        log_record_updated = self.set_log_mc.log_update_record_success(data_list_GRPO[0], id_data_operation_types, updated_operation_types, start_time, end_time, duration, modul, write_date, self.source_client.server_name, self.target_client.server_name)
+                        self.set_log_mc.create_log_note_update_success(log_record_updated)
+                        self.set_log_ss.create_log_note_update_success(log_record_updated)
+            
+            data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                    self.source_client.password, model, 'search_read', 
+                                                    [[  '&',  # Mulai grouping dengan AND untuk semua kondisi
+                                                        '|',  # OR untuk kondisi warehouse_name
+                                                        ['warehouse_id.name', '=', self.target_client.server_name], ['warehouse_id', '=', False],
+                                                        '&',  # AND untuk kondisi lainnya 
+                                                        ['name', '!=', 'False'], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
+                                                    {'fields': fields}) # , 'limit': 1
+            if data_list:
+                existing_data_target = self.get_existing_data(model, 'name', fields) # 1 calling odoo
+                existing_data = {data['name'] for data in existing_data_target}
+                filtered_data_for_update = [item for item in data_list if item['name'] in existing_data]
+
+                data_for_update = []
+                log_data_updated = []
+                id_mc_for_update_isintegrated = []
+                ids_for_update_index_store = []
+                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                    futures = []
+                    # Kirim setiap record dalam partial_data untuk diproses secara asinkron
+                    for record in filtered_data_for_update:
+                        future = executor.submit(self.update_id_mc_operation_types, model, record, existing_data_target)
+                        futures.append(future)
+                    # Tunggu semua proses selesai
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            future.result()
+                        except Exception as e:
+                            self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred while processing record data: {e}", None)
+                            self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, f"Error occurred while processing record data: {e}", None)
+        except Exception as e:
+            self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred when update operation types: {e}", None)
+            self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, f"Error occurred when update operation types: {e}", None)
+
     def transfer_data(self, model, fields, modul, date_from, date_to):
         try:  
             field_uniq = self.get_field_uniq_from_model(model)

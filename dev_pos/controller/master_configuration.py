@@ -278,6 +278,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
+            integrator_master.update_operation_types('stock.picking.type', ['name', 'code', 'sequence_id', 'sequence_code', 'warehouse_id', 'reservation_method', 'return_picking_type_id', 'default_location_return_id', 'create_backorder', 'use_create_lots', 'use_existing_lots', 'default_location_src_id', 'default_location_dest_id', 'create_date', 'write_date'], 'Update Master Operation', date_from, date_to)
             integrator_master.transfer_data('ir.sequence', ['name', 'implementation', 'code', 'active', 'prefix', 'suffix', 'use_date_range', 'padding', 'number_increment', 'create_date', 'write_date'], 'Master Sequence', date_from, date_to)
             integrator_master.transfer_data('stock.picking.type', ['name', 'code', 'sequence_id', 'sequence_code', 'warehouse_id', 'reservation_method', 'return_picking_type_id', 'default_location_return_id', 'create_backorder', 'use_create_lots', 'use_existing_lots', 'default_location_src_id', 'default_location_dest_id', 'create_date', 'write_date'], 'Master Operation', date_from, date_to)
 
