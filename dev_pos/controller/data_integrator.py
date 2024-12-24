@@ -340,7 +340,7 @@ class DataIntegrator:
                 for data_update in data_for_update:
                     id_mc = data_update[0]['id']
                     write_date = data_update[0]['write_date']
-                    log_record = self.set_log_mc.log_update_record_success(data_update[0], data_update[1], data_update[2], data_update[3], data_update[4], data_update[5], modul, write_date, self.target_client.server_name, self.source_client.server_name)
+                    log_record = self.set_log_mc.log_update_record_success(data_update[0], data_update[1], data_update[2], data_update[3], data_update[4], data_update[5], modul, write_date, self.source_client.server_name, self.target_client.server_name)
                     log_data_updated .append(log_record)
                     id_mc_for_update_isintegrated.append(id_mc)
             
