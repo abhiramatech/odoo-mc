@@ -13,6 +13,15 @@ class PurchaseOrderIntegration(models.Model):
     vit_trxid = fields.Char(string='Transaction ID')
     is_integrated = fields.Boolean(string="Integrated", default=False)
 
+    def button_confirm(self):
+        # Panggil method asli untuk tetap menjalankan logika bawaan Odoo
+        res = super().button_confirm()
+
+        for order in self:
+            # Set scheduled_date pada semua receipts agar ikut backdate
+            for picking in order.picking_ids:
+                picking.write({'vit_trxid': order.vit_trxid})
+
     def create_purchase_orders(self):
         partner_id = 7
         picking_type_id = 1

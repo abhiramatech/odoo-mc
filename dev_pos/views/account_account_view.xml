@@ -9,8 +9,6 @@
       <field name="arch" type="xml">
         <xpath expr="//field[@name='code']" position="before">
             <field name="is_store"/>
-        </xpath>
-        <xpath expr="//field[@name='reconcile']" position="after">
             <field name="is_integrated"/>
         </xpath>
       </field>

@@ -8,3 +8,5 @@ class POSLineIntegration(models.Model):
     _inherit = 'pos.order.line'
 
     is_exchange = fields.Boolean(string='Is Exchange')
+    user_id = fields.Many2one('hr.employee', string='Salesperson',
+                              help="You can see salesperson here")
