@@ -2613,7 +2613,7 @@ class DataTransaksiMCtoSS:
             payment_method = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         model_name, 'search_read',
-                                                        [[['is_integrated', '=', False]]],
+                                                        [[['is_integrated', '=', False], ['config_ids', '!=', False]]],
                                                         {'fields': fields})
 
             if not payment_method:
@@ -2622,36 +2622,43 @@ class DataTransaksiMCtoSS:
             
             # print(payment_method)
 
-            # Extract and map journal_ids
-            journal_ids = [record.get('journal_id')[0] if isinstance(record.get('journal_id'), list) else record.get('journal_id') for record in payment_method]
+            journal_ids = [str(record.get('journal_id')[0]) if isinstance(record.get('journal_id'), list) else str(record.get('journal_id')) for record in payment_method]
 
-            journal_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                        self.target_client.uid, self.target_client.password,
-                                                        'account.journal', 'search_read',
-                                                        [[['id_mc', 'in', journal_ids]]],
-                                                        {'fields': ['id', 'id_mc']})
-            journal_source_dict = {journal['id']: journal['id'] for journal in journal_source}
 
-            # print(journal_source_dict)
+            journal_id_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'account.journal', 'search_read',
+                                                                [[['id_mc', 'in', journal_ids]]],
+                                                                {'fields': ['id', 'id_mc']})
+            journal_id_source_dict = {location['id_mc']: location['id'] for location in journal_id_source}
 
-            # Extract and map config_ids
-            config_ids = [config_id for configs in payment_method for config_id in configs.get('config_ids', [])]
-            source_config = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                        self.target_client.uid, self.target_client.password,
-                                                        'pos.config', 'search_read',
-                                                        [[['id_mc', 'in', config_ids]]],
-                                                        {'fields': ['id', 'id_mc']})
-            
-            source_config_dict = {config['id']: config['id'] for config in source_config}
 
-            # print(source_config_dict)
+            pos_config_ids = [config_id for record in payment_method for config_id in record.get('config_ids', [])]
+
+            pos_configs_source = self.source_client.call_odoo(
+                'object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'pos.config', 'search_read',
+                [[['id', 'in', pos_config_ids]]],
+                {'fields': ['id', 'name']}
+            )
+
+            pos_configs_target = self.target_client.call_odoo(
+                'object', 'execute_kw', self.target_client.db,
+                self.target_client.uid, self.target_client.password,
+                'pos.config', 'search_read',
+                [[['name', 'in', [pos_config['name'] for pos_config in pos_configs_source]]]],
+                {'fields': ['id', 'name']}
+            )
+
+            pos_config_dict = {pos_config['name']: pos_config['id'] for pos_config in pos_configs_target}
 
             existing_payment_method_dict = {}
             for record in payment_method:
                 existing_payment = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'pos.payment.method', 'search_read',
-                                                                [[['name', '=', record.get('name')]]],
+                                                                [[['name', '=', record.get('vit_trxid')]]],
                                                                 {'fields': ['id']})
                 if existing_payment:
                     existing_payment_method_dict[record['id']] = existing_payment[0]['id']
@@ -2671,11 +2678,16 @@ class DataTransaksiMCtoSS:
             setting_config_id = setting_config_ids[0]['id']
 
             def process_payment_method_record_from_mc(record):
-                journal_id = journal_source_dict.get(record.get('journal_id')[0] if isinstance(record.get('journal_id'), list) else record.get('journal_id'), False)
+                # Debug record journal_id
+                # print("Processing Record:", record)
+                # print("Record Journal ID:", record.get('journal_id'))
+                
+                journal_id = journal_id_source_dict.get(
+                    str(record.get('journal_id')[0]) if isinstance(record.get('journal_id'), list) else str(record.get('journal_id'))
+                )
 
-                config_ids_mc = [source_config_dict.get(config_id) for config_id in record.get('config_ids', []) 
-                                if config_id in source_config_dict]
-                config_ids_mc = config_ids_mc if config_ids_mc else []  # Default to empty list if not found
+                source_pos_config_ids = record.get('config_ids', [])
+                target_pos_config_ids = [pos_config_dict.get(pos_config['name']) for pos_config in pos_configs_source if pos_config['id'] in source_pos_config_ids]
 
                 # No need to check if journal_id or config_ids_mc is None; just leave them empty if they are not found
                 if record['id'] in existing_payment_method_dict:
@@ -2685,7 +2697,10 @@ class DataTransaksiMCtoSS:
                                                     self.target_client.uid, self.target_client.password,
                                                     'pos.payment.method', 'write',
                                                     [[existing_payment_method_dict[record['id']]],
-                                                    {'id_mc': record.get('id'), 'is_updated': True, 'journal_id': int(journal_id), 'config_ids': [(6, 0, config_ids_mc)]}])
+                                                    {'id_mc': record.get('id'), 'is_updated': True, 
+                                                     'journal_id': int(journal_id), 'config_ids': target_pos_config_ids,
+                                                     'is_online_payment': record.get('is_online_payment') if record.get('is_online_payment') else False,
+                                                    'split_transactions': record.get('split_transactions') if record.get('split_transactions') else False,}])
                         print(f"id_mc updated for existing Payment Method with ID: {existing_payment_method_dict[record['id']]}")
                     except Exception as e:
                         print(f"Gagal memperbarui id_mc untuk Payment Method yang ada: {e}")
@@ -2700,7 +2715,8 @@ class DataTransaksiMCtoSS:
                             'is_online_payment': record.get('is_online_payment') if record.get('is_online_payment') else False,
                             'split_transactions': record.get('split_transactions') if record.get('split_transactions') else False,
                             'journal_id': int(journal_id),
-                            'config_ids': [(6, 0, config_ids_mc)]
+                            'config_ids': target_pos_config_ids,
+                            'id_mc': record.get('id')
                         }
 
                         try:
@@ -2715,7 +2731,7 @@ class DataTransaksiMCtoSS:
                                 'object', 'execute_kw', self.source_client.db,
                                 self.source_client.uid, self.source_client.password,
                                 'pos.payment.method', 'write',
-                                [[record['id']], {'is_integrated': True}]
+                                [[record['id']], {'is_integrated': True, 'vit_trxid': record.get('name')}]
                             )
                             end_time = time.time()
                             duration = end_time - start_time
@@ -2760,36 +2776,71 @@ class DataTransaksiMCtoSS:
 
             setting_config_id = setting_config_ids[0]['id']
 
+            existing_pos_config_dict = {}
+            for record in pos_config:
+                existing_pos_config = self.target_client.call_odoo(
+                    'object', 'execute_kw', 
+                    self.target_client.db,
+                    self.target_client.uid, 
+                    self.target_client.password,
+                    'pos.config', 'search_read',
+                    [[['name', '=', record.get('vit_trxid')]]],
+                    {'fields': ['id'], 'limit': 1}
+                )
+                if existing_pos_config:
+                    existing_pos_config_dict[record['id']] = existing_pos_config[0]['id']
+
             def process_pos_config_record_from_mc(record):
                 try:
-                    # Validate if the record's is_store matches the setting_config_id
-                    is_store = record.get('is_store')
-                    is_store_id = is_store[0] if isinstance(is_store, list) else is_store
-                    
-                    if is_store_id == setting_config_id:
-                        pos_config_data = {
-                            'name': record.get('name', False),
-                            'id_mc': record.get('id', False),
-                            'module_pos_hr': record.get('module_pos_hr', False)
-                        }
-
-                        # Create new POS Config in target client
-                        new_pos_config = self.target_client.call_odoo(
-                            'object', 'execute_kw', self.target_client.db,
-                            self.target_client.uid, self.target_client.password,
-                            'pos.config', 'create',
-                            [pos_config_data]
-                        )
-                        print(f"PoS Config baru telah dibuat dengan ID: {new_pos_config}")
-
-                        # Fixed: Corrected the write method call - removed extra list nesting
-                        self.source_client.call_odoo(
-                            'object', 'execute_kw', self.source_client.db,
-                            self.source_client.uid, self.source_client.password,
-                            'pos.config', 'write',
-                            [[record['id']], {'is_integrated': True}]  # Fixed here
-                        )
+                    if record['id'] in existing_pos_config_dict:
+                        # Update id_mc on target_client if payment method exists
+                        try:
+                            self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                        self.target_client.uid, self.target_client.password,
+                                                        'pos.config', 'write',
+                                                        [[existing_pos_config_dict[record['id']]],
+                                                        {'name': record.get('name', False),
+                                                        'id_mc': record.get('id', False),
+                                                        'module_pos_hr': record.get('module_pos_hr', False)}])
+                            
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'pos.config', 'write',
+                                [[record['id']], {'is_integrated': True, 'is_updated': True}]
+                            )
+                            print(f"id_mc and is_integrated updated for existing PoS Config with ID: {existing_pos_config_dict[record['id']]}")
+                        except Exception as e:
+                            print(f"Gagal memperbarui id_mc untuk PoS Config yang ada: {e}")
+                        return
                     else:
+                        # Validate if the record's is_store matches the setting_config_id
+                        is_store = record.get('is_store')
+                        is_store_id = is_store[0] if isinstance(is_store, list) else is_store
+                        
+                        if is_store_id == setting_config_id:
+                            pos_config_data = {
+                                'name': record.get('name', False),
+                                'id_mc': record.get('id', False),
+                                'module_pos_hr': record.get('module_pos_hr', False)
+                            }
+
+                            # Create new POS Config in target client
+                            new_pos_config = self.target_client.call_odoo(
+                                'object', 'execute_kw', self.target_client.db,
+                                self.target_client.uid, self.target_client.password,
+                                'pos.config', 'create',
+                                [pos_config_data]
+                            )
+                            print(f"PoS Config baru telah dibuat dengan ID: {new_pos_config}")
+
+                            # Fixed: Corrected the write method call - removed extra list nesting
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'pos.config', 'write',
+                                [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]  # Fixed here
+                        )
                         print(f"Record dengan ID {record['id']} tidak cocok dengan setting_config_id")
                 except Exception as e:
                     print(f"Gagal memproses record dengan ID {record['id']}: {e}")
@@ -2807,12 +2858,12 @@ class DataTransaksiMCtoSS:
         try:
             # Retrieve journal accounts from the source
             journal_account = self.source_client.call_odoo(
-                'object', 'execute_kw', 
+                'object', 'execute_kw',
                 self.source_client.db,
-                self.source_client.uid, 
+                self.source_client.uid,
                 self.source_client.password,
                 model_name, 'search_read',
-                [[]],
+                [[['is_integrated', '=', False]]],
                 {'fields': fields}
             )
 
@@ -2820,7 +2871,45 @@ class DataTransaksiMCtoSS:
                 print("Tidak ada journal yang ditransfer")
                 return
 
-            # Prepare a dictionary of existing journals in the target system
+            # Prepare mapping dictionaries
+            def map_accounts(account_ids, model):
+                if not account_ids:
+                    return {}
+                account_source = self.target_client.call_odoo(
+                    'object', 'execute_kw',
+                    self.target_client.db,
+                    self.target_client.uid,
+                    self.target_client.password,
+                    model, 'search_read',
+                    [[['id_mc', 'in', account_ids]]],
+                    {'fields': ['id', 'id_mc']}
+                )
+                return {record['id_mc']: record['id'] for record in account_source}
+
+            default_account_ids = [
+                str(record.get('default_account_id')[0]) if isinstance(record.get('default_account_id'), list)
+                else str(record.get('default_account_id')) for record in journal_account
+            ]
+            default_account_source_dict = map_accounts(default_account_ids, 'account.account')
+
+            suspense_account_ids = [
+                str(record.get('suspense_account_id')[0]) if isinstance(record.get('suspense_account_id'), list)
+                else str(record.get('suspense_account_id')) for record in journal_account
+            ]
+            suspense_account_source_dict = map_accounts(suspense_account_ids, 'account.account')
+
+            profit_account_ids = [
+                str(record.get('profit_account_id')[0]) if isinstance(record.get('profit_account_id'), list)
+                else str(record.get('profit_account_id')) for record in journal_account
+            ]
+            profit_account_source_dict = map_accounts(profit_account_ids, 'account.account')
+
+            loss_account_ids = [
+                str(record.get('loss_account_id')[0]) if isinstance(record.get('loss_account_id'), list)
+                else str(record.get('loss_account_id')) for record in journal_account
+            ]
+            loss_account_source_dict = map_accounts(loss_account_ids, 'account.account')
+
             existing_journal_dict = {}
             for record in journal_account:
                 existing_journal = self.target_client.call_odoo(
@@ -2835,7 +2924,175 @@ class DataTransaksiMCtoSS:
                 if existing_journal:
                     existing_journal_dict[record['id']] = existing_journal[0]['id']
 
-            print(existing_journal_dict)
+            # Process each journal account
+            def process_journal_account(record):
+                try:
+                    default_account_id = default_account_source_dict.get(
+                        str(record.get('default_account_id')[0]) if isinstance(record.get('default_account_id'), list)
+                        else str(record.get('default_account_id'))
+                    )
+                    suspense_account_id = suspense_account_source_dict.get(
+                        str(record.get('suspense_account_id')[0]) if isinstance(record.get('suspense_account_id'), list)
+                        else str(record.get('suspense_account_id'))
+                    )
+                    profit_account_id = profit_account_source_dict.get(
+                        str(record.get('profit_account_id')[0]) if isinstance(record.get('profit_account_id'), list)
+                        else str(record.get('profit_account_id'))
+                    )
+                    loss_account_id = loss_account_source_dict.get(
+                        str(record.get('loss_account_id')[0]) if isinstance(record.get('loss_account_id'), list)
+                        else str(record.get('loss_account_id'))
+                    )
+
+                    if record['id'] in existing_journal_dict:
+                        # Update id_mc on target_client if payment method exists
+                        try:
+                            self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                        self.target_client.uid, self.target_client.password,
+                                                        'account.journal', 'write',
+                                                        [[existing_journal_dict[record['id']]],
+                                                        {'id_mc': record.get('id'), 'name': record.get('name', False),
+                                                            'type': record.get('type', False),
+                                                            'refund_sequence': record.get('refund_sequence', False),
+                                                            'code': new_code,
+                                                            'id_mc': record.get('id', False),
+                                                            'default_account_id': int(default_account_id) if default_account_id else None,
+                                                            'suspense_account_id': int(suspense_account_id) if suspense_account_id else None,
+                                                            'profit_account_id': int(profit_account_id) if profit_account_id else None,
+                                                            'loss_account_id': int(loss_account_id) if loss_account_id else None,}])
+                            
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'account.journal', 'write',
+                                [[record['id']], {'is_integrated': True, 'is_updated': True}]
+                            )
+                            print(f"id_mc and is_integrated updated for existing Journal with ID: {existing_journal_dict[record['id']]}")
+                        except Exception as e:
+                            print(f"Gagal memperbarui id_mc untuk Journal yang ada: {e}")
+                        return
+                    else:
+                        # Get vit_config_server_name from is_store
+                        is_store_id = record.get('is_store')
+                        is_store_id = is_store_id[0] if isinstance(is_store_id, list) else is_store_id
+                        vit_config_server_name = None
+                        setting_config_id = self.source_client.call_odoo(
+                            'object', 'execute_kw',
+                            self.source_client.db,
+                            self.source_client.uid,
+                            self.source_client.password,
+                            'setting.config', 'search_read',
+                            [[['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                            {'fields': ['id']}
+                        )
+
+                        setting_config_id = setting_config_id[0]['id']
+                        if is_store_id == setting_config_id:
+                            is_store = self.source_client.call_odoo(
+                                'object', 'execute_kw',
+                                self.source_client.db,
+                                self.source_client.uid,
+                                self.source_client.password,
+                                'setting.config', 'search_read',
+                                [[['id', '=', is_store_id], ['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                                {'fields': ['vit_config_server_name'], 'limit': 1}
+                            )
+                            if is_store:
+                                vit_config_server_name = is_store[0]['vit_config_server_name']
+                                print(vit_config_server_name)
+
+                            if not vit_config_server_name:
+                                vit_config_server_name = "WH"
+
+                        # Combine record.get('code') and vit_config_server_name
+                        new_code = f"{record.get('code')}_{vit_config_server_name}"
+                        print(new_code)
+
+                        # Check if the journal code already exists
+                        existing_code = self.target_client.call_odoo(
+                            'object', 'execute_kw',
+                            self.target_client.db,
+                            self.target_client.uid,
+                            self.target_client.password,
+                            'account.journal', 'search_read',
+                            [[['code', '=', new_code]]],
+                            {'fields': ['id']}
+                        )
+                        if existing_code:
+                            print(f"Journal code {new_code} already exists, skipping creation.")
+                            return
+                        
+                        # Prepare journal data
+                        journal_account_data = {
+                            'name': record.get('name', False),
+                            'type': record.get('type', False),
+                            'refund_sequence': record.get('refund_sequence', False),
+                            'code': new_code,
+                            'id_mc': record.get('id', False),
+                            'default_account_id': int(default_account_id) if default_account_id else None,
+                            'suspense_account_id': int(suspense_account_id) if suspense_account_id else None,
+                            'profit_account_id': int(profit_account_id) if profit_account_id else None,
+                            'loss_account_id': int(loss_account_id) if loss_account_id else None,
+                        }
+                        # Create new journal account
+                        new_journal_id = self.target_client.call_odoo(
+                            'object', 'execute_kw',
+                            self.target_client.db,
+                            self.target_client.uid,
+                            self.target_client.password,
+                            'account.journal', 'create',
+                            [journal_account_data]
+                        )
+
+                        self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'account.journal', 'write',
+                            [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]
+                        )
+                        print(f"Journal baru telah dibuat dengan kode: {new_code} dan ID: {new_journal_id}")
+                except Exception as e:
+                    print(f"Gagal memperbarui atau membuat Journal: {e}")
+
+            # Use ThreadPoolExecutor to process records concurrently
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                futures = [executor.submit(process_journal_account, record) for record in journal_account]
+                concurrent.futures.wait(futures)
+
+        except Exception as e:
+            print(f"Gagal membuat atau memposting Payment Method di Source baru: {e}")
+
+    def account_account_from_mc(self, model_name, fields, description, date_from, date_to):
+        try:
+            # Retrieve journal accounts from the source
+            chart_account = self.source_client.call_odoo(
+                'object', 'execute_kw', 
+                self.source_client.db,
+                self.source_client.uid, 
+                self.source_client.password,
+                model_name, 'search_read',
+                [[]],
+                {'fields': fields}
+            )
+
+            if not chart_account:
+                print("Tidak ada coa yang ditransfer")
+                return
+
+            # Prepare a dictionary of existing journals in the target system
+            existing_chart_dict = {}
+            for record in chart_account:
+                existing_chart = self.target_client.call_odoo(
+                    'object', 'execute_kw', 
+                    self.target_client.db,
+                    self.target_client.uid, 
+                    self.target_client.password,
+                    'account.account', 'search_read',
+                    [[['name', '=', record.get('name')], ['code', '=', record.get('code')]]],
+                    {'fields': ['id'], 'limit': 1}
+                )
+                if existing_chart:
+                    existing_chart_dict[record['id']] = existing_chart[0]['id']
 
             setting_config_ids = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
@@ -2852,44 +3109,43 @@ class DataTransaksiMCtoSS:
             setting_config_id = setting_config_ids[0]['id']
 
             # Function to process each journal account
-            def process_journal_account(record):
+            def process_chart_account(record):
                 try:
-                    if record['id'] in existing_journal_dict:
-                        # Update id_mc for existing journal
-                        self.target_client.call_odoo(
-                            'object', 'execute_kw', 
-                            self.target_client.db,
-                            self.target_client.uid, 
-                            self.target_client.password,
-                            'account.journal', 'write',
-                            [[existing_journal_dict[record['id']]], {'id_mc': record.get('id')}]
-                        )
-                        print(f"id_mc updated for existing Journal with ID: {existing_journal_dict[record['id']]}")
+                    if record['id'] in existing_chart_dict:
+                        # Update id_mc on target_client if payment method exists
+                        try:
+                            self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                        self.target_client.uid, self.target_client.password,
+                                                        'account.account', 'write',
+                                                        [[existing_chart_dict[record['id']]],
+                                                        {'id_mc': record.get('id'), 'reconcile': record.get('reconcile')}])
+                            print(f"id_mc updated for existing COA with ID: {existing_chart_dict[record['id']]}")
+                        except Exception as e:
+                            print(f"Gagal memperbarui id_mc untuk COA yang ada: {e}")
+                        return
                     else:
                         is_store = record.get('is_store')
                         is_store_id = is_store[0] if isinstance(is_store, list) else is_store
                         
+                        print(f"Is_store: {is_store_id} setting_config_id: {setting_config_id}")
                         if is_store_id == setting_config_id:
                             # Create new journal account
-                            journal_account_data = {
+                            chart_account_data = {
                                 'name': record.get('name', False),
-                                'type': record.get('type', False),
-                                'refund_sequence': record.get('refund_sequence', False),
                                 'code': record.get('code', False),
-                                'account_control_ids': record.get('account_control_ids', False),
-                                'invoice_reference_type': record.get('invoice_reference_type', False),
-                                'invoice_reference_model': record.get('invoice_reference_model', False),
+                                'account_type': record.get('account_type', False),
+                                'reconcile': record.get('reconcile', False)
                             }
 
-                            new_journal_id = self.target_client.call_odoo(
+                            new_account_id = self.target_client.call_odoo(
                                 'object', 'execute_kw', 
                                 self.target_client.db,
                                 self.target_client.uid, 
                                 self.target_client.password,
-                                'account.journal', 'create',
-                                [journal_account_data]
+                                'account.account', 'create',
+                                [chart_account_data]
                             )
-                            print(f"Journal baru telah dibuat dengan ID: {new_journal_id}")
+                            print(f"COA baru telah dibuat dengan ID: {new_account_id}")
 
                             # Mark the source journal as integrated
                             start_time = time.time()
@@ -2898,25 +3154,25 @@ class DataTransaksiMCtoSS:
                                 self.source_client.db,
                                 self.source_client.uid, 
                                 self.source_client.password,
-                                'account.journal', 'write',
+                                'account.account', 'write',
                                 [[record['id']], {'is_integrated': True}]
                             )
                             end_time = time.time()
                             duration = end_time - start_time
 
                             write_date = self.get_write_date(model_name, record['id'])
-                            self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Journal', write_date)
-                            self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Journal', write_date)
+                            self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Chart of Account', write_date)
+                            self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Chart of Account', write_date)
                 except Exception as e:
-                    print(f"Gagal memperbarui atau membuat Journal: {e}")
+                    print(f"Gagal memperbarui atau membuat Chart Account: {e}")
 
             # Use ThreadPoolExecutor to process records concurrently
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                futures = [executor.submit(process_journal_account, record) for record in journal_account]
+                futures = [executor.submit(process_chart_account, record) for record in chart_account]
                 concurrent.futures.wait(futures)
 
         except Exception as e:
-            print(f"Gagal membuat atau memposting Payment Method di Source baru: {e}")
+            print(f"Gagal membuat atau memposting Chart Account di Source baru: {e}")
 
     def debug_taxes(self, model_name, fields, description):
         tax_source = self.source_client.call_odoo(

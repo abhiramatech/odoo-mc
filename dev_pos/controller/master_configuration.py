@@ -234,6 +234,7 @@ class SettingConfig(models.Model):
             integrator_transaksiMCtoSS.payment_method_from_mc('pos.payment.method', ['id', 'name', 'is_online_payment', 'is_store', 'split_transactions', 'journal_id', 'config_ids'], 'Transaksi PoS Payment Method', datefrom, dateto)
             integrator_transaksiMCtoSS.journal_account_from_mc('account.journal', ['id', 'name', 'type', 'refund_sequence', 'is_store', 'code', 'account_control_ids', 'invoice_reference_type', 'invoice_reference_model' ], 'Transaksi Journal', datefrom, dateto)
             integrator_transaksiMCtoSS.pos_config_from_mc('pos.config', ['id', 'name', 'module_pos_hr', 'is_store', 'is_posbox', 'other_devices'], 'Transaksi PoS Config', datefrom, dateto)
+            integrator_transaksiMCtoSS.account_account_from_mc('account.account', ['id', 'name', 'code', 'account_type', 'reconcile'], 'Transaksi COA', datefrom, dateto)
 
     def create_master_pricelist(self, mc, ss, datefrom, dateto):
         if mc and ss:
