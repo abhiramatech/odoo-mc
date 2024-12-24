@@ -2,17 +2,20 @@
 from odoo import fields, models, api
 from datetime import datetime, time
 from pytz import UTC
+from pytz import timezone
 
 class EndShiftSession(models.Model):
     _name = 'end.shift'
+    _rec_name = 'doc_num'
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _description = "End Shift Session per Cashier"
 
-    doc_num = fields.Char(string='Shift Number', tracking=True, readonly=True)
+    doc_num = fields.Char(string='Shift Number', tracking=True, readonly=True, copy=False)
     cashier_id = fields.Many2one('hr.employee', string='Cashier', tracking=True, required=True)
     session_id = fields.Many2one('pos.session', string='Session', tracking=True, required=True)
     start_date = fields.Datetime(string='Start Date', tracking=True)
     end_date = fields.Datetime(string='End Date', tracking=True)
+    is_integrated = fields.Boolean(string='Integrated', default=False, readonly=True, tracking=True)
     state = fields.Selection([
         ('opened', 'Opened'),
         ('in_progress', 'In Progress'),
@@ -68,11 +71,39 @@ class EndShiftSession(models.Model):
             'domain': domain,
             'context': {'create': False}
         }
-
+    
     @api.model
     def create(self, vals):
+        # Mengambil sequence untuk document number
+        sequence_code = 'end.shift.doc.num'
+        doc_num_seq = self.env['ir.sequence'].next_by_code(sequence_code)
+
+        # Mengambil informasi POS dari session
+        session = self.env['pos.session'].browse(vals.get('session_id'))
+        pos_config = session.config_id
+
+        # Mengambil nama POS
+        pos_name = pos_config.name if pos_config else 'UNKNOWN'
+
+        # Membersihkan nama POS dari karakter yang tidak diinginkan
+        pos_code = ''.join(e for e in pos_name if e.isalnum()).upper()
+
+        user_tz = timezone(self.env.user.tz or 'UTC')
+
+        # Mendapatkan tanggal dan waktu saat ini dalam zona waktu lokal
+        current_datetime = datetime.now(user_tz)
+        date_str = current_datetime.strftime("%Y%m%d")
+        time_str = current_datetime.strftime("%H%M%S")
+
+        # Membuat doc_num dengan format yang diinginkan
+        vals['doc_num'] = f"{pos_code}/{date_str}/{time_str}/{doc_num_seq}"
+
+        # Set state to 'opened'
         vals['state'] = 'opened'
-        return super(EndShiftSession, self).create(vals)
+
+        # Panggil metode create asli untuk membuat record baru
+        result = super(EndShiftSession, self).create(vals)
+        return result
 
     def action_start_progress(self):
         for record in self:

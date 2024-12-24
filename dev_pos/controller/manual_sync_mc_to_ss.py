@@ -25,6 +25,7 @@ class ManualSyncMCToSSIntegration(models.Model):
     update_voucher_store = fields.Boolean(string="Update Voucher & Loyalty MC to Store", default=False)
     master_pos_utility = fields.Boolean(string="Master PoS Config", default=False)
     list_warehouse = fields.Boolean(string="Master List Warehouse", default=False)
+    config_print_timbangan = fields.Boolean(string="Barcode Config", default=False)
     vit_internal_transfers = fields.Boolean(string="Internal Transfers", default=False)
     vit_goods_issue = fields.Boolean(string="Goods Issue", default=False)
     vit_goods_receipts = fields.Boolean(string="Goods Receipts", default=False)
@@ -37,7 +38,7 @@ class ManualSyncMCToSSIntegration(models.Model):
     vit_val_ts_out = fields.Boolean(string="Validate TS Out", default=False)
 
     def action_start(self):
-        store, date_from, date_to, master_item_utils, master_item, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out = self.search_manual_sync()
+        store, date_from, date_to, master_item_utils, master_item, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out = self.search_manual_sync()
         mc_client, ss_clients = self.get_config(store.id)
         datefrom, dateto = self.get_date(date_from, date_to)
 
@@ -67,6 +68,8 @@ class ManualSyncMCToSSIntegration(models.Model):
             self.create_payment_method_pos_config_journal_invoicing(mc_client, ss_clients, datefrom, dateto)
         if list_warehouse:
             self.create_list_warehouse(mc_client, ss_clients, datefrom, dateto)
+        if config_print_timbangan:
+            self.transfer_config_timbangan(mc_client, ss_clients, datefrom, dateto)
         if vit_internal_transfers:
             self.transfer_internal_transfers_from_mc_to_store(mc_client, ss_clients, datefrom, dateto)
         if vit_goods_issue:
@@ -119,6 +122,7 @@ class ManualSyncMCToSSIntegration(models.Model):
             update_voucher_store = configs.update_voucher_store
             master_pos_utility = configs.master_pos_utility
             list_warehouse = configs.list_warehouse
+            config_print_timbangan = configs.config_print_timbangan
             vit_internal_transfers= configs.vit_internal_transfers
             vit_goods_issue= configs.vit_goods_issue
             vit_goods_receipts = configs.vit_goods_receipts
@@ -129,7 +133,7 @@ class ManualSyncMCToSSIntegration(models.Model):
             vit_val_goods_receipts = configs.vit_val_goods_receipts
             vit_val_goods_issue = configs.vit_val_goods_issue
             vit_val_ts_out = configs.vit_val_ts_out
-        return store, date_from, date_to, master_item_utils, master_item, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
+        return store, date_from, date_to, master_item_utils, master_item, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
     
     def create(self, vals):
         if vals.get('store_sync'):

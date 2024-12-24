@@ -11,10 +11,10 @@
             <field name="is_integrated"/>
             <field name="index_store" widget="many2many_tags"/>
         </xpath>
-        <xpath expr="//field[@name='customer_code']" position="attributes">
+        <!-- <xpath expr="//field[@name='customer_code']" position="attributes">
           <attribute name="force_save">1</attribute>
           <attribute name="readonly">True</attribute>
-        </xpath>
+        </xpath> -->
       </field>
     </record>
 
