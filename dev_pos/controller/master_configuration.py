@@ -160,7 +160,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
-            integrator_master.transfer_data('account.tax', ['name', 'description', 'amount_type', 'active', 'type_tax_use', 'tax_scope', 'amount', 'invoice_label', 'price_include', 'include_base_amount', 'include_base_amount', 'invoice_repartition_line_ids', 'create_date', 'write_date'], 'Master Tax', date_from, date_to)
+            integrator_master.transfer_data('account.tax', ['name', 'description', 'amount_type', 'active', 'type_tax_use', 'tax_scope', 'amount', 'invoice_label', 'price_include', 'include_base_amount', 'include_base_amount', 'invoice_repartition_line_ids', 'refund_repartition_line_ids', 'create_date', 'write_date'], 'Master Tax', date_from, date_to)
             integrator_master.transfer_data('product.category', ['complete_name', 'name', 'parent_id', 'property_valuation', 'create_date', 'write_date'], 'Master Item Group', date_from, date_to)
             integrator_master.transfer_data('pos.category', ['name', 'parent_id', 'sequence', 'create_date', 'write_date'], 'Master POS Category', date_from, date_to)
             integrator_master.transfer_data('uom.category', ['name', 'is_pos_groupable', 'create_date', 'write_date'], 'Master UoM Group', date_from, date_to)
