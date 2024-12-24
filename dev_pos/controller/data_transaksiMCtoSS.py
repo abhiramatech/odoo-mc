@@ -2754,7 +2754,7 @@ class DataTransaksiMCtoSS:
             pos_config = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
                 self.source_client.uid, self.source_client.password,
-                model_name, 'search_read', [[['is_integrated', '=', True]]], {'fields': fields}
+                model_name, 'search_read', [[['is_integrated', '=', False]]], {'fields': fields}
             )
 
             if not pos_config:
