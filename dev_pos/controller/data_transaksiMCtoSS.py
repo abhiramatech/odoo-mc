@@ -2740,7 +2740,10 @@ class DataTransaksiMCtoSS:
                             self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Payment Method', write_date)
                             self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Payment Method', write_date)
                         except Exception as e:
-                            print(f"Gagal membuat atau memposting Payment Method baru: {e}")
+                            message_exception = f"Gagal memperbarui atau membuat Payment Method: {e}"
+                            write_date = self.get_write_date(model_name, record['id'])
+                            self.set_log_mc.create_log_note_failed(record, 'Payment Method', message_exception, write_date)    
+                            self.set_log_ss.create_log_note_failed(record, 'Payment Method', message_exception, write_date)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(process_payment_method_record_from_mc, record) for record in payment_method]
@@ -2824,6 +2827,7 @@ class DataTransaksiMCtoSS:
                                 'id_mc': record.get('id', False),
                                 'module_pos_hr': record.get('module_pos_hr', False)
                             }
+                            start_time = time.time()
 
                             # Create new POS Config in target client
                             new_pos_config = self.target_client.call_odoo(
@@ -2833,17 +2837,26 @@ class DataTransaksiMCtoSS:
                                 [pos_config_data]
                             )
                             print(f"PoS Config baru telah dibuat dengan ID: {new_pos_config}")
+                            end_time = time.time()
+                            duration = end_time - start_time
+
+                            write_date = self.get_write_date(model_name, record['id'])
+                            self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'TS Out/TS In', write_date)
+                            self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'TS Out/TS In', write_date)
 
                             # Fixed: Corrected the write method call - removed extra list nesting
                             self.source_client.call_odoo(
-                                'object', 'execute_kw', self.source_client.db,
-                                self.source_client.uid, self.source_client.password,
-                                'pos.config', 'write',
-                                [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]  # Fixed here
-                        )
+                                    'object', 'execute_kw', self.source_client.db,
+                                    self.source_client.uid, self.source_client.password,
+                                    'pos.config', 'write',
+                                    [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]  # Fixed here
+                            )
                         print(f"Record dengan ID {record['id']} tidak cocok dengan setting_config_id")
                 except Exception as e:
-                    print(f"Gagal memproses record dengan ID {record['id']}: {e}")
+                    message_exception = f"Gagal memperbarui atau membuat PoS Config: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'PoS Config', message_exception, write_date)    
+                    self.set_log_ss.create_log_note_failed(record, 'PoS Config', message_exception, write_date)
 
             # Process records in parallel
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
@@ -3034,6 +3047,8 @@ class DataTransaksiMCtoSS:
                             'profit_account_id': int(profit_account_id) if profit_account_id else None,
                             'loss_account_id': int(loss_account_id) if loss_account_id else None,
                         }
+
+                        start_time = time.time()
                         # Create new journal account
                         new_journal_id = self.target_client.call_odoo(
                             'object', 'execute_kw',
@@ -3051,8 +3066,17 @@ class DataTransaksiMCtoSS:
                             [[record['id']], {'is_integrated': True, 'vit_trxid': record['name']}]
                         )
                         print(f"Journal baru telah dibuat dengan kode: {new_code} dan ID: {new_journal_id}")
+                        end_time = time.time()
+                        duration = end_time - start_time
+
+                        write_date = self.get_write_date(model_name, record['id'])
+                        self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Journal', write_date)
+                        self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Journal', write_date)
                 except Exception as e:
-                    print(f"Gagal memperbarui atau membuat Journal: {e}")
+                    message_exception = f"Gagal memperbarui atau membuat Journal: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Journal', message_exception, write_date)    
+                    self.set_log_ss.create_log_note_failed(record, 'Journal', message_exception, write_date)
 
             # Use ThreadPoolExecutor to process records concurrently
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
@@ -3164,7 +3188,10 @@ class DataTransaksiMCtoSS:
                             self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Chart of Account', write_date)
                             self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Chart of Account', write_date)
                 except Exception as e:
-                    print(f"Gagal memperbarui atau membuat Chart Account: {e}")
+                    message_exception = f"Gagal memperbarui atau membuat Chart Account: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Chart of Account', message_exception, write_date)    
+                    self.set_log_ss.create_log_note_failed(record, 'Chart of Account', message_exception, write_date)
 
             # Use ThreadPoolExecutor to process records concurrently
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:

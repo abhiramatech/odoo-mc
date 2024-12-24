@@ -679,10 +679,13 @@ class DataIntegrator:
                         if pattern:
                             match = re.search(pattern, field_data)
                             field_data = match.group(1)
-                    if relation_model == 'account.account':
+                    elif relation_model == 'account.account':
                         parts = field_data.split() # Menggunakan split untuk memisahkan string
                         field_data = parts[0] # Mengambil bagian pertama yang merupakan angka
-                    
+                    elif model == 'stock.picking.type' and field_name == 'return_picking_type_id':
+                        parts = field_data.split(":")
+                        picking_type = parts[1].strip()
+                        field_data = picking_type
                     
                     if model == 'stock.picking.type' and field_name in ('default_location_src_id', 'default_location_dest_id'):
                         datas = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,

@@ -250,7 +250,7 @@ class DataTransaksi:
                 partner_id = partners_source_dict.get(record.get('partner_id')[0] if isinstance(record.get('partner_id'), list) else record.get('partner_id'))
                 session_id = sessions_source_dict.get(record.get('session_id')[0] if isinstance(record.get('session_id'), list) else record.get('session_id'))
                 employee_id = employees_source_dict.get(record.get('employee_id')[0] if isinstance(record.get('employee_id'), list) else record.get('employee_id'))
-                pricelist_id = pricelist_source_dict.get(record.get('pricelist_id')[0] if isinstance(record.get('pricelist_id'), list) else record.get('pricelist_id'), [])
+                pricelist_id = pricelist_source_dict.get(record.get('pricelist_id')[0] if isinstance(record.get('pricelist_id'), list) else [])
 
                 print(partner_id, session_id, employee_id, pricelist_id)
                 
@@ -258,7 +258,7 @@ class DataTransaksi:
                 pos_order_data = {
                     'name': record.get('name'),
                     'pos_reference': record.get('pos_reference'),
-                    'pricelist_id': int(pricelist_id) if pricelist_id is not [] else [],  # Set to None if pricelist_id is None
+                    # 'pricelist_id': int(pricelist_id) if pricelist_id is not [] else [],  # Set to None if pricelist_id is None
                     'vit_trxid': record.get('name'),
                     'vit_id': record.get('id'),
                     'partner_id': int(partner_id),
@@ -2240,7 +2240,7 @@ class DataTransaksi:
             source_session = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                         self.target_client.uid, self.target_client.password,
                                                         model_name, 'search_read',
-                                                        [[['name_session_pos', '=', str(name)], ['config_id', '=', config_id]]],  # Added config_id
+                                                        [[['name_session_pos', '=', str(name)]]],  # Added config_id
                                                         {'fields': ['state'], 'limit': 1})
 
             if not source_session:
