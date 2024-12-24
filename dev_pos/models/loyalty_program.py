@@ -14,6 +14,7 @@ class LoyaltyProgramInherit(models.Model):
         # Only set is_updated to True if it hasn't been explicitly set to False in vals
         if 'is_updated' not in vals:
             vals['is_updated'] = True
+            vals['index_store'] = [(5, 0, 0)]
             
         return super(LoyaltyProgramInherit, self).write(vals)
 

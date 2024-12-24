@@ -133,6 +133,7 @@ class MasterItemPATCH(http.Controller):
             pos_categ_ids = data.get('pos_categ_ids', [])
             category_name = data.get('category_name')
             taxes_names = data.get('taxes_names', [])
+            supplier_taxes_id = data.get('supplier_taxes_id', [])
             available_in_pos = data.get('available_in_pos')
             
             # Retrieve the master item from the database
@@ -152,8 +153,7 @@ class MasterItemPATCH(http.Controller):
                     'message': f"Failed to update Item. Category not found: {category_name}.",
                 }
             
-            # Find all taxes based on the provided names
-            tax_command = []
+            tax_command = [(5, 0, 0)]  # Hapus semua pajak sebelumnya
             for tax_name in data.get('taxes_names', []):
                 tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
                 if tax:
@@ -161,6 +161,14 @@ class MasterItemPATCH(http.Controller):
                 else:
                     return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_name}' not found."}
 
+            tax_command_vendor = [(5, 0, 0)]  # Hapus semua pajak vendor sebelumnya
+            for tax_vendor in data.get('supplier_taxes_id', []):
+                vendor_tax = env['account.tax'].sudo().search([('name', '=', tax_vendor)], limit=1)
+                if vendor_tax:
+                    tax_command_vendor.append((4, vendor_tax.id))
+                else:
+                    return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_vendor}' not found."}
+                
             # Prepare the update data
             update_data = {
                 'name': product_name,
@@ -175,7 +183,9 @@ class MasterItemPATCH(http.Controller):
                 'categ_id': name_categ.id,
                 'pos_categ_ids': [(6, 0, pos_categ_ids)],
                 'taxes_id': tax_command,
+                'supplier_taxes_id': tax_command_vendor,
                 'available_in_pos': available_in_pos,
+                'image_1920': data.get('image_1920'),
                 'write_uid': uid,
             }
 
