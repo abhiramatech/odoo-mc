@@ -48,6 +48,15 @@ class POSTMasterItem(http.Controller):
                 else:
                     return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_name}' not found."}
 
+            tax_command_vendor = []
+            for tax_vendor in data.get('supplier_taxes_id', []):
+                vendor_tax = env['account.tax'].sudo().search([('name', '=', tax_vendor)], limit=1)
+                if vendor_tax:
+                    tax_command_vendor.append((4, vendor_tax.id))  # Perbaikan di sini
+                else:
+                    return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_vendor}' not found."}
+
+                
             item_data = {
                 'name': data.get('product_name'),
                 'active': data.get('active'),
@@ -62,7 +71,9 @@ class POSTMasterItem(http.Controller):
                 'pos_categ_ids': pos_categ_command,
                 'categ_id': category.id,
                 'taxes_id': tax_command,
+                'supplier_taxes_id': tax_command_vendor,
                 'available_in_pos': data.get('available_in_pos'),
+                'image_1920': data.get('image_1920'),
                 'create_uid': uid
             }
 
@@ -76,6 +87,7 @@ class POSTMasterItem(http.Controller):
             }
         
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Item: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Item: {str(e)}"}
 
@@ -220,6 +232,7 @@ class POSTMasterPricelist(http.Controller):
                 pricelist = env['product.pricelist'].sudo().create(pricelist_data)
 
             except Exception as create_error:
+                request.env.cr.rollback()
                 _logger.error(f"Failed to create pricelist: {str(create_error)}", exc_info=True)
                 return {
                     'status': "Failed", 
@@ -236,6 +249,7 @@ class POSTMasterPricelist(http.Controller):
             }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Pricelist: {str(e)}", exc_info=True)
             return {
                 'status': "Failed", 
@@ -284,6 +298,7 @@ class POSTMasterCustomer(http.Controller):
                 'id': customer.id,
             }
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Customer: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Customer: {str(e)}"}
     
@@ -323,6 +338,7 @@ class POSTMasterWarehouse(http.Controller):
                 'id': warehouse.id,
             }
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Warehouse: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Warehouse: {str(e)}"}
     
@@ -365,6 +381,7 @@ class POSTItemCategory(http.Controller):
             }
         
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Category: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create Category: {str(e)}"}
 
@@ -405,6 +422,7 @@ class POSTItemPoSCategory(http.Controller):
             }
         
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create PoS Category: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create PoS Category: {str(e)}"}
         
@@ -514,8 +532,8 @@ class POSTGoodsReceipt(http.Controller):
                     'name': product_id.name,
                     'product_id': product_id.id,
                     'product_uom': product_id.uom_id.id,  # Added product UOM
-                    'product_uom_qty': product_uom_qty,
-                    'quantity': product_uom_qty,  # Added to ensure validation
+                    'product_uom_qty': float(product_uom_qty),
+                    'quantity': float(product_uom_qty),  # Added to ensure validation
                     'picking_id': goods_receipt.id,
                     'location_id': location_id,
                     'location_dest_id': location_dest_id,
@@ -532,6 +550,7 @@ class POSTGoodsReceipt(http.Controller):
                 # Validate the goods receipt
                 goods_receipt.button_validate()
             except Exception as validate_error:
+                env.cr.rollback()
                 # If validation fails, delete the goods receipt and return error
                 goods_receipt.sudo().unlink()
                 raise Exception(f"Failed to validate Goods Receipt: {str(validate_error)}")
@@ -545,6 +564,7 @@ class POSTGoodsReceipt(http.Controller):
             }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Goods Receipt: {str(e)}", exc_info=True)
             return {
                 'status': "Failed", 
@@ -676,6 +696,7 @@ class POSTGoodsIssue(http.Controller):
                 # Validate the goods issue
                 goods_issue.button_validate()
             except Exception as validate_error:
+                env.cr.rollback()
                 # If validation fails, delete the goods issue and return error
                 goods_issue.sudo().unlink()
                 raise Exception(f"Failed to validate Goods Issue: {str(validate_error)}")
@@ -689,6 +710,7 @@ class POSTGoodsIssue(http.Controller):
             }
             
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Goods Issue: {str(e)}", exc_info=True)
             return {
                 'status': "Failed", 
@@ -842,6 +864,7 @@ class POSTPurchaseOrderFromSAP(http.Controller):
             }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create Purchase Order: {str(e)}", exc_info=True)
             return {
                 'status': "Failed",
