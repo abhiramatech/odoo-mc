@@ -36,3 +36,7 @@ from . import master_type
 from . import account_account
 from . import end_shift
 from . import pos_cashier_log
+from . import inventory_counting
+from . import barcode_settings
+from . import multiple_barcode
+from . import print_barcode
