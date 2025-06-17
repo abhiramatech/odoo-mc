@@ -42,3 +42,4 @@ from . import multiple_barcode
 from . import print_barcode
 from . import product_tag
 from . import mrp_unbuild_line
+from . import res_partner_category
