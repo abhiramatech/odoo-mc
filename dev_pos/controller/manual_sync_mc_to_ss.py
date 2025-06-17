@@ -14,6 +14,7 @@ class ManualSyncMCToSSIntegration(models.Model):
     #MC To Store
     master_item_utils = fields.Boolean(string="Master Item Utility", default=False)
     master_item = fields.Boolean(string="Master Item", default=False)
+    master_tag = fields.Boolean(string="Master Tag", default=False)
     master_bom_to_ss = fields.Boolean(string="Master BoM", default=False)
     master_customer = fields.Boolean(string="Master Customer", default=False)
     master_location = fields.Boolean(string="Update Location", default=False)
@@ -39,7 +40,7 @@ class ManualSyncMCToSSIntegration(models.Model):
     vit_val_ts_out = fields.Boolean(string="Validate TS Out", default=False)
 
     def action_start(self):
-        store, date_from, date_to, master_item_utils, master_item, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out = self.search_manual_sync()
+        store, date_from, date_to, master_item_utils, master_item, master_tag,  master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out = self.search_manual_sync()
         mc_client, ss_clients = self.get_config(store.id)
         datefrom, dateto = self.get_date(date_from, date_to)
 
@@ -47,6 +48,8 @@ class ManualSyncMCToSSIntegration(models.Model):
             self.create_master_item_utility(mc_client, ss_clients, datefrom, dateto)
         if master_item:
             self.create_master_items(mc_client, ss_clients, datefrom, dateto)
+        if master_tag:
+            self.create_master_tags(mc_client, ss_clients, datefrom, dateto)
         if master_bom_to_ss:
             self.create_master_bom(mc_client, ss_clients, datefrom, dateto)
         if master_customer:
@@ -114,6 +117,7 @@ class ManualSyncMCToSSIntegration(models.Model):
             date_to = configs.date_to
             master_item_utils = configs.master_item_utils
             master_item = configs.master_item
+            master_tag = configs.master_tag
             master_bom_to_ss = configs.master_bom_to_ss
             master_customer = configs.master_customer
             master_location = configs.master_location
@@ -137,7 +141,7 @@ class ManualSyncMCToSSIntegration(models.Model):
             vit_val_goods_receipts = configs.vit_val_goods_receipts
             vit_val_goods_issue = configs.vit_val_goods_issue
             vit_val_ts_out = configs.vit_val_ts_out
-        return store, date_from, date_to, master_item_utils, master_item, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
+        return store, date_from, date_to, master_item_utils, master_item, master_tag, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
     
     def create(self, vals):
         if vals.get('store_sync'):

@@ -320,6 +320,11 @@ class DataIntegrator:
                     many_target = self.get_relation_target_all(relation_model) # 5 1 x relation_fields calling odoo # pilih mau field apa aja?
                     dict_relation_target[relation_model] = many_target
 
+                if model == 'product.tag':
+                    model_line = 'product.template'
+                    fields_line = ['name', 'default_code', 'description']
+                    type_fields_line, relation_fields_line = self.get_type_data_source(model_line, fields_line)
+                
                 if model == 'account.tax' or model == 'product.pricelist':
                     if model == 'product.pricelist':
                         model_line = 'product.pricelist.item'
@@ -480,6 +485,8 @@ class DataIntegrator:
                 record['invoice_repartition_line_ids'] = self.transfer_tax_lines_invoice(filtered_taxes_invoice, 'account.tax.repartition.line', record, dict_relation_source_line, dict_relation_target_line, type_fields_line, relation_fields_line)
                 filtered_taxes_refund = [item for item in dict_relation_source.get('account.tax.repartition.line', []) if item['id'] in record.get('refund_repartition_line_ids', [])]
                 record['refund_repartition_line_ids'] = self.transfer_tax_lines_refund(filtered_taxes_refund, 'account.tax.repartition.line', record, dict_relation_source_line, dict_relation_target_line, type_fields_line, relation_fields_line)    
+            elif model == 'product.tag':
+                filtered_product_tag = [item for item in dict_relation_source.get('product.template', []) if item['id'] in record.get('product_template_ids', [])]
             valid_record = self.validate_record_data(record, model, [record], type_fields, relation_fields, dict_relation_source, dict_relation_target)
             if valid_record:
                 record['id_mc'] = id_mc
@@ -664,10 +671,16 @@ class DataIntegrator:
                     field_data = field_value[1] if field_value else False
                 elif field_metadata == 'many2many' and isinstance(field_value, list):
                     name_datas_source = dict_relation_source.get(relation_model, [])
-                    field_data = [
-                        next((item['name'] for item in name_datas_source if item['id'] == data), None)
+                    if model == 'product.tag':
+                        field_data = [
+                        next((item['default_code'] for item in name_datas_source if item['id'] == data), None)
                         for data in field_value
-                    ]
+                        ]
+                    else:
+                        field_data = [
+                            next((item['name'] for item in name_datas_source if item['id'] == data), None)
+                            for data in field_value
+                        ]
                 elif field_metadata == 'one2many':
                     continue
                     
@@ -887,10 +900,16 @@ class DataIntegrator:
                         field_data = field_value[1] if field_value else False
                     elif field_metadata == 'many2many' and isinstance(field_value, list):
                         name_datas_source = dict_relation_source.get(relation_model, [])
-                        field_data = [
-                            next((item['name'] for item in name_datas_source if item['id'] == data), None)
+                        if model == 'product.tag':
+                            field_data = [
+                            next((item['default_code'] for item in name_datas_source if item['id'] == data), None)
                             for data in field_value
-                        ]
+                            ]
+                        else:
+                            field_data = [
+                                next((item['name'] for item in name_datas_source if item['id'] == data), None)
+                                for data in field_value
+                            ]
                     elif field_metadata == 'one2many':
                         continue
                         

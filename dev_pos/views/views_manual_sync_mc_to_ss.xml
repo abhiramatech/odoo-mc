@@ -19,6 +19,7 @@
                     <group string="Master Console To Store Server">
                         <field name="master_item_utils"/>    
                         <field name="master_item"/>    
+                        <field name="master_tag"/>
                         <field name="master_bom_to_ss"/>    
                         <field name="master_customer"/>    
                         <field name="master_location"/>    

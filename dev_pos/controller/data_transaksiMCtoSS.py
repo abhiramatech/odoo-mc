@@ -388,15 +388,16 @@ class DataTransaksiMCtoSS:
     # Store Server --> Master Console
     def transfer_discount_loyalty(self, model_name, fields, description, date_from, date_to):
             try:
-                # Ambil data dari sumber
                 discount_loyalty = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                                self.source_client.uid, self.source_client.password,
-                                                                model_name, 'search_read',
-                                                                [[['active', '=', True], ['is_integrated', '=', False]]],
-                                                                {'fields': fields})
+                                                        self.source_client.uid, self.source_client.password,
+                                                        model_name, 'search_read',
+                                                        [[['active', '=', True], ['is_integrated', '=', False]]],
+                                                        {'fields': fields})
                 if not discount_loyalty:
                     print("Tidak ada discount/loyalty yang ditemukan untuk ditransfer.")
                     return
+
+                print(f"Found {len(discount_loyalty)} discount/loyalty programs to transfer")
 
                 # Fetch existing discount/loyalty programs in target
                 discount_names = [record['name'] for record in discount_loyalty]
@@ -410,6 +411,7 @@ class DataTransaksiMCtoSS:
                 existing_discount_dict = {record['vit_trxid']: record['id'] for record in existing_discount_loyalty}
 
                 order_ids = [record['id'] for record in discount_loyalty]
+                
                 # Fetch all reward and rule lines for all programs at once
                 reward_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                                 self.source_client.uid, self.source_client.password,
@@ -422,225 +424,392 @@ class DataTransaksiMCtoSS:
                                                             'loyalty.rule', 'search_read',
                                                             [[['program_id', 'in', order_ids]]],
                                                             {'fields': ['minimum_qty', 'minimum_amount', 'reward_point_amount', 'reward_point_mode', 'product_domain', 'product_ids', 'product_category_id', 'minimum_amount_tax_mode', 'vit_trxid', 'program_id', 'product_tag_id']})
-
-                # Collect all product and category IDs
-                product_ids_reward = [product_id for product in reward_ids_lines for product_id in product.get('discount_product_ids', [])]
-                reward_product_id = [record.get('reward_product_id')[0] if isinstance(record.get('reward_product_id'), list) else record.get('reward_product_id') for record in reward_ids_lines if record.get('reward_product_id')]
-                product_ids_rule = [product_id for product in rule_ids_lines for product_id in product.get('product_ids', [])]
-                category_ids_reward = [record.get('discount_product_category_id')[0] if isinstance(record.get('discount_product_category_id'), list) else record.get('discount_product_category_id') for record in reward_ids_lines if record.get('discount_product_category_id')]
-                category_ids_rule = [record.get('product_category_id')[0] if isinstance(record.get('product_category_id'), list) else record.get('product_category_id') for record in rule_ids_lines if record.get('product_category_id')]
-                product_tag_ids_rule = [record.get('product_tag_id')[0] if isinstance(record.get('product_tag_id'), list) else record.get('product_tag_id') for record in rule_ids_lines if record.get('product_tag_id')]
-                product_tag_ids_reward = [record.get('discount_product_tag_id')[0] if isinstance(record.get('discount_product_tag_id'), list) else record.get('discount_product_tag_id') for record in reward_ids_lines if record.get('discount_product_tag_id')]
-
-                currency_ids = [record.get('currency_id')[0] if isinstance(record.get('currency_id'), list) else record.get('currency_id') for record in discount_loyalty if record.get('currency_id')]
-                pricelist_ids = [pricelist_id for record in discount_loyalty for pricelist_id in record.get('pricelist_ids', [])]
-                pos_config_ids = [config_id for record in discount_loyalty for config_id in record.get('pos_config_ids', [])]
                 
-                reward_product_id_source = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.product', 'search_read',
-                    [[['id', 'in', reward_product_id]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                products_source_reward = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.product', 'search_read',
-                    [[['id', 'in', product_ids_reward]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                products_source_reward = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.product', 'search_read',
-                    [[['id', 'in', product_ids_reward]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                products_source_rule = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.product', 'search_read',
-                    [[['id', 'in', product_ids_rule]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                categories_source_reward = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.category', 'search_read',
-                    [[['id', 'in', category_ids_reward]]],
-                    {'fields': ['id', 'complete_name']}
-                )
-                product_tag_source_reward = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.tag', 'search_read',
-                    [[['id', 'in', product_tag_ids_reward]]],
-                    {'fields': ['id', 'complete_name']}
-                )
-                categories_source_rule = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.category', 'search_read',
-                    [[['id', 'in', category_ids_rule]]],
-                    {'fields': ['id', 'complete_name']}
-                )
-                product_tag_source_rule = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.tag', 'search_read',
-                    [[['id', 'in', product_tag_ids_rule]]],
-                    {'fields': ['id', 'name']}
-                )
-                currencies_source = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'res.currency', 'search_read',
-                    [[['id', 'in', currency_ids]]],
-                    {'fields': ['id', 'name']}
-                )
-                pricelists_source = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'product.pricelist', 'search_read',
-                    [[['id', 'in', pricelist_ids]]],
-                    {'fields': ['id', 'name']}
-                )
-                pos_configs_source = self.source_client.call_odoo(
-                    'object', 'execute_kw', self.source_client.db,
-                    self.source_client.uid, self.source_client.password,
-                    'pos.config', 'search_read',
-                    [[['id', 'in', pos_config_ids]]],
-                    {'fields': ['id', 'name']}
-                )
-                # Fetch corresponding data from target
-                reward_product_id_target = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.product', 'search_read',
-                    [[['default_code', 'in', [product['default_code'] for product in reward_product_id_source]]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                products_target_reward = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.product', 'search_read',
-                    [[['default_code', 'in', [product['default_code'] for product in products_source_reward]]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                products_target_rule = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.product', 'search_read',
-                    [[['default_code', 'in', [product['default_code'] for product in products_source_rule]]]],
-                    {'fields': ['id', 'default_code']}
-                )
-                categories_target_reward = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.category', 'search_read',
-                    [[['complete_name', 'in', [category['complete_name'] for category in categories_source_reward]]]],
-                    {'fields': ['id', 'complete_name']}
-                )
-                product_tag_id_target_reward = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.category', 'search_read',
-                    [[['name', 'in', [tag['name'] for tag in product_tag_source_reward]]]],
-                    {'fields': ['id', 'name']}
-                )
-                categories_target_rule = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.category', 'search_read',
-                    [[['complete_name', 'in', [category['complete_name'] for category in categories_source_rule]]]],
-                    {'fields': ['id', 'complete_name']}
-                )
-                product_tag_target_rule = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.tag', 'search_read',
-                    [[['name', 'in', [tags['name'] for tags in product_tag_source_rule]]]],
-                    {'fields': ['id', 'name']}
-                )
-                currencies_target = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'res.currency', 'search_read',
-                    [[['name', 'in', [currency['name'] for currency in currencies_source]]]],
-                    {'fields': ['id', 'name']}
-                )
-                pricelists_target = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'product.pricelist', 'search_read',
-                    [[['name', 'in', [pricelist['name'] for pricelist in pricelists_source]]]],
-                    {'fields': ['id', 'name']}
-                )
-                pos_configs_target = self.target_client.call_odoo(
-                    'object', 'execute_kw', self.target_client.db,
-                    self.target_client.uid, self.target_client.password,
-                    'pos.config', 'search_read',
-                    [[['name', 'in', [pos_config['name'] for pos_config in pos_configs_source]]]],
-                    {'fields': ['id', 'name']}
-                )
+                # Fetch schedule and member data
+                schedule_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                self.source_client.uid, self.source_client.password,
+                                                                'loyalty.program.schedule', 'search_read',
+                                                                [[['program_id', 'in', order_ids]]],
+                                                                {'fields': ['program_id', 'days', 'time_start', 'time_end']})
 
-                product_dict_reward = {product['default_code']: product['id'] for product in products_target_reward}
-                reward_product_id_dict = {product['default_code']: product['id'] for product in reward_product_id_target}
-                product_dict_rule = {product['default_code']: product['id'] for product in products_target_rule}
-                category_dict_reward = {category['complete_name']: category['id'] for category in categories_target_reward}
-                category_dict_rule = {category['complete_name']: category['id'] for category in categories_target_rule}
-                product_tag_dict_reward = {tag['name']: tag['id'] for tag in product_tag_id_target_reward}
-                product_tag_dict_rule = {tag['name']: tag['id'] for tag in product_tag_target_rule}
-                currency_dict = {currency['name']: currency['id'] for currency in currencies_target}
-                pricelist_dict = {pricelist['name']: pricelist['id'] for pricelist in pricelists_target}
-                pos_config_dict = {pos_config['name']: pos_config['id'] for pos_config in pos_configs_target}
+                member_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'loyalty.member', 'search_read',
+                                                            [[['member_program_id', 'in', order_ids]]],
+                                                            {'fields': ['member_program_id', 'member_pos']})
                 
-                print(reward_product_id_dict)
+                # Collect all product and category IDs (with null checks)
+                product_ids_reward = []
+                for product in reward_ids_lines:
+                    if product.get('discount_product_ids'):
+                        product_ids_reward.extend(product['discount_product_ids'])
+                
+                reward_product_id = []
+                for record in reward_ids_lines:
+                    if record.get('reward_product_id'):
+                        if isinstance(record['reward_product_id'], list):
+                            reward_product_id.append(record['reward_product_id'][0])
+                        else:
+                            reward_product_id.append(record['reward_product_id'])
+                
+                product_ids_rule = []
+                for product in rule_ids_lines:
+                    if product.get('product_ids'):
+                        product_ids_rule.extend(product['product_ids'])
+                
+                category_ids_reward = []
+                for record in reward_ids_lines:
+                    if record.get('discount_product_category_id'):
+                        if isinstance(record['discount_product_category_id'], list):
+                            category_ids_reward.append(record['discount_product_category_id'][0])
+                        else:
+                            category_ids_reward.append(record['discount_product_category_id'])
+                
+                category_ids_rule = []
+                for record in rule_ids_lines:
+                    if record.get('product_category_id'):
+                        if isinstance(record['product_category_id'], list):
+                            category_ids_rule.append(record['product_category_id'][0])
+                        else:
+                            category_ids_rule.append(record['product_category_id'])
+                
+                product_tag_ids_rule = []
+                for record in rule_ids_lines:
+                    if record.get('product_tag_id'):
+                        if isinstance(record['product_tag_id'], list):
+                            product_tag_ids_rule.append(record['product_tag_id'][0])
+                        else:
+                            product_tag_ids_rule.append(record['product_tag_id'])
+                
+                product_tag_ids_reward = []
+                for record in reward_ids_lines:
+                    if record.get('discount_product_tag_id'):
+                        if isinstance(record['discount_product_tag_id'], list):
+                            product_tag_ids_reward.append(record['discount_product_tag_id'][0])
+                        else:
+                            product_tag_ids_reward.append(record['discount_product_tag_id'])
+
+                # Collect member category IDs
+                member_pos_ids = []
+                for record in member_ids_lines:
+                    if record.get('member_pos'):
+                        if isinstance(record['member_pos'], list):
+                            member_pos_ids.append(record['member_pos'][0])
+                        else:
+                            member_pos_ids.append(record['member_pos'])
+                
+                currency_ids = []
+                for record in discount_loyalty:
+                    if record.get('currency_id'):
+                        if isinstance(record['currency_id'], list):
+                            currency_ids.append(record['currency_id'][0])
+                        else:
+                            currency_ids.append(record['currency_id'])
+                
+                pricelist_ids = []
+                for record in discount_loyalty:
+                    if record.get('pricelist_ids'):
+                        pricelist_ids.extend(record['pricelist_ids'])
+                
+                pos_config_ids = []
+                for record in discount_loyalty:
+                    if record.get('pos_config_ids'):
+                        pos_config_ids.extend(record['pos_config_ids'])
+                
+                # Fetch source data only if IDs exist
+                reward_product_id_source = []
+                if reward_product_id:
+                    reward_product_id_source = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.product', 'search_read',
+                        [[['id', 'in', reward_product_id]]],
+                        {'fields': ['id', 'default_code']}
+                    )
+                
+                products_source_reward = []
+                if product_ids_reward:
+                    products_source_reward = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.product', 'search_read',
+                        [[['id', 'in', product_ids_reward]]],
+                        {'fields': ['id', 'default_code']}
+                    )
+                
+                products_source_rule = []
+                if product_ids_rule:
+                    products_source_rule = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.product', 'search_read',
+                        [[['id', 'in', product_ids_rule]]],
+                        {'fields': ['id', 'default_code']}
+                    )
+                
+                categories_source_reward = []
+                if category_ids_reward:
+                    categories_source_reward = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.category', 'search_read',
+                        [[['id', 'in', category_ids_reward]]],
+                        {'fields': ['id', 'complete_name']}
+                    )
+                
+                product_tag_source_reward = []
+                if product_tag_ids_reward:
+                    product_tag_source_reward = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.tag', 'search_read',
+                        [[['id', 'in', product_tag_ids_reward]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                categories_source_rule = []
+                if category_ids_rule:
+                    categories_source_rule = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.category', 'search_read',
+                        [[['id', 'in', category_ids_rule]]],
+                        {'fields': ['id', 'complete_name']}
+                    )
+                
+                product_tag_source_rule = []
+                if product_tag_ids_rule:
+                    product_tag_source_rule = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.tag', 'search_read',
+                        [[['id', 'in', product_tag_ids_rule]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                currencies_source = []
+                if currency_ids:
+                    currencies_source = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'res.currency', 'search_read',
+                        [[['id', 'in', currency_ids]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                pricelists_source = []
+                if pricelist_ids:
+                    pricelists_source = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'product.pricelist', 'search_read',
+                        [[['id', 'in', pricelist_ids]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                pos_configs_source = []
+                if pos_config_ids:
+                    pos_configs_source = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'pos.config', 'search_read',
+                        [[['id', 'in', pos_config_ids]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                # Fetch member categories from source
+                member_categories_source = []
+                if member_pos_ids:
+                    member_categories_source = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'res.partner.category', 'search_read',
+                        [[['id', 'in', member_pos_ids]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                # Fetch corresponding data from target (with empty list checks)
+                reward_product_id_target = []
+                if reward_product_id_source:
+                    reward_product_id_target = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.product', 'search_read',
+                        [[['default_code', 'in', [product['default_code'] for product in reward_product_id_source if product.get('default_code')]]]],
+                        {'fields': ['id', 'default_code']}
+                    )
+                
+                products_target_reward = []
+                if products_source_reward:
+                    products_target_reward = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.product', 'search_read',
+                        [[['default_code', 'in', [product['default_code'] for product in products_source_reward if product.get('default_code')]]]],
+                        {'fields': ['id', 'default_code']}
+                    )
+                
+                products_target_rule = []
+                if products_source_rule:
+                    products_target_rule = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.product', 'search_read',
+                        [[['default_code', 'in', [product['default_code'] for product in products_source_rule if product.get('default_code')]]]],
+                        {'fields': ['id', 'default_code']}
+                    )
+                
+                categories_target_reward = []
+                if categories_source_reward:
+                    categories_target_reward = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.category', 'search_read',
+                        [[['complete_name', 'in', [category['complete_name'] for category in categories_source_reward if category.get('complete_name')]]]],
+                        {'fields': ['id', 'complete_name']}
+                    )
+                
+                # Fix: Changed model from 'product.category' to 'product.tag' for product tags
+                product_tag_id_target_reward = []
+                if product_tag_source_reward:
+                    product_tag_id_target_reward = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.tag', 'search_read',  # Fixed: was 'product.category'
+                        [[['name', 'in', [tag['name'] for tag in product_tag_source_reward if tag.get('name')]]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                categories_target_rule = []
+                if categories_source_rule:
+                    categories_target_rule = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.category', 'search_read',
+                        [[['complete_name', 'in', [category['complete_name'] for category in categories_source_rule if category.get('complete_name')]]]],
+                        {'fields': ['id', 'complete_name']}
+                    )
+                
+                product_tag_target_rule = []
+                if product_tag_source_rule:
+                    product_tag_target_rule = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.tag', 'search_read',
+                        [[['name', 'in', [tags['name'] for tags in product_tag_source_rule if tags.get('name')]]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                currencies_target = []
+                if currencies_source:
+                    currencies_target = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'res.currency', 'search_read',
+                        [[['name', 'in', [currency['name'] for currency in currencies_source if currency.get('name')]]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                pricelists_target = []
+                if pricelists_source:
+                    pricelists_target = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'product.pricelist', 'search_read',
+                        [[['name', 'in', [pricelist['name'] for pricelist in pricelists_source if pricelist.get('name')]]]],
+                        {'fields': ['id', 'name']}
+                    )
+                
+                pos_configs_target = []
+                if pos_configs_source:
+                    pos_configs_target = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'pos.config', 'search_read',
+                        [[['name', 'in', [pos_config['name'] for pos_config in pos_configs_source if pos_config.get('name')]]]],
+                        {'fields': ['id', 'name']}
+                    )
+
+                # Fetch member categories from target
+                member_categories_target = []
+                if member_categories_source:
+                    member_categories_target = self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        'res.partner.category', 'search_read',
+                        [[['name', 'in', [category['name'] for category in member_categories_source if category.get('name')]]]],
+                        {'fields': ['id', 'name']}
+                    )
+
+                # Create mapping dictionaries
+                product_dict_reward = {product['default_code']: product['id'] for product in products_target_reward if product.get('default_code')}
+                reward_product_id_dict = {product['default_code']: product['id'] for product in reward_product_id_target if product.get('default_code')}
+                product_dict_rule = {product['default_code']: product['id'] for product in products_target_rule if product.get('default_code')}
+                category_dict_reward = {category['complete_name']: category['id'] for category in categories_target_reward if category.get('complete_name')}
+                category_dict_rule = {category['complete_name']: category['id'] for category in categories_target_rule if category.get('complete_name')}
+                product_tag_dict_reward = {tag['name']: tag['id'] for tag in product_tag_id_target_reward if tag.get('name')}
+                product_tag_dict_rule = {tag['name']: tag['id'] for tag in product_tag_target_rule if tag.get('name')}
+                currency_dict = {currency['name']: currency['id'] for currency in currencies_target if currency.get('name')}
+                pricelist_dict = {pricelist['name']: pricelist['id'] for pricelist in pricelists_target if pricelist.get('name')}
+                pos_config_dict = {pos_config['name']: pos_config['id'] for pos_config in pos_configs_target if pos_config.get('name')}
+                member_category_dict = {category['name']: category['id'] for category in member_categories_target if category.get('name')}
+
+                # print(reward_product_id_dict)
                 def process_create_discount(record):
                     if record['vit_trxid'] in existing_discount_dict:
+                        print(f"Program {record.get('name')} already exists, skipping...")
                         return
+                    
                     current_reward_lines = [line for line in reward_ids_lines if line['program_id'][0] == record['id']]
                     current_rule_lines = [line for line in rule_ids_lines if line['program_id'][0] == record['id']]
+                    current_schedule_lines = [line for line in schedule_ids_lines if line['program_id'][0] == record['id']]
+                    current_member_lines = [line for line in member_ids_lines if line['member_program_id'][0] == record['id']]
 
                     discount_loyalty_line_ids = []
                     for line in current_reward_lines:
                         if isinstance(line, dict):
                             reward_product_ids = line.get('discount_product_ids', [])
-                            reward_target_product_ids = [product_dict_reward.get(product['default_code']) for product in products_source_reward if product['id'] in reward_product_ids]
+                            reward_target_product_ids = [product_dict_reward.get(product['default_code']) 
+                                                    for product in products_source_reward 
+                                                    if product['id'] in reward_product_ids and product_dict_reward.get(product['default_code'])]
 
                             reward_product_id_field = line.get('reward_product_id')
                             reward_product_id_field = reward_product_id_field[0] if isinstance(reward_product_id_field, list) else reward_product_id_field
 
-                            # Ambil nama default_code dari reward_product_id_source
-                            if isinstance(reward_product_id_field, list) and len(reward_product_id_field) == 2:
-                                reward_product_default_code = reward_product_id_field[1]
-                            else:
-                                reward_product_default_code = next(
-                                    (product['default_code'] for product in reward_product_id_source if product['id'] == reward_product_id_field),
-                                    None
-                                )
+                            # Get default_code from reward_product_id_source
+                            reward_product_default_code = None
+                            if reward_product_id_field:
+                                if isinstance(reward_product_id_field, list) and len(reward_product_id_field) == 2:
+                                    reward_product_default_code = reward_product_id_field[1]
+                                else:
+                                    reward_product_default_code = next(
+                                        (product['default_code'] for product in reward_product_id_source if product['id'] == reward_product_id_field),
+                                        None
+                                    )
 
-                            # Ambil ID dari target database berdasarkan default_code
-                            reward_product_id_id = reward_product_id_dict.get(reward_product_default_code)
-                            # print(reward_product_id_id)
+                            # Get ID from target database based on default_code
+                            reward_product_id_id = reward_product_id_dict.get(reward_product_default_code) if reward_product_default_code else None
 
                             reward_source_category_id = line.get('discount_product_category_id')
-                            if isinstance(reward_source_category_id, list) and len(reward_source_category_id) == 2:
-                                reward_source_category_name = reward_source_category_id[1]
-                            else:
-                                reward_source_category_name = next((category['complete_name'] for category in categories_source_reward if category['id'] == reward_source_category_id), None)
+                            reward_source_category_name = None
+                            if reward_source_category_id:
+                                if isinstance(reward_source_category_id, list) and len(reward_source_category_id) == 2:
+                                    reward_source_category_name = reward_source_category_id[1]
+                                else:
+                                    reward_source_category_name = next((category['complete_name'] for category in categories_source_reward if category['id'] == reward_source_category_id), None)
 
-                            reward_target_category_id = category_dict_reward.get(reward_source_category_name)
+                            reward_target_category_id = category_dict_reward.get(reward_source_category_name) if reward_source_category_name else None
 
-                            #Product Tag
+                            # Product Tag
                             reward_source_product_tag_id = line.get('discount_product_tag_id')
-                            if isinstance(reward_source_product_tag_id, list) and len(reward_source_product_tag_id) == 2:
-                                reward_source_product_tag_name = reward_source_product_tag_id[1]
-                            else:
-                                reward_source_product_tag_name = next((tag['name'] for tag in product_tag_source_reward if tag['id'] == reward_source_product_tag_id), None)
+                            reward_source_product_tag_name = None
+                            if reward_source_product_tag_id:
+                                if isinstance(reward_source_product_tag_id, list) and len(reward_source_product_tag_id) == 2:
+                                    reward_source_product_tag_name = reward_source_product_tag_id[1]
+                                else:
+                                    reward_source_product_tag_name = next((tag['name'] for tag in product_tag_source_reward if tag['id'] == reward_source_product_tag_id), None)
 
-                            reward_target_product_tag_id = product_tag_dict_reward.get(reward_source_product_tag_name)
+                            reward_target_product_tag_id = product_tag_dict_reward.get(reward_source_product_tag_name) if reward_source_product_tag_name else None
 
                         discount_line_data = {
                             'reward_type': line.get('reward_type'),
@@ -650,53 +819,100 @@ class DataTransaksiMCtoSS:
                             'required_points': line.get('required_points'),
                             'description': line.get('description'),
                             'discount_mode': line.get('discount_mode'),
-                            'discount_product_ids': [(6, 0, reward_target_product_ids)],
-                            'reward_product_id': reward_product_id_id,
-                            'discount_product_category_id': reward_target_category_id,
-                            'discount_product_tag_id': reward_target_product_tag_id,
                             'vit_trxid': record.get('name')
                         }
+                        
+                        # Only add fields if they have values
+                        if reward_target_product_ids:
+                            discount_line_data['discount_product_ids'] = [(6, 0, reward_target_product_ids)]
+                        if reward_product_id_id:
+                            discount_line_data['reward_product_id'] = reward_product_id_id
+                        if reward_target_category_id:
+                            discount_line_data['discount_product_category_id'] = reward_target_category_id
+                        if reward_target_product_tag_id:
+                            discount_line_data['discount_product_tag_id'] = reward_target_product_tag_id
+                        
                         discount_loyalty_line_ids.append((0, 0, discount_line_data))
 
                     rule_ids = []
                     for rule in current_rule_lines:
                         if isinstance(rule, dict):
                             rule_product_ids = rule.get('product_ids', [])
-                            rule_target_product_ids = [product_dict_rule.get(product['default_code']) for product in products_source_rule if product['id'] in rule_product_ids]
+                            rule_target_product_ids = [product_dict_rule.get(product['default_code']) 
+                                                    for product in products_source_rule 
+                                                    if product['id'] in rule_product_ids and product_dict_rule.get(product['default_code'])]
 
                             rule_source_category_id = rule.get('product_category_id')
-                            if isinstance(rule_source_category_id, list) and len(rule_source_category_id) == 2:
-                                rule_source_category_name = rule_source_category_id[1]
-                            else:
-                                rule_source_category_name = next((category['complete_name'] for category in categories_source_rule if category['id'] == rule_source_category_id), None)
+                            rule_source_category_name = None
+                            if rule_source_category_id:
+                                if isinstance(rule_source_category_id, list) and len(rule_source_category_id) == 2:
+                                    rule_source_category_name = rule_source_category_id[1]
+                                else:
+                                    rule_source_category_name = next((category['complete_name'] for category in categories_source_rule if category['id'] == rule_source_category_id), None)
 
-                            rule_target_category_id = category_dict_rule.get(rule_source_category_name)
+                            rule_target_category_id = category_dict_rule.get(rule_source_category_name) if rule_source_category_name else None
 
-                            #Product tag
+                            # Product tag
                             rule_source_product_tag_id = rule.get('product_tag_id')
-                            if isinstance(rule_source_product_tag_id, list) and len(rule_source_product_tag_id) == 2:
-                                rule_source_product_tag_name = rule_source_product_tag_id[1]
-                            else:
-                                rule_source_product_tag_name = next((tag['name'] for tag in product_tag_source_rule if tag['id'] == rule_source_product_tag_id), None)
+                            rule_source_product_tag_name = None
+                            if rule_source_product_tag_id:
+                                if isinstance(rule_source_product_tag_id, list) and len(rule_source_product_tag_id) == 2:
+                                    rule_source_product_tag_name = rule_source_product_tag_id[1]
+                                else:
+                                    rule_source_product_tag_name = next((tag['name'] for tag in product_tag_source_rule if tag['id'] == rule_source_product_tag_id), None)
 
-                            rule_target_product_tag_id = product_tag_dict_rule.get(rule_source_product_tag_name)
+                            rule_target_product_tag_id = product_tag_dict_rule.get(rule_source_product_tag_name) if rule_source_product_tag_name else None
                             
-                        # tag_name = next((tag['name'] for tag in tags_source if tag['id'] == rule.get('product_tag_id')), None)
-                        # tag_id = tag_dict.get(tag_name)
-
                         rule_data = {
                             'minimum_qty': rule.get('minimum_qty'),
                             'minimum_amount': rule.get('minimum_amount'),
                             'reward_point_amount': rule.get('reward_point_amount'),
                             'reward_point_mode': rule.get('reward_point_mode'),
                             'product_domain': rule.get('product_domain'),
-                            'product_ids': rule_target_product_ids,
                             'minimum_amount_tax_mode': rule.get('minimum_amount_tax_mode'),
-                            'product_category_id': rule_target_category_id,
-                            'product_tag_id': rule_target_product_tag_id,
                             'vit_trxid': record.get('name'),
                         }
+                        
+                        # Only add fields if they have values
+                        if rule_target_product_ids:
+                            rule_data['product_ids'] = [(6, 0, rule_target_product_ids)]
+                        if rule_target_category_id:
+                            rule_data['product_category_id'] = rule_target_category_id
+                        if rule_target_product_tag_id:
+                            rule_data['product_tag_id'] = rule_target_product_tag_id
+                        
                         rule_ids.append((0, 0, rule_data))
+
+                    # Process schedule data
+                    schedule_vals = []
+                    for schedule in current_schedule_lines:
+                        schedule_data = {
+                            'days': schedule.get('days'),
+                            'time_start': schedule.get('time_start'),
+                            'time_end': schedule.get('time_end'),
+                        }
+                        schedule_vals.append((0, 0, schedule_data))
+
+                    # Process member data
+                    member_vals = []
+                    for member in current_member_lines:
+                        member_pos_id = member.get('member_pos')
+                        member_pos_name = None
+                        if member_pos_id:
+                            if isinstance(member_pos_id, list) and len(member_pos_id) == 2:
+                                member_pos_name = member_pos_id[1]
+                            else:
+                                member_pos_name = next((category['name'] for category in member_categories_source if category['id'] == member_pos_id), None)
+                        
+                        member_target_id = member_category_dict.get(member_pos_name) if member_pos_name else None
+                        
+                        if member_target_id:
+                            member_data = {
+                                'member_pos': member_target_id,
+                            }
+                            member_vals.append((0, 0, member_data))
+
+                    # Process program data
 
                     currency_id = record.get('currency_id')
                     currency_id = currency_id[0] if isinstance(currency_id, list) else currency_id
@@ -729,8 +945,8 @@ class DataTransaksiMCtoSS:
                         'sale_ok': record.get('sale_ok'),
                         'pos_config_ids': target_pos_config_ids,
                         'reward_ids': discount_loyalty_line_ids,
-                        # 'schedule_ids': schedule_vals,
-                        # 'member_ids': member_vals,
+                        'schedule_ids': schedule_vals,
+                        'member_ids': member_vals,
                         'rule_ids': rule_ids,
                     }
                     try:
@@ -837,6 +1053,19 @@ class DataTransaksiMCtoSS:
                                                         [[['program_id', 'in', order_ids]]],
                                                         {'fields': ['minimum_qty', 'minimum_amount', 'reward_point_amount', 'reward_point_mode', 'product_domain', 'product_ids', 'product_category_id', 'minimum_amount_tax_mode', 'vit_trxid', 'program_id', 'product_tag_id']})
 
+            # Fetch schedule and member data for all programs
+            schedule_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'loyalty.program.schedule', 'search_read',
+                                                            [[['program_id', 'in', order_ids]]],
+                                                            {'fields': ['program_id', 'days', 'time_start', 'time_end']})
+
+            member_ids_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                          self.source_client.uid, self.source_client.password,
+                                                          'loyalty.member', 'search_read',
+                                                          [[['member_program_id', 'in', order_ids]]],
+                                                          {'fields': ['member_program_id', 'member_pos']})
+            
             # Collect all product and category IDs
 
             product_ids_reward = [product_id for product in reward_ids_lines for product_id in product.get('discount_product_ids', [])]
@@ -850,6 +1079,9 @@ class DataTransaksiMCtoSS:
             currency_ids = [record.get('currency_id')[0] if isinstance(record.get('currency_id'), list) else record.get('currency_id') for record in discount_loyalty if record.get('currency_id')]
             pricelist_ids = [pricelist_id for record in discount_loyalty for pricelist_id in record.get('pricelist_ids', [])]
             pos_config_ids = [config_id for record in discount_loyalty for config_id in record.get('pos_config_ids', [])]
+            # Collect member_pos IDs for partner category mapping
+            member_pos_ids = [record.get('member_pos')[0] if isinstance(record.get('member_pos'), list) else record.get('member_pos') for record in member_ids_lines if record.get('member_pos')]
+            
             # Fetch all necessary data from source
             products_source_reward = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
@@ -880,7 +1112,6 @@ class DataTransaksiMCtoSS:
                 [[['id', 'in', category_ids_reward]]],
                 {'fields': ['id', 'complete_name']}
             )
-
             categories_source_rule = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
                 self.source_client.uid, self.source_client.password,
@@ -900,7 +1131,7 @@ class DataTransaksiMCtoSS:
                 self.source_client.uid, self.source_client.password,
                 'product.tag', 'search_read',
                 [[['id', 'in', product_tag_ids_reward]]],
-                {'fields': ['id', 'complete_name']}
+                {'fields': ['id', 'name']}
             )
 
             currencies_source = self.source_client.call_odoo(
@@ -923,6 +1154,14 @@ class DataTransaksiMCtoSS:
                 self.source_client.uid, self.source_client.password,
                 'pos.config', 'search_read',
                 [[['id', 'in', pos_config_ids]]],
+                {'fields': ['id', 'name']}
+            )
+            # Fetch member categories from source
+            member_categories_source = self.source_client.call_odoo(
+                'object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'res.partner.category', 'search_read',
+                [[['id', 'in', member_pos_ids]]],
                 {'fields': ['id', 'name']}
             )
             # Fetch corresponding data from target
@@ -1003,6 +1242,15 @@ class DataTransaksiMCtoSS:
                 {'fields': ['id', 'name']}
             )
 
+            # Fetch member categories from target
+            member_categories_target = self.target_client.call_odoo(
+                'object', 'execute_kw', self.target_client.db,
+                self.target_client.uid, self.target_client.password,
+                'res.partner.category', 'search_read',
+                [[['name', 'in', [category['name'] for category in member_categories_source]]]],
+                {'fields': ['id', 'name']}
+            )
+
             # Create mapping dictionaries
             product_dict_reward = {product['default_code']: product['id'] for product in products_target_reward}
             reward_product_id_dict = {product['default_code']: product['id'] for product in reward_product_id_target}
@@ -1014,6 +1262,8 @@ class DataTransaksiMCtoSS:
             currency_dict = {currency['name']: currency['id'] for currency in currencies_target}
             pricelist_dict = {pricelist['name']: pricelist['id'] for pricelist in pricelists_target}
             pos_config_dict = {pos_config['name']: pos_config['id'] for pos_config in pos_configs_target}
+
+            member_category_dict = {category['name']: category['id'] for category in member_categories_target}
 
             def process_update_discount(record):
                 program_id = existing_discount_dict[record['vit_trxid']]
@@ -1029,10 +1279,25 @@ class DataTransaksiMCtoSS:
                                                                 [[['program_id', '=', program_id]]],
                                                                 {'fields': ['id', 'minimum_qty', 'minimum_amount', 'reward_point_amount', 'reward_point_mode', 'product_domain', 'product_ids', 'product_category_id', 'vit_trxid', 'product_tag_id']})
 
+                # Fetch existing schedule and member lines in target
+                existing_schedule_lines = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                     self.target_client.uid, self.target_client.password,
+                                                                     'loyalty.program.schedule', 'search_read',
+                                                                     [[['program_id', '=', program_id]]],
+                                                                     {'fields': ['id', 'days', 'time_start', 'time_end']})
+
+                existing_member_lines = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                   self.target_client.uid, self.target_client.password,
+                                                                   'loyalty.member', 'search_read',
+                                                                   [[['member_program_id', '=', program_id]]],
+                                                                   {'fields': ['id', 'member_pos']})
+
                 # Filter reward_ids_lines and rule_ids_lines for the current record
                 current_reward_lines = [line for line in reward_ids_lines if line['program_id'][0] == record['id']]
                 current_rule_lines = [line for line in rule_ids_lines if line['program_id'][0] == record['id']]
-
+                current_schedule_lines = [line for line in schedule_ids_lines if line['program_id'][0] == record['id']]
+                current_member_lines = [line for line in member_ids_lines if line['member_program_id'][0] == record['id']]
+                
                 discount_loyalty_line_ids = []
                 for line in current_reward_lines:
                     if isinstance(line, dict):
@@ -1053,7 +1318,7 @@ class DataTransaksiMCtoSS:
                         # Ambil ID dari target database berdasarkan default_code
                         reward_product_id_id = reward_product_id_dict.get(reward_product_default_code)
 
-                        reward_source_category_id = line.get('product_category_id')
+                        reward_source_category_id = line.get('discount_product_category_id')
                         if isinstance(reward_source_category_id, list) and len(reward_source_category_id) == 2:
                             reward_source_category_name = reward_source_category_id[1]
                         else:
@@ -1175,6 +1440,81 @@ class DataTransaksiMCtoSS:
                             })
                             rule_ids.append(rule_data)
 
+                # Process schedule data - only update what changed
+                schedule_vals = []
+                existing_schedule_dict = {}
+
+                # Create dictionary of existing schedules for easy comparison
+                for existing_schedule in existing_schedule_lines:
+                    key = f"{existing_schedule.get('days')}_{existing_schedule.get('time_start')}_{existing_schedule.get('time_end')}"
+                    existing_schedule_dict[key] = existing_schedule['id']
+
+                # Track which existing schedules are still valid
+                valid_schedule_ids = set()
+
+                for schedule in current_schedule_lines:
+                    schedule_key = f"{schedule.get('days')}_{schedule.get('time_start')}_{schedule.get('time_end')}"
+                    
+                    if schedule_key in existing_schedule_dict:
+                        # Schedule already exists, just mark as valid
+                        valid_schedule_ids.add(existing_schedule_dict[schedule_key])
+                    else:
+                        # New schedule, add it
+                        schedule_data = {
+                            'days': schedule.get('days'),
+                            'time_start': schedule.get('time_start'),
+                            'time_end': schedule.get('time_end'),
+                        }
+                        schedule_vals.append((0, 0, schedule_data))
+
+                # Remove schedules that are no longer needed
+                for existing_schedule in existing_schedule_lines:
+                    if existing_schedule['id'] not in valid_schedule_ids:
+                        schedule_vals.append((2, existing_schedule['id']))
+
+                # Process member data - only update what changed
+                member_vals = []
+                existing_member_dict = {}
+
+                # Create dictionary of existing members for easy comparison
+                for existing_member in existing_member_lines:
+                    member_pos_id = existing_member.get('member_pos')
+                    if isinstance(member_pos_id, list) and len(member_pos_id) == 2:
+                        member_key = member_pos_id[0]  # Use ID for comparison
+                    else:
+                        member_key = member_pos_id
+                    existing_member_dict[member_key] = existing_member['id']
+
+                # Track which existing members are still valid
+                valid_member_ids = set()
+
+                for member in current_member_lines:
+                    member_pos_id = member.get('member_pos')
+                    if isinstance(member_pos_id, list) and len(member_pos_id) == 2:
+                        member_pos_name = member_pos_id[1]
+                        source_member_id = member_pos_id[0]
+                    else:
+                        member_pos_name = next((category['name'] for category in member_categories_source if category['id'] == member_pos_id), None)
+                        source_member_id = member_pos_id
+                    
+                    member_target_id = member_category_dict.get(member_pos_name)
+                    
+                    if member_target_id:
+                        if member_target_id in existing_member_dict:
+                            # Member already exists, just mark as valid
+                            valid_member_ids.add(existing_member_dict[member_target_id])
+                        else:
+                            # New member, add it
+                            member_data = {
+                                'member_pos': member_target_id,
+                            }
+                            member_vals.append((0, 0, member_data))
+
+                # Remove members that are no longer needed
+                for existing_member in existing_member_lines:
+                    if existing_member['id'] not in valid_member_ids:
+                        member_vals.append((2, existing_member['id']))
+
                 currency_id = record.get('currency_id')
                 currency_id = currency_id[0] if isinstance(currency_id, list) else currency_id
                 currency_name = next((currency['name'] for currency in currencies_source if currency['id'] == currency_id), None)
@@ -1204,6 +1544,8 @@ class DataTransaksiMCtoSS:
                     'pos_config_ids': target_pos_config_ids,
                     'pos_ok': record.get('pos_ok'),
                     'sale_ok': record.get('sale_ok'),
+                    'schedule_ids': schedule_vals,
+                    'member_ids': member_vals,
                     'reward_ids': discount_loyalty_line_ids,
                     'rule_ids': rule_ids,
                 }
@@ -1250,7 +1592,7 @@ class DataTransaksiMCtoSS:
                         'loyalty.program', 'write',
                         [[record['id']], {'is_integrated': False, 'index_store': [(5, 0, 0)]}])
 
-                    write_date = self.get_write_date(model_name, gr['id'])
+                    write_date = self.get_write_date(model_name, record['id'])
 
                     # self.source_client.call_odoo(
                     #     'object', 'execute_kw', self.source_client.db,
@@ -1271,7 +1613,7 @@ class DataTransaksiMCtoSS:
 
         except Exception as e:
             print(f"Error during processing: {e}")
-
+            
     def transfer_loyalty_point_mc_to_ss(self, model_name, fields, description, date_from, date_to):
         if isinstance(date_from, datetime):
             date_from = date_from.strftime('%Y-%m-%d %H:%M:%S')
