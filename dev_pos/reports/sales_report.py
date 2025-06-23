@@ -13,3 +13,5 @@ class SalesReport(models.TransientModel):
     vit_sales_spending = fields.Boolean(string="Sales Report Spending", default=False)
     vit_sales_hourly = fields.Boolean(string="Sales Report Hourly", default=False)
     
+    def action_generate_report(self):
+        return
