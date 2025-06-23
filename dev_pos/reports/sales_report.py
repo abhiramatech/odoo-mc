@@ -15,7 +15,6 @@ class SalesReportDetail(models.TransientModel):
     # def action_generate_report_detail(self):
     #     raise ValidationError("Masuk action_generate_report_detail")
     
-    @api.multi
     def action_generate_report_detail(self):
         orders = self.env['pos.order'].search([
             ('date_order', '>=', self.vit_date_from),
