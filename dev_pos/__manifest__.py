@@ -60,10 +60,7 @@
         'views/print_barcode_view.xml',
         'views/product_product_view.xml',
         'views/mrp_unbuild_line_view.xml',
-        'reports/sales_report_detail_view.xml',
-        'reports/sales_report_recap_view.xml',
-        'reports/sales_report_spending_view.xml',
-        'reports/sales_report_hourly_view.xml',
+        'reports/sales_report_view.xml',
         'reports/sales_report_menu_view.xml',
     ],
     'assets': {
