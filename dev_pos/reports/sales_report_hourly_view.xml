@@ -22,7 +22,7 @@
 
     <!-- actions --> 
     <record id="action_generate_sales_report_hourly" model="ir.actions.act_window">
-        <field name="name">Generate Sales Report</field>
+        <field name="name">Generate Sales Report Hourly</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
