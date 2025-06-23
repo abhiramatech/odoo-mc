@@ -1,7 +1,7 @@
 <odoo>
   <data>
     <!-- form view -->
-    <record id="view_sales_report_form" model="ir.ui.view">
+    <record id="view_sales_report_detail_form" model="ir.ui.view">
         <field name="name">sales.report.detail.form</field>
         <field name="model">sales.report</field>
         <field name="arch" type="xml">
@@ -29,6 +29,7 @@
         <field name="name">Generate Sales Report Detail</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_detail_form"/>
         <field name="target">new</field>
     </record>
   </data>
