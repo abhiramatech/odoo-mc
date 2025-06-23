@@ -41,7 +41,7 @@
         id="sales_report_menu"
         name="Sales Report"
         action="action_generate_sales_report"
-        parent="menu_point_rep"
+        parent="menu_point_root"
         sequence="10"/>
   </data>
 </odoo>
