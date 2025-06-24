@@ -11,6 +11,7 @@
                         <field name="vit_date_from"/>
                         <field name="vit_date_to"/>
                         <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
                     </group>
                 </sheet>
                 <footer>
@@ -31,6 +32,7 @@
                         <field name="vit_date_from"/>
                         <field name="vit_date_to"/>
                         <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
                     </group>
                 </sheet>
                 <footer>
@@ -51,6 +53,7 @@
                         <field name="vit_date_from"/>
                         <field name="vit_date_to"/>
                         <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
                     </group>
                 </sheet>
                 <footer>
@@ -71,6 +74,7 @@
                         <field name="vit_date_from"/>
                         <field name="vit_date_to"/>
                         <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
                     </group>
                 </sheet>
                 <footer>
