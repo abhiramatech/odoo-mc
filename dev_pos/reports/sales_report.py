@@ -66,7 +66,7 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 4, order.config_id.name or '')
                 worksheet.write(row, 5, order.account_move.name or '')
                 worksheet.write(row, 6, order.name or '')
-                worksheet.write(row, 7, order.return_order_id.name if order.return_order_id else '')
+                worksheet.write(row, 7, order.name if 'REFUND' in order.name.upper() else '')
                 worksheet.write(row, 8, order.partner_id.mobile or '')
                 worksheet.write(row, 9, str(order.date_order))
 
