@@ -8,8 +8,8 @@
             <form string="Report Detail">
                 <sheet>
                     <group string="Report Detail">
-                        <field name="vit_date_from"/>
-                        <field name="vit_date_to"/>
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
                         <field name="vit_invoice_no"/>
                         <field name="vit_pos_order_ref"/>
                     </group>
@@ -29,8 +29,8 @@
             <form string="Report Recap">
                 <sheet>
                     <group string="Report Recap">
-                        <field name="vit_date_from"/>
-                        <field name="vit_date_to"/>
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
                         <field name="vit_invoice_no"/>
                         <field name="vit_pos_order_ref"/>
                     </group>
@@ -50,8 +50,8 @@
             <form string="Report Spending">
                 <sheet>
                     <group string="Report Spending">
-                        <field name="vit_date_from"/>
-                        <field name="vit_date_to"/>
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
                         <field name="vit_invoice_no"/>
                         <field name="vit_pos_order_ref"/>
                     </group>
@@ -71,8 +71,8 @@
             <form string="Report Hourly">
                 <sheet>
                     <group string="Report Hourly">
-                        <field name="vit_date_from"/>
-                        <field name="vit_date_to"/>
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
                         <field name="vit_invoice_no"/>
                         <field name="vit_pos_order_ref"/>
                     </group>

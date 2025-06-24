@@ -72,7 +72,7 @@ class SalesReportDetail(models.TransientModel):
 
                 worksheet.write(row, 10, order_line.product_id.default_code or '')
                 worksheet.write(row, 11, order_line.product_id.name or '')
-                worksheet.write(row, 12, order_line.product_id.product_tmpl_id.pos_categ_id.name or '')
+                worksheet.write(row, 12, order_line.product_id.product_tmpl_id.pos_categ_ids[0].name if order_line.product_id.product_tmpl_id.pos_categ_ids else '')
                 worksheet.write(row, 13, order_line.product_uom_id.name or '')
                 worksheet.write(row, 14, order_line.qty)
                 worksheet.write(row, 15, order_line.price_unit)
