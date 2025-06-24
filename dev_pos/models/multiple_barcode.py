@@ -8,6 +8,8 @@ class MultipleBarcode(models.Model):
     barcode = fields.Char(string="Barcode", required=True)
     product_tmpl_id = fields.Many2one('product.template', string='Product Template', ondelete='cascade')
     product_id = fields.Many2one('product.product', string='Product Variant', ondelete='cascade')
+    is_integrated = fields.Boolean(string="Integrated", default=False, readonly=True, tracking=True)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
 
     @api.model
     def create(self, vals):

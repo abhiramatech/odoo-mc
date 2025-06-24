@@ -22,7 +22,8 @@ class DataIntegrator:
                 'res.users': 'login',
                 'stock.location': 'complete_name',
                 'account.account': 'code',
-                'loyalty.card': 'code'
+                'loyalty.card': 'code',
+                'multiple.barcode': 'barcode'
             }
             return field_uniq_mapping.get(model, 'name')
         except Exception as e:
@@ -110,6 +111,17 @@ class DataIntegrator:
                                                         '&',  # AND untuk kondisi lainnya
                                                         [field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
                                                     {'fields': fields})
+            elif model == 'product.template':
+                ids = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                    self.source_client.password, model, 'search', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]]) 
+                data_list = []
+                batch_size=2000
+                for i in range(0, len(ids), batch_size):
+                    batch_ids = ids[i:i + batch_size]
+                    batch_data = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                    self.source_client.uid, self.source_client.password, model,
+                                                    'read', [batch_ids], {'fields': fields})
+                    data_list.extend(batch_data)
             else:
                 data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
                                                     self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
