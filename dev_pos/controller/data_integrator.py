@@ -35,10 +35,22 @@ class DataIntegrator:
         try:
             fields_target = fields.copy() # kalau tidak pakai copy makan value fields akan berubah juga sama seperti fields_target
             fields_target.extend(['id_mc'])
+            existing_datalist = list(existing_datalist)  # ubah set ke list
 
-            existing_data = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                        self.target_client.uid, self.target_client.password, model,
-                                                        'search_read', [[[field_uniq, '!=', False]]], {'fields': fields_target}) # , {'fields': [field_uniq]}
+            # Step 1: Cari semua ID yang memenuhi kondisi
+            ids = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                self.target_client.uid, self.target_client.password, model,
+                                                'search', [[[field_uniq, 'in', existing_datalist]]])
+
+            # Step 2: Read per batch dengan fields_target
+            existing_data = []
+            batch_size=2000
+            for i in range(0, len(ids), batch_size):
+                batch_ids = ids[i:i + batch_size]
+                batch_data = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                self.target_client.uid, self.target_client.password, model,
+                                                'read', [batch_ids], {'fields': fields_target})
+                existing_data.extend(batch_data)
             return existing_data
         except Exception as e:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", e, None)
@@ -274,7 +286,8 @@ class DataIntegrator:
                                                         ['name', '!=', 'False'], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
                                                     {'fields': fields}) # , 'limit': 1
             if data_list:
-                existing_data_target = self.get_existing_data(model, 'name', fields) # 1 calling odoo
+                existing_datalist = {data['name'] for data in data_list}
+                existing_data_target = self.get_existing_data(model, 'name', fields, existing_datalist) # 1 calling odoo
                 existing_data = {data['name'] for data in existing_data_target}
                 filtered_data_for_update = [item for item in data_list if item['name'] in existing_data]
 
@@ -314,7 +327,7 @@ class DataIntegrator:
 
             if data_list:
                 len_master, last_master_url, index_store_field = self.get_master_conf()
-                existing_data_target = self.get_existing_data(model, field_uniq, fields) # 1 calling odoo
+                existing_data_target = self.get_existing_data(model, field_uniq, fields, existing_datalist) # 1 calling odoo
                 existing_data = {data[field_uniq] for data in existing_data_target}
                 type_fields, relation_fields = self.get_type_data_source(model, fields) # 2 calling odoo
 
