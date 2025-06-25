@@ -7,7 +7,7 @@ from .data_integrator import DataIntegrator
 from .data_transaksiMCtoSS import DataTransaksiMCtoSS
 from datetime import datetime, timedelta
 
-class SettingConfig(models.TransientModel):
+class SettingConfig(models.Model):
     _name = "setting.config"
     _rec_name = "vit_config_server_name"
     _description = "Master Configuration"
