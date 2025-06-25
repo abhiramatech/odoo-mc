@@ -3,7 +3,7 @@ from odoo.exceptions import UserError
 from odoo.exceptions import ValidationError
 from .odoo_client import OdooClient
 
-class ManualSyncSSToMCIntegratiion(models.Model):
+class ManualSyncSSToMCIntegratiion(models.TransientModel):
     _name = 'manual.sync.ss.to.mc'
     _inherit = "setting.config"
     _description = 'Manual Sync For Integration'

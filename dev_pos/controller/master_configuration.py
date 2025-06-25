@@ -7,7 +7,7 @@ from .data_integrator import DataIntegrator
 from .data_transaksiMCtoSS import DataTransaksiMCtoSS
 from datetime import datetime, timedelta
 
-class SettingConfig(models.Model):
+class SettingConfig(models.TransientModel):
     _name = "setting.config"
     _rec_name = "vit_config_server_name"
     _description = "Master Configuration"
@@ -210,6 +210,28 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
             integrator_master.transfer_data('product.tag', ['name', 'color', 'product_template_ids', 'create_date', 'write_date'], 'Master Tags', date_from, date_to)
+
+    def create_master_barcode(self, mc, ss, datefrom, dateto):
+        if mc and ss:
+            mc_client = mc
+            ss_clients = ss
+        else:
+            mc_client, ss_clients = self.get_config(False)
+
+        if datefrom and dateto:
+            date_from = datefrom
+            date_to = dateto
+            # Format date_from and date_to to include time
+            date_from = date_from.strftime("%Y-%m-%d %H:%M:%S.%f")
+            date_to = date_to.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            date_from, date_to = self.get_date(False, False)
+
+        date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
+
+        for ss_client in ss_clients:
+            integrator_master = DataIntegrator(mc_client, ss_client)
+            integrator_master.transfer_data('multiple.barcode', ['barcode', 'product_tmpl_id'], 'Master Multiple Barcode', date_from, date_to) # , 'multi_barcode_ids'
 
     def create_location(self, mc, ss, datefrom, dateto):
         if mc and ss:
