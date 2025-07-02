@@ -1239,6 +1239,7 @@ class SettingConfig(models.Model):
                         vals['vit_linked_server'] = False
                         vals['vit_state'] = 'failed'
             except Exception as e:
+                raise UserError(_("{url} {db} {username} {password} {common} {e}"))
                 vals['vit_linked_server'] = False
                 vals['vit_state'] = 'failed'
             
