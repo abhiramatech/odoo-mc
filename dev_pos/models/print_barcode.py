@@ -39,32 +39,30 @@ class PrintBarcode(models.Model):
     nama_printer = fields.Many2one('printer.list', string="Printer")
     printer_list = fields.Selection(selection='_get_printer_selection', string="Printer")
     ukuran_kertas = fields.Many2one('paper.size', string="Ukuran Kertas")
-    size_kertas = fields.Selection(selection='_get_paper_sizes', string="Ukuran Kertas", default='a4')
-    lebar = fields.Float(string="Lebar", default=210.0)  # Default A4 width in mm
-    tinggi = fields.Float(string="Tinggi", default=297.0)  # Default A4 height in mm
+    size_kertas = fields.Selection(selection='_get_paper_sizes', string="Ukuran Kertas", default='custom')
+    lebar = fields.Float(string="Lebar (mm)", default=100.0)  # Label strip width
+    tinggi = fields.Float(string="Tinggi (mm)", default=30.0)  # Label strip height
     orientasi = fields.Selection([
         ('landscape', 'Landscape'),
         ('portrait', 'Portrait'),
-    ], default='portrait')
+    ], default='landscape')
+
+    # Label Strip Configuration
+    single_label_width = fields.Float(string="Single Label Width (mm)", default=30.0)
+    single_label_height = fields.Float(string="Single Label Height (mm)", default=25.0)
+    label_spacing = fields.Float(string="Label Spacing (mm)", default=2.0)
+    max_labels_per_row = fields.Integer(string="Max Labels Per Row", default=4, help="Maximum number of labels per row when mixing single and multi-copy products")
 
     # Margin Config
-    margin_atas = fields.Float(string="Margin Atas", default=10.0)
-    margin_bawah = fields.Float(string="Margin Bawah", default=10.0)
-    margin_kiri = fields.Float(string="Margin Kiri", default=10.0)
-    margin_kanan = fields.Float(string="Margin Kanan", default=10.0)
+    margin_atas = fields.Float(string="Margin Atas", default=2.0)
+    margin_bawah = fields.Float(string="Margin Bawah", default=2.0)
+    margin_kiri = fields.Float(string="Margin Kiri", default=2.0)
+    margin_kanan = fields.Float(string="Margin Kanan", default=2.0)
     label = fields.Selection([
         ('1', '1 Label'),
         ('2', '2 Label'),
     ], default='1')
     jumlah_baris = fields.Float(string="Jumlah Baris", default=10.0)
-
-    # Setting Barcode
-    jumlah_kolom = fields.Float(string="Jumlah Kolom", default=3.0)
-    jarak_antar_kolom = fields.Float(string="Jarak Antar Kolom", default=5.0)
-    tinggi_baris = fields.Float(string="Tinggi Baris", default=20.0)
-    jarak_antar_baris = fields.Float(string="Jarak Antar Baris", default=5.0)
-    lebar_kolom = fields.Float(string="Lebar Kolom", default=60.0)
-    jumlah_karakter = fields.Float(string="Jumlah Karakter", default=13.0)
 
     # Font Barcode
     available_fonts = fields.Selection(selection='_get_available_fonts', string="Jenis Fonts Text")
@@ -82,16 +80,16 @@ class PrintBarcode(models.Model):
         ('jan', 'JAN'),
         ('upca', 'UPC-A'),
     ], string="Jenis Barcode")
-    ukuran_font_barcode = fields.Float(string="Ukuran Font Barcode", default=40.0)
-    ukuran_font_kode = fields.Float(string="Ukuran Font Kode", default=8.0)
-    ukuran_font_nama = fields.Float(string="Ukuran Font Nama", default=8.0)
-    ukuran_font_harga = fields.Float(string="Ukuran Font Harga", default=10.0)
-    posisi_barcode = fields.Float(string="Posisi Barcode", default=15.0)
-    posisi_kode = fields.Float(string="Posisi Kode", default=5.0)
-    tinggi_kode = fields.Float(string="Tinggi Kode", default=10.0)
-    posisi_harga = fields.Float(string="Posisi Harga", default=30.0)
-    posisi_nama_barang = fields.Float(string="Posisi Nama Barang", default=10.0)
-    tinggi_nama_barnag = fields.Float(string="Tinggi Nama Barang", default=15.0)
+    ukuran_font_barcode = fields.Float(string="Ukuran Font Barcode", default=20.0)
+    ukuran_font_kode = fields.Float(string="Ukuran Font Kode", default=6.0)
+    ukuran_font_nama = fields.Float(string="Ukuran Font Nama", default=6.0)
+    ukuran_font_harga = fields.Float(string="Ukuran Font Harga", default=8.0)
+    posisi_barcode = fields.Float(string="Posisi Barcode", default=12.0)
+    posisi_kode = fields.Float(string="Posisi Kode", default=3.0)
+    tinggi_kode = fields.Float(string="Tinggi Kode", default=8.0)
+    posisi_harga = fields.Float(string="Posisi Harga", default=20.0)
+    posisi_nama_barang = fields.Float(string="Posisi Nama Barang", default=8.0)
+    tinggi_nama_barnag = fields.Float(string="Tinggi Nama Barang", default=10.0)
 
     #Filter date
     start_date = fields.Datetime(string="Date From")
@@ -108,58 +106,63 @@ class PrintBarcode(models.Model):
 
     @api.model
     def _get_paper_sizes(self):
-        """Get standard paper sizes using papersize library"""
+        """Get standard paper sizes including custom option for label strips"""
         try:
             import papersize
             
-            # Get standard paper sizes from papersize library
             paper_sizes = []
             
             # ISO A series
             for size in ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8']:
-                width_mm = papersize.parse_length(papersize.SIZES[size][0]) * 25.4  # convert inches to mm
-                height_mm = papersize.parse_length(papersize.SIZES[size][1]) * 25.4  # convert inches to mm
+                width_mm = papersize.parse_length(papersize.SIZES[size][0]) * 25.4
+                height_mm = papersize.parse_length(papersize.SIZES[size][1]) * 25.4
                 paper_sizes.append((size, f"{size.upper()} ({width_mm:.1f} × {height_mm:.1f} mm)"))
             
             # Common North American sizes
             for size in ['letter', 'legal', 'tabloid']:
-                width_mm = papersize.parse_length(papersize.SIZES[size][0]) * 25.4  # convert inches to mm
-                height_mm = papersize.parse_length(papersize.SIZES[size][1]) * 25.4  # convert inches to mm
+                width_mm = papersize.parse_length(papersize.SIZES[size][0]) * 25.4
+                height_mm = papersize.parse_length(papersize.SIZES[size][1]) * 25.4
                 paper_sizes.append((size, f"{size.title()} ({width_mm:.1f} × {height_mm:.1f} mm)"))
             
-            # Add custom option
-            paper_sizes.append(('custom', 'Custom'))
+            # Add common label sizes
+            paper_sizes.extend([
+                ('label_strip_small', 'Label Strip Small (100 × 30 mm)'),
+                ('label_strip_medium', 'Label Strip Medium (150 × 40 mm)'),
+                ('label_strip_large', 'Label Strip Large (200 × 50 mm)'),
+                ('custom', 'Custom'),
+            ])
             
             return paper_sizes
         except ImportError:
-            # Fallback if papersize library is not available
             return [
-                ('a0', 'A0 (841.0 × 1189.0 mm)'),
-                ('a1', 'A1 (594.0 × 841.0 mm)'),
-                ('a2', 'A2 (420.0 × 594.0 mm)'),
-                ('a3', 'A3 (297.0 × 420.0 mm)'),
                 ('a4', 'A4 (210.0 × 297.0 mm)'),
                 ('a5', 'A5 (148.0 × 210.0 mm)'),
-                ('a6', 'A6 (105.0 × 148.0 mm)'),
-                ('a7', 'A7 (74.0 × 105.0 mm)'),
-                ('a8', 'A8 (52.0 × 74.0 mm)'),
                 ('letter', 'Letter (215.9 × 279.4 mm)'),
-                ('legal', 'Legal (215.9 × 355.6 mm)'),
-                ('tabloid', 'Tabloid (279.4 × 431.8 mm)'),
+                ('label_strip_small', 'Label Strip Small (100 × 30 mm)'),
+                ('label_strip_medium', 'Label Strip Medium (150 × 40 mm)'),
+                ('label_strip_large', 'Label Strip Large (200 × 50 mm)'),
                 ('custom', 'Custom'),
             ]
     
     def _get_paper_size_dimensions(self, size_key):
         """Get dimensions (width, height) in mm for the given paper size key"""
+        # Handle label strip sizes
+        label_sizes = {
+            'label_strip_small': (100.0, 30.0),
+            'label_strip_medium': (150.0, 40.0),
+            'label_strip_large': (200.0, 50.0),
+        }
+        
+        if size_key in label_sizes:
+            return label_sizes[size_key]
+            
         try:
             import papersize
             if size_key in papersize.SIZES:
                 width_in = papersize.parse_length(papersize.SIZES[size_key][0])
                 height_in = papersize.parse_length(papersize.SIZES[size_key][1])
-                # Convert from inches to mm
                 return (width_in * 25.4, height_in * 25.4)
         except ImportError:
-            # Fallback dimensions if papersize library is not available
             fallback_sizes = {
                 'a0': (841.0, 1189.0),
                 'a1': (594.0, 841.0),
@@ -174,44 +177,49 @@ class PrintBarcode(models.Model):
                 'legal': (215.9, 355.6),
                 'tabloid': (279.4, 431.8),
             }
-            return fallback_sizes.get(size_key.lower(), (210.0, 297.0))  # Default to A4 if not found
+            return fallback_sizes.get(size_key.lower(), (100.0, 30.0))
             
-        # Default to A4 if size not in papersize library
-        return (210.0, 297.0)
+        return (100.0, 30.0)  # Default label strip size
     
     @api.onchange('size_kertas')
     def _onchange_size_kertas(self):
         """Update lebar and tinggi fields when paper size changes"""
         if self.size_kertas and self.size_kertas != 'custom':
             self.lebar, self.tinggi = self._get_paper_size_dimensions(self.size_kertas)
+            
+        # Set default single label dimensions based on paper size
+        if self.size_kertas and 'label_strip' in self.size_kertas:
+            if self.size_kertas == 'label_strip_small':
+                self.single_label_width = 30.0
+                self.single_label_height = 25.0
+            elif self.size_kertas == 'label_strip_medium':
+                self.single_label_width = 45.0
+                self.single_label_height = 35.0
+            elif self.size_kertas == 'label_strip_large':
+                self.single_label_width = 60.0
+                self.single_label_height = 45.0
 
     @api.onchange('doc_type')
     def _onchange_doc_type(self):
-        """
-        Automatically populate product_line_ids when doc_type is selected
-        """
+        """Automatically populate product_line_ids when doc_type is selected"""
         # Clear existing product lines
         self.product_line_ids = [(5, 0, 0)]
         
-        # If doc_type is not selected, do nothing
         if not self.doc_type:
             return
             
-        # Validate dates are provided
         if not self.start_date or not self.end_date:
             return {'warning': {
                 'title': 'Information',
                 'message': 'Mohon tentukan Tanggal Mulai dan Tanggal Akhir terlebih dahulu.'
             }}
             
-        # Validate date range
         if self.end_date < self.start_date:
             return {'warning': {
                 'title': 'Warning',
                 'message': 'Tanggal Akhir tidak boleh lebih awal dari Tanggal Mulai.'
             }}
             
-        # Mapping dari pilihan doc_type ke nama picking_type_id.name
         doc_type_mapping = {
             'receipt': 'GRPO',
             'good_receipts': 'Goods Receipts',
@@ -227,7 +235,6 @@ class PrintBarcode(models.Model):
                 'message': 'Tipe Dokumen tidak valid.'
             }}
 
-        # Convert start_date dan end_date ke datetime
         start_datetime = datetime.combine(self.start_date, datetime.min.time())
         end_datetime = datetime.combine(self.end_date, datetime.max.time())
 
@@ -269,7 +276,6 @@ class PrintBarcode(models.Model):
                 'message': "Tidak ada produk dengan barcode yang ditemukan pada dokumen yang dipilih."
             }}
 
-        # Prepare product lines
         product_lines = []
         for product_data in products_data.values():
             product_lines.append((0, 0, {
@@ -278,7 +284,6 @@ class PrintBarcode(models.Model):
                 'tanggal_masuk': product_data['receipt_date']
             }))
             
-        # Update product_line_ids with new records
         if product_lines:
             self.product_line_ids = product_lines
     
@@ -290,10 +295,7 @@ class PrintBarcode(models.Model):
     
     @api.model
     def _get_system_printers(self):
-        """
-        Get list of system printers
-        Supports Windows, Linux (including Ubuntu) and macOS
-        """
+        """Get list of system printers"""
         printers = []
         system = platform.system()
         
@@ -301,12 +303,10 @@ class PrintBarcode(models.Model):
             if system == "Windows":
                 try:
                     import win32print
-                    # Using Win32 API for Windows
                     for printer in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL, None, 1):
                         printer_name = printer[2]
                         printers.append(printer_name)
                 except ImportError:
-                    # Fallback if win32print is not available
                     output = subprocess.check_output(['wmic', 'printer', 'get', 'name'], 
                                                     universal_newlines=True, 
                                                     shell=True)
@@ -314,18 +314,15 @@ class PrintBarcode(models.Model):
                         if line.strip() and line.strip().lower() != 'name':
                             printers.append(line.strip())
             
-            elif system == "Linux" or system == "Darwin":  # Linux or macOS
-                # Try lpstat (CUPS)
+            elif system == "Linux" or system == "Darwin":
                 try:
                     output = subprocess.check_output(['lpstat', '-a'], 
                                                    universal_newlines=True)
                     for line in output.split('\n'):
                         if line.strip():
-                            # Format: "PrinterName accepting requests since..."
                             printer_name = line.split()[0]
                             printers.append(printer_name)
                 except:
-                    # Fallback to lpadmin or lpc
                     try:
                         output = subprocess.check_output(['lpc', 'status'], 
                                                        universal_newlines=True)
@@ -335,24 +332,19 @@ class PrintBarcode(models.Model):
                                 current_printer = line.split(':')[0]
                                 printers.append(current_printer)
                     except:
-                        # Last fallback: check /etc/cups/printers.conf
                         if os.path.exists('/etc/cups/printers.conf'):
                             try:
                                 with open('/etc/cups/printers.conf', 'r') as f:
                                     for line in f:
                                         if line.startswith('<Printer '):
-                                            # Format: <Printer PrinterName>
-                                            printer_name = line[9:-1]  # Extract printer name
+                                            printer_name = line[9:-1]
                                             printers.append(printer_name)
                             except:
                                 pass
         
         except Exception as e:
-            # Just return empty list on error instead of raising exception
-            # since this is called during field selection initialization
             return []
         
-        # Add a 'None' option if needed
         if not printers:
             printers = [('none', 'No printers found')]
             
@@ -375,7 +367,6 @@ class PrintBarcode(models.Model):
                 font_names.append((font_name, font_name))
             except Exception:
                 continue
-        # Remove duplicates
         font_names = list(set(font_names))
         return sorted(font_names)
 
@@ -395,31 +386,27 @@ class PrintBarcode(models.Model):
         else:
             width_mm, height_mm = self.lebar, self.tinggi
 
-        # Convert mm to points (ReportLab uses points)
         width_pts = width_mm * mm
         height_pts = height_mm * mm
 
-        # Return dimensions based on orientation
         if self.orientasi == 'landscape':
-            return (height_pts, width_pts)  # Swap dimensions for landscape
-        return (width_pts, height_pts)  # Portrait orientation
+            return (height_pts, width_pts)
+        return (width_pts, height_pts)
     
     def _create_barcode_drawing(self, barcode_value, width=50*mm, height=20*mm):
         """Create a barcode using ReportLab's built-in functionality."""
         try:
-            # Default to Code128 if no barcode type selected (more versatile)
             barcode_type = self.available_fonts_barcode or 'code128'
             
-            # Map python-barcode types to ReportLab barcode types
             barcode_type_mapping = {
                 'ean13': 'EAN13',
                 'ean8': 'EAN8',
-                'ean': 'EAN13',  # Default to EAN13 for generic EAN
+                'ean': 'EAN13',
                 'code39': 'Standard39',
                 'code128': 'Code128',
                 'upc': 'UPCA',
                 'upca': 'UPCA',
-                'isbn13': 'EAN13',  # ISBN-13 is EAN-13 format
+                'isbn13': 'EAN13',
                 'isbn10': 'ISBN',
                 'issn': 'ISSN',
                 'jan': 'JAN',
@@ -428,28 +415,22 @@ class PrintBarcode(models.Model):
             
             reportlab_barcode_type = barcode_type_mapping.get(barcode_type, 'Code128')
             
-            # Handle specific barcode type requirements
             if reportlab_barcode_type == 'EAN13' and len(barcode_value) < 12:
-                # EAN13 needs at least 12 digits (13th is checksum)
                 barcode_value = barcode_value.zfill(12)
             elif reportlab_barcode_type == 'EAN8' and len(barcode_value) < 7:
-                # EAN8 needs at least 7 digits (8th is checksum)
                 barcode_value = barcode_value.zfill(7)
             
-            # Create the barcode drawing using ReportLab's built-in functionality
             barcode_drawing = createBarcodeDrawing(
                 reportlab_barcode_type,
                 value=barcode_value,
                 width=width,
                 height=height,
-                humanReadable=False  # Don't add text, we'll do it separately
+                humanReadable=False
             )
             
             return barcode_drawing
         except Exception as e:
-            # If ReportLab's built-in function fails, provide fallback that always works
             try:
-                # Code128 is the most versatile and accepts almost any string
                 barcode_drawing = createBarcodeDrawing(
                     'Code128',
                     value=barcode_value,
@@ -459,7 +440,6 @@ class PrintBarcode(models.Model):
                 )
                 return barcode_drawing
             except Exception as inner_e:
-                # Last resort: create a dummy Drawing with a message
                 from reportlab.graphics.shapes import Drawing, String
                 drawing = Drawing(width, height)
                 drawing.add(String(width/2, height/2, f"Invalid: {barcode_value}", textAnchor='middle'))
@@ -480,161 +460,163 @@ class PrintBarcode(models.Model):
 
         return self.generate_barcode_pdf(product_data)
 
-    
     def action_print_barcode(self):
         """Action to print barcodes for selected products"""
         if not self.product_line_ids:
             raise ValidationError("No products selected for printing barcodes.")
         
-        # Collect product IDs and copies only for products with barcodes
         product_data = {}
         for line in self.product_line_ids:
-            if line.product_id.barcode:  # Only include products with barcodes
+            if line.product_id.barcode:
                 product_data[line.product_id.id] = int(line.jumlah_copy)
         
         if not product_data:
             raise ValidationError("None of the selected products have barcodes assigned. Please assign barcodes to products first.")
         
-        # Optionally, inform the user about skipped products
         skipped_products = self.product_line_ids.filtered(lambda l: not l.product_id.barcode).mapped('product_id.name')
         if skipped_products:
             message = f"Note: {len(skipped_products)} products without barcodes were skipped."
-            # You could log this or add it to a notification but we'll proceed with the ones that have barcodes
         
-        # Pass the product data to generate_barcode_pdf
         return self.generate_barcode_pdf(product_data)
         
-    # Update your generate_barcode_pdf method to handle copies per product
     def generate_barcode_pdf(self, product_data):
-        """Generate PDF with barcodes for selected products, supporting custom fonts and copies."""
+        """Generate PDF with label strips - optimized layout for mixed copy counts"""
+        return self._generate_strip_pdf(product_data)
+    
+    def _generate_strip_pdf(self, product_data):
+        """Generate PDF with label strips - optimized layout for mixed copy counts"""
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         file_path = temp_file.name
         temp_file.close()
 
-        # Get page size based on the selected paper size or custom dimensions
-        page_size = self._get_page_size()
-        c = canvas.Canvas(file_path, pagesize=page_size)
-        
-        # Get the dimensions of the page in the correct orientation
-        page_width, page_height = page_size
-
-        # Calculate usable area considering margins
-        usable_width = page_width - (self.margin_kiri + self.margin_kanan) * mm
-        usable_height = page_height - (self.margin_atas + self.margin_bawah) * mm
-
-        # Calculate label dimensions based on the number of columns and rows
-        label_width = usable_width / int(self.jumlah_kolom)  # Convert float to int
-        label_height = usable_height / int(self.jumlah_baris)  # Convert float to int
-
-        # Get spacing factor based on label selection
-        spacing_factor = int(self.label) if self.label else 1
-
         products = self.env['product.product'].browse(product_data.keys())
-
-        x_start = self.margin_kiri * mm
-        y_start = page_height - self.margin_atas * mm
-
-        current_row = 0
-        current_col = 0
-
-        # Get font from field
-        font_name_product = self.available_fonts or "Helvetica"
-        font_name_barcode = self.available_fonts or "Helvetica"
-        font_name_code = self.available_fonts or "Helvetica"
-        font_name_price = self.available_fonts or "Helvetica"
-
-        # Check if font is not a standard ReportLab font, then register the TTF font
-        standard_fonts = [
-            'Courier', 'Courier-Bold', 'Courier-Oblique', 'Courier-BoldOblique',
-            'Helvetica', 'Helvetica-Bold', 'Helvetica-Oblique', 'Helvetica-BoldOblique',
-            'Times-Roman', 'Times-Bold', 'Times-Italic', 'Times-BoldItalic',
-            'Symbol', 'ZapfDingbats'
-        ]
-
-        if font_name_product not in standard_fonts:
-            # Find TTF path
-            font_paths = font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
-            for path in font_paths:
-                try:
-                    font_prop = font_manager.FontProperties(fname=path)
-                    if font_prop.get_name() == font_name_product:
-                        font_id = font_name_product.replace(" ", "_")
-                        pdfmetrics.registerFont(TTFont(font_id, path))
-                        font_name_product = font_id
-                        font_name_barcode = font_id
-                        font_name_code = font_id
-                        font_name_price = font_id
-                        break
-                except Exception:
-                    continue
-
-        for product in products:
+        
+        # Get fonts
+        font_name = self._register_font()
+        
+        if not products:
+            raise ValidationError("No valid products found.")
+        
+        # Separate products by copy count
+        multi_copy_products = [p for p in products if product_data.get(p.id, 1) > 1]
+        single_copy_products = [p for p in products if product_data.get(p.id, 1) == 1]
+        
+        # Calculate maximum possible labels per row (user configurable)
+        max_labels_per_row = self.max_labels_per_row or 4  # Use user setting or default to 4
+        max_copies = max(product_data.values()) if product_data else 1
+        strip_height = self.single_label_height + (self.margin_atas + self.margin_bawah)
+        
+        # Create canvas
+        c = canvas.Canvas(file_path, pagesize=(210 * mm, strip_height * mm))  # Start with A4 width
+        
+        # Track remaining single copy products
+        remaining_single_products = single_copy_products.copy()
+        
+        # Process multi-copy products and try to fit single products in same row
+        for idx, product in enumerate(multi_copy_products):
             if not product.barcode:
                 continue
-
-            barcode_value = product.barcode.strip()
+                
             copies = product_data.get(product.id, 1)
-
-            for copy in range(copies):
-                # Apply spacing based on the label field
-                x = x_start + current_col * (label_width + self.jarak_antar_kolom * mm)
-                y = y_start - current_row * (label_height + self.jarak_antar_baris * mm)
-
-                # Draw Product Name
-                c.setFont(font_name_product, self.ukuran_font_nama)
-                product_name = product.name[:25] + ("..." if len(product.name) > 25 else "")
-                c.drawCentredString(x + label_width / 2, y - self.posisi_nama_barang * mm, product_name)
-
-                # Draw Barcode
-                barcode = self._create_barcode_drawing(
-                    barcode_value,
-                    width=self.lebar_kolom * mm,
-                    height=self.ukuran_font_barcode * mm
-                )
-                barcode_x = x + (label_width - self.lebar_kolom * mm) / 2
-                barcode_y = y - (self.posisi_barcode * mm) - (self.ukuran_font_barcode * mm)
-                barcode.drawOn(c, barcode_x, barcode_y)
-
-                # Draw Barcode Number
-                c.setFont(font_name_code, self.ukuran_font_kode)
-                c.drawCentredString(x + label_width / 2, barcode_y - self.posisi_kode * mm, product.barcode)
-
-                # Draw Price
-                product_line = self.env['print.barcode.product.line'].search([
-                    ('barcode_id', '=', self.id),
-                    ('product_id', '=', product.id)
-                ], limit=1)
-
-                if product_line and product_line.harga_jual:
-                    c.setFont(font_name_price, self.ukuran_font_harga)
-                    price_text = f"Rp {product_line.harga_jual:,.0f}"
-                    c.drawCentredString(x + label_width / 2, y - self.posisi_harga * mm, price_text)
-
-                # Move to next label position with appropriate spacing
-                current_col += 1
-                # Check if we've reached the maximum columns for this row
-                # We need to adjust the maximum columns based on the spacing factor
-                max_cols = int(self.jumlah_kolom) or 1
-                    
-                if current_col >= max_cols:
-                    current_col = 0
-                    current_row += 1
-
-                # Check if we need a new page
-                if current_row >= int(self.jumlah_baris):
+            
+            # Calculate how many single products can fit in this row with the multi-copy product
+            total_labels_this_row = copies
+            single_products_this_row = []
+            
+            # Try to fit single products until we reach max_labels_per_row
+            while total_labels_this_row < max_labels_per_row and remaining_single_products:
+                single_products_this_row.append(remaining_single_products.pop(0))
+                total_labels_this_row += 1
+            
+            # Calculate actual page width needed for this row
+            actual_page_width = (self.single_label_width * total_labels_this_row) + \
+                               (self.label_spacing * (total_labels_this_row - 1)) + \
+                               (self.margin_kiri + self.margin_kanan)
+            
+            c.setPageSize((actual_page_width * mm, strip_height * mm))
+            
+            current_position = 0
+            
+            # Draw multi-copy product labels first
+            for copy_num in range(copies):
+                x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
+                y_pos = self.margin_bawah
+                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
+                current_position += 1
+            
+            # Draw single products that fit in this row
+            for single_product in single_products_this_row:
+                if single_product.barcode:
+                    x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
+                    y_pos = self.margin_bawah
+                    self._draw_single_label(c, single_product, x_pos * mm, y_pos * mm, font_name)
+                    current_position += 1
+            
+            # New page for next product (if not the last one or if there are remaining single products)
+            if idx < len(multi_copy_products) - 1 or remaining_single_products:
+                c.showPage()
+        
+        # Handle remaining single products (if any) - each gets its own small page
+        if remaining_single_products:
+            # Give each remaining single product its own small page
+            for idx, product in enumerate(remaining_single_products):
+                if not product.barcode:
+                    continue
+                
+                # Each single product gets its own compact page
+                # Use user-configured dimensions for single labels
+                single_page_width = self.single_label_width
+                single_page_height = self.single_label_height
+                
+                page_width = single_page_width + (self.margin_kiri + self.margin_kanan)
+                page_height = single_page_height + (self.margin_atas + self.margin_bawah)
+                
+                c.setPageSize((page_width * mm, page_height * mm))
+                
+                x_pos = self.margin_kiri
+                y_pos = self.margin_bawah
+                
+                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
+                
+                # New page for next product (if not the last one)
+                if idx < len(remaining_single_products) - 1:
                     c.showPage()
-                    current_row = 0
-                    current_col = 0
-                    c.setFont(font_name_code, self.ukuran_font_kode)
-
+        
+        # Handle case where we only have single copy products - each gets its own small page
+        elif not multi_copy_products and single_copy_products:
+            # All products are single copy - give each product its own small page
+            for idx, product in enumerate(single_copy_products):
+                if not product.barcode:
+                    continue
+                
+                # Each single product gets its own compact page  
+                # Use user-configured dimensions for single labels
+                single_page_width = self.single_label_width
+                single_page_height = self.single_label_height
+                
+                page_width = single_page_width + (self.margin_kiri + self.margin_kanan)
+                page_height = single_page_height + (self.margin_atas + self.margin_bawah)
+                
+                c.setPageSize((page_width * mm, page_height * mm))
+                
+                x_pos = self.margin_kiri
+                y_pos = self.margin_bawah
+                
+                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
+                
+                # New page for next product (if not the last one)
+                if idx < len(single_copy_products) - 1:
+                    c.showPage()
+        
         c.save()
 
+        # Read and store PDF
         with open(file_path, 'rb') as pdf_file:
             pdf_data = pdf_file.read()
 
         os.unlink(file_path)
 
-        filename = f"barcodes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        filename = f"barcode_strips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         self.write({
             'barcode_pdf': base64.b64encode(pdf_data),
             'barcode_filename': filename
@@ -645,6 +627,93 @@ class PrintBarcode(models.Model):
             'url': f'/web/content/?model=print.barcode&id={self.id}&field=barcode_pdf&filename={filename}',
             'target': 'new',
         }
+    
+    def _register_font(self):
+        """Register and return font name"""
+        font_name = self.available_fonts or "Helvetica"
+        
+        standard_fonts = [
+            'Courier', 'Courier-Bold', 'Courier-Oblique', 'Courier-BoldOblique',
+            'Helvetica', 'Helvetica-Bold', 'Helvetica-Oblique', 'Helvetica-BoldOblique',
+            'Times-Roman', 'Times-Bold', 'Times-Italic', 'Times-BoldItalic',
+            'Symbol', 'ZapfDingbats'
+        ]
+
+        if font_name not in standard_fonts:
+            font_paths = font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
+            for path in font_paths:
+                try:
+                    font_prop = font_manager.FontProperties(fname=path)
+                    if font_prop.get_name() == font_name:
+                        font_id = font_name.replace(" ", "_")
+                        pdfmetrics.registerFont(TTFont(font_id, path))
+                        return font_id
+                except Exception:
+                    continue
+        
+        return font_name
+    
+    def _draw_single_label(self, canvas_obj, product, x_pos, y_pos, font_name):
+        """Draw a single label at specified position"""
+        # Get product line for pricing info
+        product_line = self.env['print.barcode.product.line'].search([
+            ('barcode_id', '=', self.id),
+            ('product_id', '=', product.id)
+        ], limit=1)
+        
+        label_width = self.single_label_width * mm
+        label_height = self.single_label_height * mm
+        
+    def _draw_single_label(self, canvas_obj, product, x_pos, y_pos, font_name):
+        """Draw a single label at specified position"""
+        # Get product line for pricing info
+        product_line = self.env['print.barcode.product.line'].search([
+            ('barcode_id', '=', self.id),
+            ('product_id', '=', product.id)
+        ], limit=1)
+        
+        label_width = self.single_label_width * mm
+        label_height = self.single_label_height * mm
+        
+        # Draw border (optional - can be controlled by a field)
+        # canvas_obj.rect(x_pos, y_pos, label_width, label_height)
+        
+        # Calculate center positions
+        center_x = x_pos + (label_width / 2)
+        
+        # Draw Product Name (top)
+        canvas_obj.setFont(font_name, self.ukuran_font_nama)
+        product_name = product.name[:20] + ("..." if len(product.name) > 20 else "")
+        name_y = y_pos + label_height - (self.posisi_nama_barang * mm)
+        canvas_obj.drawCentredString(center_x, name_y, product_name)
+        
+        # Draw Barcode (center)
+        if product.barcode:
+            # Calculate barcode width based on label dimensions (no hardcode reference to lebar_kolom)
+            barcode_width = label_width * 0.8  # 80% of label width
+            barcode_height = self.ukuran_font_barcode * mm * 0.6  # Smaller barcode for strip labels
+            
+            barcode = self._create_barcode_drawing(
+                product.barcode.strip(),
+                width=barcode_width,
+                height=barcode_height
+            )
+            
+            barcode_x = x_pos + (label_width - barcode_width) / 2
+            barcode_y = y_pos + (label_height / 2) - (barcode_height / 2)
+            barcode.drawOn(canvas_obj, barcode_x, barcode_y)
+            
+            # Draw Barcode Number (below barcode)
+            canvas_obj.setFont(font_name, self.ukuran_font_kode)
+            code_y = barcode_y - (self.posisi_kode * mm)
+            canvas_obj.drawCentredString(center_x, code_y, product.barcode)
+        
+        # Draw Price (bottom)
+        if product_line and product_line.harga_jual:
+            canvas_obj.setFont(font_name, self.ukuran_font_harga)
+            price_text = f"Rp {product_line.harga_jual:,.0f}"
+            price_y = y_pos + (self.posisi_harga * mm * 0.3)  # Adjust position for strip labels
+            canvas_obj.drawCentredString(center_x, price_y, price_text)
 
     def action_open_pdf(self):
         """Open the generated PDF in a new browser tab"""
@@ -659,7 +728,6 @@ class PrintBarcode(models.Model):
             'target': 'new',
         }
 
-    
     def action_print_to_printer(self):
         """Send the generated PDF directly to the selected printer"""
         if not self.nama_printer:
@@ -668,29 +736,24 @@ class PrintBarcode(models.Model):
         if not self.barcode_pdf:
             raise ValidationError("No barcode PDF generated. Please generate barcode first.")
         
-        # This is where you would integrate with a printing system
-        # The implementation depends on your server setup and printing system
         try:
-            # Decode the PDF
             pdf_data = base64.b64decode(self.barcode_pdf)
             
-            # Create temporary file
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
             file_path = temp_file.name
             temp_file.write(pdf_data)
             temp_file.close()
             
-            # Print using the printer's system name
             printer_name = self.nama_printer.system_name
             os.system(f'lpr -P {printer_name} {file_path}')
             
-            # Clean up
             os.unlink(file_path)
             
             return {'type': 'ir.actions.client', 'tag': 'reload'}
         
         except Exception as e:
             raise ValidationError(f"Error printing: {str(e)}")
+
 
 class PrintBarcodeProductLine(models.Model):
     _name = "print.barcode.product.line"
@@ -707,7 +770,6 @@ class PrintBarcodeProductLine(models.Model):
     def _onchange_product_id(self):
         if self.product_id:
             self.harga_jual = self.product_id.list_price
-            # Find the latest receipt date for this product
             self.tanggal_masuk = self._get_product_receipt_date()
     
     def _get_product_receipt_date(self):
@@ -715,7 +777,6 @@ class PrintBarcodeProductLine(models.Model):
         if not self.product_id:
             return False
             
-        # Find stock moves for this product in GRPO or Goods Receipts pickings
         stock_moves = self.env['stock.move'].search([
             ('product_id', '=', self.product_id.id),
             ('state', '=', 'done'),
@@ -723,10 +784,8 @@ class PrintBarcodeProductLine(models.Model):
         ], order='date desc', limit=1)
         
         if stock_moves:
-            # Convert datetime to date
             return fields.Date.to_date(stock_moves.date)
         
-        # Alternative approach: search directly in stock.picking
         if not stock_moves:
             picking = self.env['stock.picking'].search([
                 ('picking_type_id.name', 'in', ['GRPO', 'Goods Receipts']),
@@ -739,6 +798,7 @@ class PrintBarcodeProductLine(models.Model):
                 
         return False
 
+
 class PrinterList(models.Model):
     _name = "printer.list"
     _description = "Printer List"
@@ -749,10 +809,7 @@ class PrinterList(models.Model):
     
     @api.model
     def get_system_printers(self):
-        """
-        Mendapatkan daftar printer dari sistem
-        Mendukung Windows, Linux (termasuk Ubuntu) dan macOS
-        """
+        """Get system printers supporting Windows, Linux and macOS"""
         printers = []
         system = platform.system()
         
@@ -760,12 +817,10 @@ class PrinterList(models.Model):
             if system == "Windows":
                 try:
                     import win32print
-                    # Menggunakan Win32 API untuk Windows
                     for printer in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL, None, 1):
                         printer_name = printer[2]
                         printers.append(printer_name)
                 except ImportError:
-                    # Fallback jika win32print tidak tersedia
                     output = subprocess.check_output(['wmic', 'printer', 'get', 'name'], 
                                                     universal_newlines=True, 
                                                     shell=True)
@@ -773,18 +828,15 @@ class PrinterList(models.Model):
                         if line.strip() and line.strip().lower() != 'name':
                             printers.append(line.strip())
             
-            elif system == "Linux" or system == "Darwin":  # Linux atau macOS
-                # Coba lpstat (CUPS)
+            elif system == "Linux" or system == "Darwin":
                 try:
                     output = subprocess.check_output(['lpstat', '-a'], 
                                                    universal_newlines=True)
                     for line in output.split('\n'):
                         if line.strip():
-                            # Format: "PrinterName accepting requests since..."
                             printer_name = line.split()[0]
                             printers.append(printer_name)
                 except:
-                    # Fallback ke lpadmin atau lpc
                     try:
                         output = subprocess.check_output(['lpc', 'status'], 
                                                        universal_newlines=True)
@@ -794,14 +846,12 @@ class PrinterList(models.Model):
                                 current_printer = line.split(':')[0]
                                 printers.append(current_printer)
                     except:
-                        # Fallback terakhir: cek di /etc/cups/printers.conf
                         if os.path.exists('/etc/cups/printers.conf'):
                             try:
                                 with open('/etc/cups/printers.conf', 'r') as f:
                                     for line in f:
                                         if line.startswith('<Printer '):
-                                            # Format: <Printer PrinterName>
-                                            printer_name = line[9:-1]  # Ambil nama printer
+                                            printer_name = line[9:-1]
                                             printers.append(printer_name)
                             except:
                                 pass
@@ -812,9 +862,7 @@ class PrinterList(models.Model):
         return printers
     
     def action_load_system_printers(self):
-        """
-        Action untuk memuat printer sistem ke dalam database Odoo
-        """
+        """Load system printers into Odoo database"""
         printers = self.env['printer.list'].get_system_printers()
         existing_printers = self.env['printer.list'].search([]).mapped('system_name')
         
@@ -841,8 +889,8 @@ class PrinterList(models.Model):
                 }
             }
         }
-    
-    
+
+
 class PaperSize(models.Model):
     _name = "paper.size"
     _description = "Paper Size"

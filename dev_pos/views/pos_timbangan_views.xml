@@ -1,0 +1,54 @@
+<odoo>
+  <data>
+
+    <!-- WIZARD FORM -->
+    <record id="view_export_timbangan_wizard_form" model="ir.ui.view">
+      <field name="name">export.timbangan.wizard.form</field>
+      <field name="model">export.timbangan.wizard</field>
+      <field name="arch" type="xml">
+        <form string="Export Timbangan CSV">
+          <group>
+            <field name="export_type"/>
+          </group>
+
+          <button name="action_generate_all_products"
+                  type="object"
+                  string="Generate All Products"
+                  class="btn-secondary"/>
+
+          <field name="line_ids">
+            <tree editable="bottom">
+              <field name="item_code"/>
+              <field name="barcode"/>
+              <field name="item_name"/>
+              <field name="uom_id"/>
+              <field name="price_unit"/>
+              <field name="berat_timbangan"/>
+            </tree>
+          </field>
+
+          <footer>
+            <button name="action_export" type="object" string="Export" class="btn-primary"/>
+            <button string="Cancel" class="btn-secondary" special="cancel"/>
+          </footer>
+        </form>
+      </field>
+    </record>
+
+    <!-- ACTION -->
+    <record id="action_export_timbangan" model="ir.actions.act_window">
+      <field name="name">Timbangan Catalog</field>
+      <field name="res_model">export.timbangan.wizard</field>
+      <field name="view_mode">form</field>
+      <field name="target">new</field>
+    </record>
+
+    <!-- MENU -->
+    <menuitem id="menu_pos_timbangan_template"
+              name="Template Timbangan"
+              parent="point_of_sale.pos_config_menu_catalog"
+              action="action_export_timbangan"
+              sequence="80"/>
+
+  </data>
+</odoo>
