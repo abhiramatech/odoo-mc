@@ -7,7 +7,7 @@
     'company': 'Visi Intech',
     'maintainer': 'Visi Intech',
     'website': "https://www.Visi-Intech.com",
-    'depends': ['base', 'sale', 'stock', 'point_of_sale', 'account', 'mrp', 'loyalty', 'purchase', 'hr', 'l10n_id', 'l10n_id_efaktur', 'l10n_id_efaktur_coretax'],
+    'depends': ['base', 'sale', 'stock', 'point_of_sale', 'account', 'mrp', 'loyalty', 'purchase', 'hr', 'l10n_id', 'l10n_id_efaktur'], #, 'l10n_id_efaktur_coretax'
     'data': [
         # 'security/hr_security.xml',
         'security/ir.model.access.csv',
