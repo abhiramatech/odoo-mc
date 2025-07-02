@@ -10,7 +10,6 @@
                     <header>
                         <button name="action_print_barcode" string="Generate Barcode PDF" type="object" class="oe_highlight"/>
                         <button name="action_print_to_printer" string="Print to Printer" type="object" class="btn-primary" invisible="barcode_pdf == False"/>
-                        <!-- <button name="action_tarik_barang_masuk" string="Barang Masuk" type="object" class="btn-primary" invisible="start_date == False"/> -->
                     </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
@@ -27,11 +26,16 @@
                             </h1>
                         </div>
                         <group>
-                            <field name="start_date"/>
-                            <field name="end_date"/>
-                            <field name="pilihan" widget="radio"/>
-                            <field name="barcode_pdf" invisible="1"/>
-                            <field name="doc_type" widget="radio"/>
+                            <group>
+                                <field name="label_mode" widget="radio"/>
+                                <field name="start_date"/>
+                                <field name="end_date"/>
+                                <field name="doc_type" widget="radio"/>
+                            </group>
+                            <group>
+                                <field name="pilihan" widget="radio"/>
+                                <field name="barcode_pdf" invisible="1"/>
+                            </group>
                         </group>
                         
                         <!-- Add Products section -->
@@ -40,60 +44,87 @@
                             <!-- Printer Configuration Page -->
                             <page string="Printer Configuration" invisible="pilihan not in ('print')">
                                 <group>
-                                    <!-- <field name="nama_printer"/> -->
-                                    <field name="printer_list"/>
-                                    <field name="size_kertas"/>
-                                    <field name="lebar"/>
-                                    <field name="tinggi"/>
-                                    <field name="orientasi" widget="radio"/>
+                                    <group string="Paper Settings">
+                                        <field name="printer_list"/>
+                                        <field name="size_kertas"/>
+                                        <field name="lebar" invisible="size_kertas != 'custom'"/>
+                                        <field name="tinggi" invisible="size_kertas != 'custom'"/>
+                                        <field name="orientasi" widget="radio"/>
+                                    </group>
+                                    <group string="Label Strip Settings" invisible="label_mode != 'strip'">
+                                        <field name="single_label_width"/>
+                                        <field name="single_label_height"/>
+                                        <field name="label_spacing"/>
+                                    </group>
                                 </group>
                             </page>
                             
                             <!-- Margin Configuration Page -->
                             <page string="Margin Configuration" invisible="pilihan not in ('margin')">
                                 <group>
-                                    <field name="margin_atas"/>
-                                    <field name="margin_bawah"/>
-                                    <field name="margin_kiri"/>
-                                    <field name="margin_kanan"/>
-                                    <field name="label" widget="radio"/>
-                                    <field name="jumlah_baris"/>
+                                    <group string="Margins">
+                                        <field name="margin_atas"/>
+                                        <field name="margin_bawah"/>
+                                        <field name="margin_kiri"/>
+                                        <field name="margin_kanan"/>
+                                    </group>
+                                    <group string="Grid Layout Settings" invisible="label_mode != 'grid'">
+                                        <field name="label" widget="radio"/>
+                                        <field name="jumlah_baris"/>
+                                    </group>
                                 </group>
                             </page>
                             
                             <!-- Barcode Settings Page -->
                             <page string="Barcode Settings" invisible="pilihan not in ('setting')">
                                 <group>
-                                    <field name="jumlah_kolom"/>
-                                    <field name="jarak_antar_kolom"/>
-                                    <field name="tinggi_baris"/>
-                                    <field name="jarak_antar_baris"/>
-                                    <field name="lebar_kolom"/>
-                                    <field name="jumlah_karakter"/>
+                                    <group string="Grid Layout Settings" invisible="label_mode != 'grid'">
+                                        <field name="jumlah_kolom"/>
+                                        <field name="jarak_antar_kolom"/>
+                                        <field name="tinggi_baris"/>
+                                        <field name="jarak_antar_baris"/>
+                                        <field name="lebar_kolom"/>
+                                        <field name="jumlah_karakter"/>
+                                    </group>
+                                    <group string="Strip Layout Settings" invisible="label_mode != 'strip'">
+                                        <label for="single_label_width" string="Note: Strip settings are configured in Printer Configuration tab"/>
+                                    </group>
                                 </group>
                             </page>
                             
                             <!-- Font Configuration Page -->
                             <page string="Font Configuration" invisible="pilihan not in ('font')">
                                 <group>
-                                    <group string="Font Sizes">
+                                    <group string="Font Types">
                                         <field name="available_fonts"/>
                                         <field name="available_fonts_barcode"/>
+                                    </group>
+                                    <group string="Font Sizes">
+                                        <field name="ukuran_font_nama"/>
                                         <field name="ukuran_font_barcode"/>
                                         <field name="ukuran_font_kode"/>
-                                        <field name="ukuran_font_nama"/>
                                         <field name="ukuran_font_harga"/>
                                     </group>
-                                    <group string="Positions">
+                                </group>
+                                <separator string="Position Settings (Grid Mode Only)" invisible="label_mode != 'grid'"/>
+                                <group invisible="label_mode != 'grid'">
+                                    <group string="Vertical Positions">
+                                        <field name="posisi_nama_barang"/>
                                         <field name="posisi_barcode"/>
                                         <field name="posisi_kode"/>
-                                        <field name="tinggi_kode"/>
                                         <field name="posisi_harga"/>
-                                        <field name="posisi_nama_barang"/>
+                                    </group>
+                                    <group string="Heights">
+                                        <field name="tinggi_kode"/>
                                         <field name="tinggi_nama_barnag"/>
                                     </group>
                                 </group>
+                                <div invisible="label_mode != 'strip'" class="alert alert-info" role="alert">
+                                    <strong>Note:</strong> In Strip Mode, positions are automatically calculated based on label dimensions.
+                                    Font sizes above will still apply.
+                                </div>
                             </page>
+                            
                             <!-- Product List Page -->
                             <page string="Products">
                                 <field name="product_line_ids">
@@ -105,6 +136,16 @@
                                         <field name="tanggal_masuk" width="150"/>
                                     </tree>
                                 </field>
+                                <div class="mt16">
+                                    <div class="alert alert-info" role="alert" invisible="label_mode != 'strip'">
+                                        <strong>Strip Mode:</strong> Each product will create a separate horizontal strip with the specified number of copies.
+                                        Perfect for label printers and sticker sheets.
+                                    </div>
+                                    <div class="alert alert-info" role="alert" invisible="label_mode != 'grid'">
+                                        <strong>Grid Mode:</strong> All product labels will be arranged in a grid layout on standard paper sizes.
+                                        Ideal for office printers and full-page layouts.
+                                    </div>
+                                </div>
                             </page>
                         </notebook>
                     </sheet>
@@ -118,11 +159,30 @@
             <field name="model">print.barcode</field>
             <field name="arch" type="xml">
                 <tree string="Print Barcode">
+                    <field name="label_mode"/>
                     <field name="pilihan"/>
                     <field name="nama_printer"/>
                     <field name="size_kertas"/>
                     <field name="barcode_filename"/>
                 </tree>
+            </field>
+        </record>
+
+        <!-- Search View -->
+        <record id="view_print_barcode_search" model="ir.ui.view">
+            <field name="name">print.barcode.search</field>
+            <field name="model">print.barcode</field>
+            <field name="arch" type="xml">
+                <search string="Print Barcode">
+                    <field name="pilihan"/>
+                    <field name="label_mode"/>
+                    <field name="size_kertas"/>
+                    <group expand="0" string="Group By">
+                        <filter string="Print Mode" name="group_label_mode" context="{'group_by': 'label_mode'}"/>
+                        <filter string="Configuration Type" name="group_pilihan" context="{'group_by': 'pilihan'}"/>
+                        <filter string="Paper Size" name="group_size_kertas" context="{'group_by': 'size_kertas'}"/>
+                    </group>
+                </search>
             </field>
         </record>
 
@@ -135,38 +195,146 @@
                 <p class="o_view_nocontent_smiling_face">
                     Create your first barcode configuration
                 </p>
+                <p>
+                    Choose between:
+                    <br/>• <strong>Strip Mode</strong>: Each product gets its own horizontal label strip (perfect for sticker labels)
+                    <br/>• <strong>Grid Mode</strong>: All products arranged in a grid on standard paper
+                </p>
             </field>
         </record>
 
-        <!-- Action Window for Printing Barcodes from Product -->
-        <record id="action_print_product_barcode" model="ir.actions.act_window">
-            <field name="name">Print Product Barcodes</field>
+        <!-- Action Window for Strip Mode Printing -->
+        <record id="action_print_product_barcode_strip" model="ir.actions.act_window">
+            <field name="name">Print Product Barcode Strips</field>
             <field name="res_model">print.barcode</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
-            <field name="context">{'default_pilihan': 'print'}</field>
+            <field name="context">{'default_pilihan': 'print', 'default_label_mode': 'strip'}</field>
         </record>
 
-        <!-- Add "Print Barcode" button to product form view -->
+        <!-- Action Window for Grid Mode Printing -->
+        <record id="action_print_product_barcode_grid" model="ir.actions.act_window">
+            <field name="name">Print Product Barcode Grid</field>
+            <field name="res_model">print.barcode</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="context">{'default_pilihan': 'print', 'default_label_mode': 'grid'}</field>
+        </record>
+
+        <!-- Add "Print Barcode" buttons to product form view -->
         <record id="product_template_form_view_barcode_print" model="ir.ui.view">
             <field name="name">product.template.form.barcode.print</field>
             <field name="model">product.template</field>
             <field name="inherit_id" ref="product.product_template_form_view"/>
             <field name="arch" type="xml">
                 <div name="button_box" position="inside">
-                    <button class="oe_stat_button" name="%(action_print_product_barcode)d" 
-                            type="action" icon="fa-barcode" string="Print Barcode"
+                    <button class="oe_stat_button" name="%(action_print_product_barcode_strip)d" 
+                            type="action" icon="fa-tags" string="Print Label Strips"
+                            context="{'default_active_ids': active_ids}">
+                    </button>
+                    <button class="oe_stat_button" name="%(action_print_product_barcode_grid)d" 
+                            type="action" icon="fa-barcode" string="Print Barcode Grid"
                             context="{'default_active_ids': active_ids}">
                     </button>
                 </div>
             </field>
         </record>
 
-        <!-- Menu Item -->
+        <!-- Printer List Views -->
+        <record id="view_printer_list_form" model="ir.ui.view">
+            <field name="name">printer.list.form</field>
+            <field name="model">printer.list</field>
+            <field name="arch" type="xml">
+                <form string="Printer Configuration">
+                    <header>
+                        <button name="action_load_system_printers" string="Load System Printers" type="object" class="oe_highlight"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <field name="name"/>
+                            <field name="system_name"/>
+                            <field name="is_active"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_printer_list_tree" model="ir.ui.view">
+            <field name="name">printer.list.tree</field>
+            <field name="model">printer.list</field>
+            <field name="arch" type="xml">
+                <tree string="Printer List">
+                    <field name="name"/>
+                    <field name="system_name"/>
+                    <field name="is_active"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="action_printer_list" model="ir.actions.act_window">
+            <field name="name">Printer List</field>
+            <field name="res_model">printer.list</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <!-- Paper Size Views -->
+        <record id="view_paper_size_form" model="ir.ui.view">
+            <field name="name">paper.size.form</field>
+            <field name="model">paper.size</field>
+            <field name="arch" type="xml">
+                <form string="Paper Size">
+                    <sheet>
+                        <group>
+                            <field name="name"/>
+                            <field name="width"/>
+                            <field name="height"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_paper_size_tree" model="ir.ui.view">
+            <field name="name">paper.size.tree</field>
+            <field name="model">paper.size</field>
+            <field name="arch" type="xml">
+                <tree string="Paper Sizes">
+                    <field name="name"/>
+                    <field name="width"/>
+                    <field name="height"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="action_paper_size" model="ir.actions.act_window">
+            <field name="name">Paper Sizes</field>
+            <field name="res_model">paper.size</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <!-- Menu Items -->
+        <menuitem id="menu_print_barcode_root"
+            name="Barcode Printing"
+            parent="point_of_sale.menu_point_config_product"
+            sequence="4"/>
+
         <menuitem id="menu_print_barcode"
             name="Print Barcode"
             action="action_print_barcode"
-            parent="point_of_sale.menu_point_config_product"
-            sequence="4"/>
+            parent="menu_print_barcode_root"
+            sequence="1"/>
+
+        <menuitem id="menu_printer_list"
+            name="Printer Configuration"
+            action="action_printer_list"
+            parent="menu_print_barcode_root"
+            sequence="2"/>
+
+        <menuitem id="menu_paper_size"
+            name="Paper Sizes"
+            action="action_paper_size"
+            parent="menu_print_barcode_root"
+            sequence="3"/>
     </data>
 </odoo>

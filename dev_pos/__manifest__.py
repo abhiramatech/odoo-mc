@@ -60,6 +60,7 @@
         'views/print_barcode_view.xml',
         'views/product_product_view.xml',
         'views/mrp_unbuild_line_view.xml',
+        'views/pos_timbangan_views.xml',
         'reports/sales_report_view.xml',
         'reports/sales_report_menu_view.xml',
     ],
