@@ -54,7 +54,8 @@ class SalesReportDetail(models.TransientModel):
 
         header = [
             'User', 'Kasir', 'Customer Code', 'Customer Name', 'Kode Currency', 'Kode Store',
-            'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal', 
+            'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal',
+            'Sub Divisi', 'Item Kelas', 'Item Tipe',
             'Item Code', 'Nama Item', 'POS Category', 'Satuan', 'Quantity',
             'Harga', 'Taxes', 'Sub Total', 'Sub Total Nett'
         ]
@@ -78,16 +79,20 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 9, order.name if 'REFUND' in order.name.upper() else '')
                 worksheet.write(row, 10, order.partner_id.mobile or '')
                 worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+                
+                worksheet.write(row, 12, order_line.product_id.vit_sub_div or '')
+                worksheet.write(row, 13, order_line.product_id.vit_item_kel or '')
+                worksheet.write(row, 14, order_line.product_id.vit_item_type or '')
 
-                worksheet.write(row, 12, order_line.product_id.default_code or '')
-                worksheet.write(row, 13, order_line.product_id.name or '')
-                worksheet.write(row, 14, order_line.product_id.product_tmpl_id.pos_categ_ids[0].name if order_line.product_id.product_tmpl_id.pos_categ_ids else '')
-                worksheet.write(row, 15, order_line.product_uom_id.name or '')
-                worksheet.write(row, 16, order_line.qty)
-                worksheet.write(row, 17, order_line.price_unit)
-                worksheet.write(row, 18, ", ".join(order_line.tax_ids_after_fiscal_position.mapped('name')) or '')
-                worksheet.write(row, 19, order_line.price_subtotal)
-                worksheet.write(row, 20, order_line.price_subtotal_incl)
+                worksheet.write(row, 15, order_line.product_id.default_code or '')
+                worksheet.write(row, 16, order_line.product_id.name or '')
+                worksheet.write(row, 17, order_line.product_id.product_tmpl_id.pos_categ_ids[0].name if order_line.product_id.product_tmpl_id.pos_categ_ids else '')
+                worksheet.write(row, 18, order_line.product_uom_id.name or '')
+                worksheet.write(row, 19, order_line.qty)
+                worksheet.write(row, 20, order_line.price_unit)
+                worksheet.write(row, 21, ", ".join(order_line.tax_ids_after_fiscal_position.mapped('name')) or '')
+                worksheet.write(row, 22, order_line.price_subtotal)
+                worksheet.write(row, 23, order_line.price_subtotal_incl)
                 row += 1
 
         workbook.close()
@@ -148,7 +153,9 @@ class SalesReportDetail(models.TransientModel):
 
         header = [
             'User', 'Kasir', 'Customer Code', 'Customer Name', 'Kode Currency', 'Kode Store',
-            'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal', 'Total Quantity', 'Total Bersih'
+            'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal', 
+            'Sub Divisi', 'Item Kelas', 'Item Tipe',
+            'Total Quantity', 'Total Bersih'
         ]
 
         for col, title in enumerate(header):
@@ -172,6 +179,9 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(row, 9, order.name if 'REFUND' in order.name.upper() else '')
             worksheet.write(row, 10, order.partner_id.mobile or '')
             worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+            worksheet.write(row, 12, order.product_id.vit_sub_div or '')
+            worksheet.write(row, 13, order.product_id.vit_item_kel or '')
+            worksheet.write(row, 14, order.product_id.vit_item_type or '')
             worksheet.write(row, 12, total_qty)
             worksheet.write(row, 13, total_bersih)
             row += 1

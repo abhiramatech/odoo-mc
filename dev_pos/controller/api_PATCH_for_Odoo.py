@@ -188,6 +188,9 @@ class MasterItemPATCH(http.Controller):
                 'image_1920': data.get('image_1920'),
                 'barcode': data.get('barcode'),
                 'write_uid': uid,
+                'vit_sub_div': data.get('vit_sub_div'),
+                'vit_item_kel': data.get('vit_item_kel'),
+                'vit_item_type': data.get('vit_item_type')
             }
 
             # Only update 'active' if it's provided in the data

@@ -178,7 +178,10 @@ class POSTMasterItem(http.Controller):
                 'available_in_pos': data.get('available_in_pos'),
                 'image_1920': data.get('image_1920'),
                 'barcode': data.get('barcode'),
-                'create_uid': uid
+                'create_uid': uid,
+                'vit_sub_div': data.get('vit_sub_div'),
+                'vit_item_kel': data.get('vit_item_kel'),
+                'vit_item_type': data.get('vit_item_type')
             }
 
             item = env['product.template'].sudo().create(item_data)

@@ -31,7 +31,7 @@ class DataIntegrator:
             self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, f"Error occurred when getting param existing data: {e}", None)
 
     # Master Console --> Store Server
-    def get_existing_data(self, model, field_uniq, fields):
+    def get_existing_data(self, model, field_uniq, fields, existing_datalist):
         try:
             fields_target = fields.copy() # kalau tidak pakai copy makan value fields akan berubah juga sama seperti fields_target
             fields_target.extend(['id_mc'])
@@ -316,16 +316,8 @@ class DataIntegrator:
         try:  
             field_uniq = self.get_field_uniq_from_model(model)
             data_list = self.get_data_list(model, fields, field_uniq, date_from, date_to)
-            # buat update dadakan di mc
-            # ids = [item['id'] for item in data_list]
-            # ids = [2972]
-            # self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-            #                                     self.source_client.password, 'product.pricelist.item', 'write', [ids, {'is_integrated': True, 'is_updated': False}]) # ,  'mobile': '+62', 'website': 'wwww.test_cust.co.id', 'title': 3
-            # for id in ids:
-            #     self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-            #                                     self.source_client.password, model, 'write', [id, {'customer_code': f"Cust_test{id}"}]) # {'is_integrated': False }, 'categ_id' : 7, 'available_in_pos' : False
-
             if data_list:
+                existing_datalist = {data[field_uniq] for data in data_list}
                 len_master, last_master_url, index_store_field = self.get_master_conf()
                 existing_data_target = self.get_existing_data(model, field_uniq, fields, existing_datalist) # 1 calling odoo
                 existing_data = {data[field_uniq] for data in existing_data_target}
@@ -623,7 +615,7 @@ class DataIntegrator:
 
                 fields_many2one_to_check = [
                     'title', 'categ_id', 'category_id',  'uom_id', 'uom_po_id', 'parent_id', 'location_id', 'partner_id', 'sequence_id', 'warehouse_id',
-                    'default_location_src_id', 'return_picking_type_id', 'default_location_dest_id']
+                    'default_location_src_id', 'return_picking_type_id', 'default_location_dest_id', 'product_tmpl_id']
                 for field in updated_fields:
                     if field in fields_many2one_to_check:
                         if record[field][1] == target_record[field][1]:
@@ -724,6 +716,10 @@ class DataIntegrator:
                         parts = field_data.split(":")
                         picking_type = parts[1].strip()
                         field_data = picking_type
+                    elif model == 'multiple.barcode':
+                        match = re.search(r'\[(.*?)\]', field_data)
+                        if match:
+                            field_data = match.group(1)
                     
                     if model == 'stock.picking.type' and field_name in ('default_location_src_id', 'default_location_dest_id'):
                         datas = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
@@ -946,10 +942,13 @@ class DataIntegrator:
                             if pattern:
                                 match = re.search(pattern, field_data)
                                 field_data = match.group(1)
-                        if relation_model == 'account.account':
+                        elif relation_model == 'account.account':
                             parts = field_data.split() # Menggunakan split untuk memisahkan string
                             field_data = parts[0] # Mengambil bagian pertama yang merupakan angka
-                        
+                        elif model == 'multiple.barcode':
+                            match = re.search(r'\[(.*?)\]', field_data)
+                            if match:
+                                field_data = match.group(1)
                         
                         if model == 'stock.picking.type' and field_name in ('default_location_src_id', 'default_location_dest_id'):
                             datas = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,

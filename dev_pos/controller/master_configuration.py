@@ -187,7 +187,7 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
             # raise ValidationError(_(f"{mc_client}, {ss_client}, {ss_clients}, {mc}, {ss}, {datefrom}, {dateto}, {date_from}, {date_to}")) # buat check debug ya
-            integrator_master.transfer_data('product.template', ['name', 'sale_ok', 'purchase_ok', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id', 'list_price', 'standard_price', 'categ_id', 'default_code', 'pos_categ_ids', 'available_in_pos', 'taxes_id', 'active', 'create_date', 'write_date', 'image_1920', 'barcode'], 'Master Item', date_from, date_to) # , 'multi_barcode_ids'
+            integrator_master.transfer_data('product.template', ['name', 'sale_ok', 'purchase_ok', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id', 'list_price', 'standard_price', 'categ_id', 'default_code', 'pos_categ_ids', 'available_in_pos', 'taxes_id', 'active', 'create_date', 'write_date', 'image_1920', 'barcode', 'vit_sub_div', 'vit_item_kel', 'vit_item_type'], 'Master Item', date_from, date_to) # , 'multi_barcode_ids'
 
     def create_master_tags(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -231,7 +231,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
-            integrator_master.transfer_data('multiple.barcode', ['barcode', 'product_tmpl_id'], 'Master Multiple Barcode', date_from, date_to) # , 'multi_barcode_ids'
+            integrator_master.transfer_data('multiple.barcode', ['barcode', 'product_tmpl_id', 'create_date', 'write_date'], 'Master Multiple Barcode', date_from, date_to) # , 'multi_barcode_ids'
 
     def create_location(self, mc, ss, datefrom, dateto):
         if mc and ss:

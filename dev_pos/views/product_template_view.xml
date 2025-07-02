@@ -9,6 +9,9 @@
         <xpath expr="//field[@name='product_tag_ids']" position="after">
             <field name="is_integrated"/>
             <field name="index_store" widget="many2many_tags"/>
+            <field name="vit_sub_div"/>
+            <field name="vit_item_kel"/>
+            <field name="vit_item_type"/>
         </xpath>
         <xpath expr="//page[@name='invoicing']" position="after">
             <page string="Barcodes">

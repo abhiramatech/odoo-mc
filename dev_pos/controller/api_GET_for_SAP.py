@@ -928,6 +928,9 @@ class MasterProductItemAPI(http.Controller):
                     'create_date': str(create_date_jakarta),
                     'is_integrated': product.is_integrated,
                     # 'image_1920': base64.b64encode(product.image_1920).decode('utf-8') if product.image_1920 else None
+                    'vit_sub_div': product.vit_sub_div,
+                    'vit_item_kel': product.vit_item_kel,
+                    'vit_item_type': product.vit_item_type
                 }
                 data_master_product.append(product_data)
 
