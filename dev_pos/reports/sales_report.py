@@ -397,8 +397,8 @@ class SalesReportDetail(models.TransientModel):
     def action_generate_sales_report_loyalty_customer(self):
         customer = self.vit_customer_name or False # res.partner(2721,)
         
-        loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids)])
-        raise ValidationError(_(f"{loyalty}"))
+        loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids)]) # loyalty.card(130,)
+        # raise ValidationError(_(f"{loyalty}"))
         if not loyalty:
             raise UserError("Tidak ada data Loyalty pada customer tersebut.")
 
@@ -406,53 +406,66 @@ class SalesReportDetail(models.TransientModel):
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
 
-        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
-        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        cust_id = customer.ids
+        cust_code = cust_id.customer_code
+        cust_name = cust_id.name
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
-        worksheet.write(0, 0, "Laporan History Penjualan")
-        worksheet.write(1, 0, "[{} - {}]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(0, 0, "Laporan Loyalty Customer")
+        worksheet.write(1, 0, f"[{cust_code} - {cust_name}]")
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
-        # Ambil semua tanggal unik dalam order
-        tanggal_set = set(fields.Datetime.context_timestamp(self, order.date_order).date() for order in orders)
-        tanggal_list = sorted(list(tanggal_set))
 
-        # Buat header kolom
-        headers = ["Jam"]
-        for tgl in tanggal_list:
-            tgl_str = tgl.strftime('%d/%m/%Y')
-            headers += [f"Qty-{tgl_str}", f"Trx-{tgl_str}", f"Sales-{tgl_str}"]
-
-        for col, title in enumerate(headers):
+        header = [
+            'program_id', 'program_type', 'points', 'point_name', 'code', 'expiration_date', 'use_count', 'history_ids', 'source_pos_order_id', 'order_id',
+            'loyalty_card_count',
+            'Invoice No.', 'Order No.', 'Session', 'Kode Store', 'Tanggal', 'Keterangan'
+        ]
+        
+        for col, title in enumerate(header):
             worksheet.write(4, col, title)
 
         row = 5
-        for hour in range(24):
-            worksheet.write(row, 0, f"{hour:02d}")
+        for order in loyalty:
+            # local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
+            for order_line in order.lines:
+                worksheet.write(row, 0, order.program_id.name or '')
+                worksheet.write(row, 1, order.program_type or '')
+                worksheet.write(row, 2, order.points or '')
+                worksheet.write(row, 3, order.point_name or '')
+                worksheet.write(row, 4, order.code or '')
+                worksheet.write(row, 5, order.expiration_date or '')
+                worksheet.write(row, 6, order.use_count or '')
+                worksheet.write(row, 7, order.history_ids or '')
+                worksheet.write(row, 8, order.source_pos_order_id.name or '')
+                worksheet.write(row, 9, order.order_id or '')
+                
+                
+                # worksheet.write(row, 10, order.partner_id.mobile or '')
+                # worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+                
+                # worksheet.write(row, 12, order_line.product_id.vit_sub_div or '')
+                # worksheet.write(row, 13, order_line.product_id.vit_item_kel or '')
+                # worksheet.write(row, 14, order_line.product_id.vit_item_type or '')
 
-            col = 1
-            for tgl in tanggal_list:
-                order_filtered = orders.filtered(lambda o: fields.Datetime.context_timestamp(self, o.date_order).date() == tgl and fields.Datetime.context_timestamp(self, o.date_order).hour == hour)
-
-                total_qty = sum(order_filtered.mapped(lambda o: sum(o.lines.mapped('qty'))))
-                total_trx = len(order_filtered)
-                total_sales = sum(order_filtered.mapped('amount_total'))
-
-                worksheet.write(row, col, total_qty)
-                worksheet.write(row, col + 1, total_trx)
-                worksheet.write(row, col + 2, total_sales)
-
-                col += 3
-            row += 1
+                # worksheet.write(row, 15, order_line.product_id.default_code or '')
+                # worksheet.write(row, 16, order_line.product_id.name or '')
+                # worksheet.write(row, 17, order_line.product_id.product_tmpl_id.pos_categ_ids[0].name if order_line.product_id.product_tmpl_id.pos_categ_ids else '')
+                # worksheet.write(row, 18, order_line.product_uom_id.name or '')
+                # worksheet.write(row, 19, order_line.qty)
+                # worksheet.write(row, 20, order_line.price_unit)
+                # worksheet.write(row, 21, ", ".join(order_line.tax_ids_after_fiscal_position.mapped('name')) or '')
+                # worksheet.write(row, 22, order_line.price_subtotal)
+                # worksheet.write(row, 23, order_line.price_subtotal_incl)
+                row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
         output.close()
 
         attachment = self.env['ir.attachment'].create({
-            'name': 'Sales_Report_Hourly.xlsx',
+            'name': 'Sales_Report_Detail.xlsx',
             'type': 'binary',
             'datas': base64.b64encode(xlsx_data),
             'res_model': self._name,
