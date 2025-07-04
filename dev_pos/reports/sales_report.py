@@ -431,7 +431,7 @@ class SalesReportDetail(models.TransientModel):
         row = 5
         for order in loyalty:
             # local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-            for order_line in order.lines:
+            # for order_line in order.lines:
                 worksheet.write(row, 0, order.program_id.name or '')
                 worksheet.write(row, 1, order.program_type or '')
                 worksheet.write(row, 2, order.points or '')
