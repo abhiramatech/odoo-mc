@@ -395,31 +395,12 @@ class SalesReportDetail(models.TransientModel):
         }
         
     def action_generate_sales_report_loyalty_customer(self):
-        customer = self.vit_customer_name or False
+        customer = self.vit_customer_name or False # res.partner(2721,)
         
-        raise ValidationError(_(f"{customer}"))
-        
-        date_from = self.vit_date_from or False
-        date_to = self.vit_date_to or False
-        invoice_no = self.vit_invoice_no or False
-        pos_order_ref = self.vit_pos_order_ref or False
-
-        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
-
-        domain = []
-        if date_from:
-            domain.append(('date_order', '>=', date_from))
-        if date_to:
-            domain.append(('date_order', '<=', date_to))
-        if account_move:
-            domain.append(('account_move', '=', account_move.id))
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
-
-        orders = self.env['pos.order'].search(domain)
-
-        if not orders:
-            raise UserError("Tidak ada data POS di periode tersebut.")
+        loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids)])
+        raise ValidationError(_(f"{loyalty}"))
+        if not loyalty:
+            raise UserError("Tidak ada data Loyalty pada customer tersebut.")
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
