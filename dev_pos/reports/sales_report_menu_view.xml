@@ -28,4 +28,10 @@
         action="action_generate_sales_report_hourly"
         parent="sales_report_menu"
         sequence="4"/>
+
+    <menuitem id="sales_report_loyalty_customer"
+        name="Sales Report Loyalty Customer"
+        action="action_generate_sales_report_loyalty_customer"
+        parent="sales_report_menu"
+        sequence="5"/>
 </odoo>
