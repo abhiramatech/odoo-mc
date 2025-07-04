@@ -397,6 +397,9 @@ class SalesReportDetail(models.TransientModel):
     def action_generate_sales_report_loyalty_customer(self):
         customer = self.vit_customer_name or False # res.partner(2721,)
         
+        if not customer:
+            raise UserError("Tidak ada Customer yang dipilih.")
+        
         loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids)]) # loyalty.card(130,)
         # raise ValidationError(_(f"{loyalty}"))
         if not loyalty:
@@ -406,9 +409,8 @@ class SalesReportDetail(models.TransientModel):
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
 
-        cust_id = customer.ids
-        cust_code = cust_id.customer_code
-        cust_name = cust_id.name
+        cust_code = customer.customer_code
+        cust_name = customer.name
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
