@@ -441,8 +441,8 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 6, order.use_count or '')
                 
                 # worksheet.write(row, 7, order.history_ids or '')
-                history_names = ', '.join(order.history_ids.mapped('name')) if order.history_ids else ''
-                worksheet.write(row, 7, history_names)
+                # history_names = ', '.join(order.history_ids.mapped('name')) if order.history_ids else ''
+                # worksheet.write(row, 7, history_names)
                 
                 worksheet.write(row, 8, order.source_pos_order_id.name or '')
                 worksheet.write(row, 9, order.order_id or '')

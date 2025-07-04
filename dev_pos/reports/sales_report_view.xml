@@ -92,7 +92,7 @@
             <form string="Report Loyalty Customer">
                 <sheet>
                     <group string="Report Loyalty Customer">
-                        <field name="vit_customer_name"/>
+                        <field name="vit_customer_name" options="{'no_quick_create': True}"/>
                     </group>
                 </sheet>
                 <footer>
