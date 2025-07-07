@@ -400,23 +400,23 @@ class SalesReportDetail(models.TransientModel):
         
         if customer:
             domain = [('partner_id', 'in', customer.ids)]
+            cust_code = customer.customer_code
+            cust_name = customer.name
         
-        loyalty = self.env['loyalty.card'].search(domain) # loyalty.card(130,)
+        loyalty_card = self.env['loyalty.card'].search(domain) # loyalty.card(130,)
         # raise ValidationError(_(f"{loyalty}"))
-        if not loyalty:
+        if not loyalty_card:
             raise UserError("Tidak ada data Loyalty pada customer tersebut.")
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
 
-        cust_code = customer.customer_code
-        cust_name = customer.name
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
         worksheet.write(0, 0, "Laporan Loyalty Customer")
-        worksheet.write(1, 0, f"[{cust_code} - {cust_name}]")
+        worksheet.write(1, 0, f"[{cust_code} - {cust_name}]" if customer else 'All')
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
 
@@ -430,7 +430,7 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(4, col, title)
 
         row = 5
-        for order in loyalty:
+        for order in loyalty_card:
             # local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
             # for order_line in order.lines:
                 worksheet.write(row, 0, order.program_id.name or '')
