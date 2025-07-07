@@ -396,18 +396,16 @@ class SalesReportDetail(models.TransientModel):
         
     def action_generate_sales_report_loyalty_customer(self):
         customer = self.vit_customer_name or False # res.partner(2721,)
-        domain = []
-        
+        domain = [('program_type', '=', 'loyalty')]
         if customer:
-            domain = [('partner_id', 'in', customer.ids)]
+            domain = [('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')]
             cust_code = customer.customer_code
             cust_name = customer.name
         
-        loyalty_card = self.env['loyalty.card'].search(domain) # loyalty.card(130,)
-        # raise ValidationError(_(f"{loyalty}"))
+        loyalty_card = self.env['loyalty.card'].search(domain) # loyalty.card(130,) # raise ValidationError(_(f"{loyalty}"))
         if not loyalty_card:
             raise UserError("Tidak ada data Loyalty pada customer tersebut.")
-
+        
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
@@ -419,11 +417,9 @@ class SalesReportDetail(models.TransientModel):
         worksheet.write(1, 0, f"[{cust_code} - {cust_name}]" if customer else 'All')
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
-
         header = [
-            'program_id', 'program_type', 'points', 'point_name', 'code', 'expiration_date', 'use_count', 'history_ids', 'source_pos_order_id', 'order_id',
-            'loyalty_card_count',
-            'Invoice No.', 'Order No.', 'Session', 'Kode Store', 'Tanggal', 'Keterangan'
+            'Program Name',' Code', 'Points', 'Use Count', 'Invoice No.',
+            'Order No.', 'Session', 'Kode Store', 'Tanggal', 'Keterangan'
         ]
         
         for col, title in enumerate(header):
@@ -431,48 +427,26 @@ class SalesReportDetail(models.TransientModel):
 
         row = 5
         for order in loyalty_card:
-            # local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-            # for order_line in order.lines:
-                worksheet.write(row, 0, order.program_id.name or '')
-                worksheet.write(row, 1, order.program_type or '')
-                worksheet.write(row, 2, order.points or '')
-                worksheet.write(row, 3, order.point_name or '')
-                worksheet.write(row, 4, order.code or '')
-                worksheet.write(row, 5, order.expiration_date or '')
-                worksheet.write(row, 6, order.use_count or '')
-                
-                # worksheet.write(row, 7, order.history_ids or '')
-                # history_names = ', '.join(order.history_ids.mapped('name')) if order.history_ids else ''
-                # worksheet.write(row, 7, history_names)
-                
-                worksheet.write(row, 8, order.source_pos_order_id.name or '')
-                worksheet.write(row, 9, order.order_id or '')
-                
-                
-                # worksheet.write(row, 10, order.partner_id.mobile or '')
-                # worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
-                
-                # worksheet.write(row, 12, order_line.product_id.vit_sub_div or '')
-                # worksheet.write(row, 13, order_line.product_id.vit_item_kel or '')
-                # worksheet.write(row, 14, order_line.product_id.vit_item_type or '')
+            local_date_order = fields.Datetime.context_timestamp(self, order.source_pos_order_id.date_order)
 
-                # worksheet.write(row, 15, order_line.product_id.default_code or '')
-                # worksheet.write(row, 16, order_line.product_id.name or '')
-                # worksheet.write(row, 17, order_line.product_id.product_tmpl_id.pos_categ_ids[0].name if order_line.product_id.product_tmpl_id.pos_categ_ids else '')
-                # worksheet.write(row, 18, order_line.product_uom_id.name or '')
-                # worksheet.write(row, 19, order_line.qty)
-                # worksheet.write(row, 20, order_line.price_unit)
-                # worksheet.write(row, 21, ", ".join(order_line.tax_ids_after_fiscal_position.mapped('name')) or '')
-                # worksheet.write(row, 22, order_line.price_subtotal)
-                # worksheet.write(row, 23, order_line.price_subtotal_incl)
-                row += 1
+            worksheet.write(row, 0, order.program_id.name or '')
+            worksheet.write(row, 1, order.code or '')
+            worksheet.write(row, 2, order.points or '')
+            worksheet.write(row, 3, order.use_count or '')
+            
+            worksheet.write(row, 5, order.source_pos_order_id.name or '')
+            worksheet.write(row, 6, order.source_pos_order_id.session_id.name or '')
+            worksheet.write(row, 5, order.source_pos_order_id.config_id.name or '')
+            worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+
+            row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
         output.close()
 
         attachment = self.env['ir.attachment'].create({
-            'name': 'Sales_Report_Detail.xlsx',
+            'name': 'Report_Loyalty_Customer.xlsx',
             'type': 'binary',
             'datas': base64.b64encode(xlsx_data),
             'res_model': self._name,
