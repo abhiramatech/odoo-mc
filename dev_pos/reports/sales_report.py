@@ -442,8 +442,8 @@ class SalesReportDetail(models.TransientModel):
             
             worksheet.write(row, 5, order.source_pos_order_id.name or '')
             worksheet.write(row, 6, order.source_pos_order_id.session_id.name or '')
-            worksheet.write(row, 5, order.source_pos_order_id.config_id.name or '')
-            worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+            worksheet.write(row, 7, order.source_pos_order_id.config_id.name or '')
+            worksheet.write(row, 8, local_date_order)
 
             row += 1
 
