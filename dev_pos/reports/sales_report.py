@@ -1,6 +1,7 @@
 from odoo import models, fields, _, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
+from datetime import datetime
 import base64
 import io
 import xlsxwriter
@@ -427,8 +428,13 @@ class SalesReportDetail(models.TransientModel):
 
         row = 5
         for order in loyalty_card:
-            local_date_order = fields.Datetime.context_timestamp(self, order.source_pos_order_id.date_order)
-
+            date_order = order.source_pos_order_id.date_order
+            # Pastikan date_order tidak kosong dan bertipe datetime
+            local_date_order = ''
+            if date_order and isinstance(date_order, datetime):
+                local_date_order = fields.Datetime.context_timestamp(self, date_order)
+                local_date_order = local_date_order.strftime('%d/%m/%Y %H:%M:%S')
+            
             worksheet.write(row, 0, order.program_id.name or '')
             worksheet.write(row, 1, order.code or '')
             worksheet.write(row, 2, order.points or '')
