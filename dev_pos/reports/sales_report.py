@@ -428,12 +428,12 @@ class SalesReportDetail(models.TransientModel):
 
         row = 5
         for order in loyalty_card:
-            date_order = order.source_pos_order_id.date_order
-            # Pastikan date_order tidak kosong dan bertipe datetime
-            local_date_order = ''
-            if date_order and isinstance(date_order, datetime):
-                local_date_order = fields.Datetime.context_timestamp(self, date_order)
-                local_date_order = local_date_order.strftime('%d/%m/%Y %H:%M:%S')
+            # date_order = order.source_pos_order_id.date_order
+            # # Pastikan date_order tidak kosong dan bertipe datetime
+            # local_date_order = ''
+            # if date_order and isinstance(date_order, datetime):
+            #     local_date_order = fields.Datetime.context_timestamp(self, date_order)
+            #     local_date_order = local_date_order.strftime('%d/%m/%Y %H:%M:%S')
             
             worksheet.write(row, 0, order.program_id.name or '')
             worksheet.write(row, 1, order.code or '')
@@ -443,7 +443,8 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(row, 5, order.source_pos_order_id.name or '')
             worksheet.write(row, 6, order.source_pos_order_id.session_id.name or '')
             worksheet.write(row, 7, order.source_pos_order_id.config_id.name or '')
-            worksheet.write(row, 8, local_date_order)
+            # worksheet.write(row, 8, local_date_order)
+            worksheet.write(row, 8, order.source_pos_order_id.date_order)
 
             row += 1
 
