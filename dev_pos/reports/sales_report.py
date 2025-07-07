@@ -396,11 +396,12 @@ class SalesReportDetail(models.TransientModel):
         
     def action_generate_sales_report_loyalty_customer(self):
         customer = self.vit_customer_name or False # res.partner(2721,)
+        domain = []
         
-        if not customer:
-            raise UserError("Tidak ada Customer yang dipilih.")
+        if customer:
+            domain = [('partner_id', 'in', customer.ids)]
         
-        loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids)]) # loyalty.card(130,)
+        loyalty = self.env['loyalty.card'].search(domain) # loyalty.card(130,)
         # raise ValidationError(_(f"{loyalty}"))
         if not loyalty:
             raise UserError("Tidak ada data Loyalty pada customer tersebut.")
