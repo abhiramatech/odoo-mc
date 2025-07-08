@@ -154,7 +154,7 @@
         <field name="target">new</field>
     </record>
 
-    <record id="action_generate_sales_report_history_loyalty_customer" model="ir.actions.act_window">
+    <record id="action_generate_sales_report_loyalty_customer" model="ir.actions.act_window">
         <field name="name">Generate Sales Report Loyalty Customer</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
@@ -162,7 +162,7 @@
         <field name="target">new</field>
     </record>
 
-    <record id="action_generate_sales_report_loyalty_customer" model="ir.actions.act_window">
+    <record id="action_generate_sales_report_history_loyalty_customer" model="ir.actions.act_window">
         <field name="name">Generate Sales Report History Loyalty Customer</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
