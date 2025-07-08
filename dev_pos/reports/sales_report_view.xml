@@ -84,19 +84,37 @@
             </form>
         </field>
     </record>
-    <!-- loayalty customer --> 
+    <!-- loyalty customer --> 
     <record id="view_sales_report_loyalty_customer_form" model="ir.ui.view">
-        <field name="name">sales.report.detail.form</field>
+        <field name="name">sales.report.loyalty.form</field>
         <field name="model">sales.report</field>
         <field name="arch" type="xml">
             <form string="Report Loyalty Customer">
                 <sheet>
                     <group string="Report Loyalty Customer">
-                        <field name="vit_customer_name" options="{'no_quick_create': True}"/>
+                        <field name="vit_customer_name_id" options="{'no_quick_create': True}"/>
                     </group>
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_loyalty_customer" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_loyalty_customer_form" model="ir.ui.view">
+        <field name="name">sales.report.history.loyalty.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Loyalty Customer">
+                <sheet>
+                    <group string="Report History Loyalty Customer">
+                        <field name="vit_customer_name_id" options="{'no_quick_create': True}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_history_loyalty_customer" string="Print" type="object" class="btn-primary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -136,11 +154,19 @@
         <field name="target">new</field>
     </record>
 
-    <record id="action_generate_sales_report_loyalty_customer" model="ir.actions.act_window">
+    <record id="action_generate_sales_report_history_loyalty_customer" model="ir.actions.act_window">
         <field name="name">Generate Sales Report Loyalty Customer</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_sales_report_loyalty_customer_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_loyalty_customer" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report History Loyalty Customer</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_loyalty_customer_form"/>
         <field name="target">new</field>
     </record>
   </data>

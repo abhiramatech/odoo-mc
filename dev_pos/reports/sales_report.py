@@ -1,10 +1,13 @@
-from odoo import models, fields, _, api
-from odoo.exceptions import UserError, ValidationError
-from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
+# 1. Standard Python libraries
 from datetime import datetime
 import base64
 import io
 import xlsxwriter
+# 2. Odoo core
+from odoo import models, fields, _, api
+from odoo.exceptions import UserError, ValidationError
+from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
+# 3. Odoo addons
 
 class SalesReportDetail(models.TransientModel):
     _name = 'sales.report'
@@ -15,11 +18,12 @@ class SalesReportDetail(models.TransientModel):
     vit_invoice_no = fields.Char(string='Invoice No.')
     vit_pos_order_ref = fields.Char(string='POS Order No.')
     
-    vit_customer_name = fields.Many2one('res.partner', string='Customer Name')
+    vit_customer_name_id = fields.Many2one('res.partner', string='Customer Name')
   
 # [{'id': 17, 'name': 'S01/0016', 'date_order': datetime.datetime(2025, 6, 17, 7, 45, 20), 'user_id': (2, 'Administrator'), 'amount_difference': 0.0, 'amount_tax': 0.0, 'amount_total': 0.0, 'amount_paid': 0.0, 'amount_return': 0.0, 'margin': 0.0, 'margin_percent': 0.0, 'is_total_cost_computed': True, 'lines': [31, 32], 'company_id': (1, 'Visi-Intech'), 'country_code': 'ID', 'pricelist_id': False, 'partner_id': (10, 'Astri Ririn'), 'sequence_number': 14, 'session_id': (5, 'POS/00003'), 'config_id': (1, 'S01'), 'currency_id': (12, 'IDR'), 'currency_rate': 1.0, 'state': 'paid', 'account_move': False, 'picking_ids': [79], 'picking_count': 1, 'failed_pickings': False, 'picking_type_id': (9, 'Store 01: PoS Orders'), 'procurement_group_id': False, 'floating_order_name': False, 'general_note': '', 'nb_print': 0, 'pos_reference': 'Order 00005-008-0014', 'sale_journal': (12, 'Point of Sale'), 'fiscal_position_id': False, 'payment_ids': [], 'session_move_id': False, 'to_invoice': False, 'shipping_date': False, 'is_invoiced': False, 'is_tipped': False, 'tip_amount': 0.0, 'refund_orders_count': 0, 'refunded_order_id': False, 'has_refundable_lines': True, 'ticket_code': 'k7my0', 'tracking_number': '514', 'uuid': 'f123d9f8-3721-40f3-9d18-dd3132506887', 'email': 'ririn.e@visi-intech.com', 'mobile': False, 'is_edited': False, 'has_deleted_line': False, 'order_edit_tracking': False, 'available_payment_method_ids': [2, 3, 1], 'display_name': 'S01/0016', 'create_uid': (2, 'Administrator'), 'create_date': datetime.datetime(2025, 6, 17, 7, 45, 22, 29417), 'write_uid': (2, 'Administrator'), 'write_date': datetime.datetime(2025, 6, 17, 7, 45, 22, 29417), 'l10n_id_qris_transaction_ids': [], 'employee_id': False, 'cashier': 'Administrator', 'online_payment_method_id': False, 'next_online_payment_amount': 0.0, 'table_id': False, 'customer_count': 0, 'takeaway': False, 'crm_team_id': False, 'sale_order_count': 0, 'table_stand_number': False, 'use_self_order_online_payment': False}]
     
     def action_generate_report_detail(self):
+        self.ensure_one() # umumnya dipakai dari form view karena memastikan hanya mengambil 1 record
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -119,6 +123,7 @@ class SalesReportDetail(models.TransientModel):
         }
 
     def action_generate_report_recap(self):
+        self.ensure_one()
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -210,6 +215,7 @@ class SalesReportDetail(models.TransientModel):
         }
 
     def action_generate_report_spending(self):
+        self.ensure_one()
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -308,6 +314,7 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_report_hourly(self):
+        self.ensure_one()
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -396,7 +403,8 @@ class SalesReportDetail(models.TransientModel):
         }
         
     def action_generate_sales_report_loyalty_customer(self):
-        customer = self.vit_customer_name or False # res.partner(2721,)
+        self.ensure_one()
+        customer = self.vit_customer_name_id or False # res.partner(2721,)
         domain = [('program_type', '=', 'loyalty')]
         if customer:
             domain = [('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')]
@@ -458,6 +466,67 @@ class SalesReportDetail(models.TransientModel):
 
         attachment = self.env['ir.attachment'].create({
             'name': 'Report_Loyalty_Customer.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+        
+    def action_generate_sales_report_history_loyalty_customer(self):
+        self.ensure_one()
+        customer = self.vit_customer_name_id or False # res.partner(2721,)
+        if not customer:
+            raise UserError("Tidak ada Customer yang dipilih.")
+        
+        loyalty = self.env['loyalty.card'].search([('partner_id', '=', customer.id)]) # loyalty.card(130,)
+        loyalty_history = self.env['loyalty.history'].search([('card_id', 'in', loyalty.ids)]) # loyalty.card(130,)
+        
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        
+        cust_code = customer.customer_code or ''
+        cust_name = customer.name or ''
+        cust_phone = customer.mobile or ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+        points_akhir = loyalty.points
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Loyalty Customer")
+        worksheet.write(1, 0, f"[{cust_code} - {cust_name} - {cust_phone}]")
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'Program Name', 'Keterangan', 'Masuk', 'Keluar', 'Akhir',
+        ]
+        
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title)
+
+        row = 5
+        for order in loyalty_history:
+            worksheet.write(row, 0, order.card_id.name or '')
+            worksheet.write(row, 1, order.description or '')
+            worksheet.write(row, 2, order.issued or '')
+            worksheet.write(row, 3, order.used or '')
+            worksheet.write(row, 4, points_akhir or '')
+
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Report_History_Loyalty_Customer.xlsx',
             'type': 'binary',
             'datas': base64.b64encode(xlsx_data),
             'res_model': self._name,

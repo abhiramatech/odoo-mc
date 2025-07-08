@@ -34,4 +34,10 @@
         action="action_generate_sales_report_loyalty_customer"
         parent="sales_report_menu"
         sequence="5"/>
+
+    <menuitem id="sales_report_history_loyalty_customer"
+        name="Sales Report History Loyalty Customer"
+        action="action_generate_sales_report_history_loyalty_customer"
+        parent="sales_report_menu"
+        sequence="6"/>
 </odoo>
