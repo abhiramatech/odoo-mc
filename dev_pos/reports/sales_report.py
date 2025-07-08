@@ -505,7 +505,7 @@ class SalesReportDetail(models.TransientModel):
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
         header = [
-            'Program Name', 'Keterangan', 'Masuk', 'Keluar', 'Akhir',
+            'Program Name', 'Masuk', 'Keluar', 'Akhir',
         ]
         
         for col, title in enumerate(header):
@@ -514,10 +514,11 @@ class SalesReportDetail(models.TransientModel):
         row = 5
         for order in loyalty_history:
             worksheet.write(row, 0, order.card_id.name or '')
-            worksheet.write(row, 1, order.description or '')
-            worksheet.write(row, 2, order.issued or '')
-            worksheet.write(row, 3, order.used or '')
-            worksheet.write(row, 4, points_akhir or '')
+            worksheet.write(row, 1, order.issued or '')
+            worksheet.write(row, 2, order.used or '')
+            worksheet.write(row, 3, points_akhir or '')
+            # worksheet.write(row, 1, order.source_pos_order_id.name or '')
+            # worksheet.write(row, 2, order.source_pos_order_id.session_id.name or '')
 
             row += 1
 

@@ -9,7 +9,12 @@ class LoyaltyCardInherit(models.Model):
     is_updated = fields.Boolean(string="Updated", default=False, readonly=True, tracking=True)  
     index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
     vit_trxid = fields.Char(string="Transaction ID", default=False)
-
+    
+    history_ids = fields.One2many(
+        comodel_name='loyalty.history',
+        inverse_name='card_id',
+        readonly=True,
+    )
 
     def delete_card(self):
         a = self.env['loyalty.card'].search([('code', '=', "0443-3174-4ce2Store")])
