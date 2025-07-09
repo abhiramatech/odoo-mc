@@ -1873,7 +1873,7 @@ class SetLogMC:
         gmt_7_start_time = datetime.fromtimestamp(start_time) #- timedelta(hours=7)
         gmt_7_end_time = datetime.fromtimestamp(end_time) #- timedelta(hours=7)
 
-        if record.get('code'):
+        if record.get('code') and modul is not 'Master Operation':
             key = record.get('code')
         elif record.get('complete_name'):
             key = record.get('complete_name')
