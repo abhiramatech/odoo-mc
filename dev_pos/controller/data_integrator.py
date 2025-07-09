@@ -1553,7 +1553,7 @@ class DataIntegrator:
                 currency_id = currency[0]['currency_id'][0]
                 data_list = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
                                                     self.target_client.password, model, 'search_read', [[['code','=', '044d-ab69-4a4a'], ['currency_id','=', currency_id], ['is_integrated', '=', True], [field_uniq, '!=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
-                                                    {'fields': fields, 'limit': 1}) # ['code','=', '044d-ab69-4a4a']
+                                                    {'fields': fields}) # ['code','=', '044d-ab69-4a4a']
             elif model == 'res.partner.title':
                 data_list = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
                                                     self.target_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
