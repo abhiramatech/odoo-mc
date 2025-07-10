@@ -1526,12 +1526,20 @@ class DataIntegrator:
 
 
     # Store Server --> Master Console
-    def get_existing_data_mc(self, model, field_uniq, fields):
+    def get_existing_data_mc(self, model, field_uniq, fields, existing_datalist):
         try:
-            existing_data = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                        self.source_client.uid, self.source_client.password, model,
-                                                        'search_read', [[[field_uniq, '!=', False]]], {'fields': fields}) # , {'fields': [field_uniq]}
-            return existing_data
+            existing_datalist = list(existing_datalist)
+            ids = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                self.source_client.uid, self.source_client.password, model,
+                                                'search', [[[field_uniq, 'in', existing_datalist]]])
+            existing_data = []
+            batch_size=2000
+            for i in range(0, len(ids), batch_size):
+                batch_ids = ids[i:i + batch_size]
+                batch_data = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                self.source_client.uid, self.source_client.password, model,
+                                                'read', [batch_ids], {'fields': fields})
+                existing_data.extend(batch_data)
         except Exception as e:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.target_client.server_name} to {self.source_client.server_name}", e, None)
             self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, e, None)
@@ -1715,7 +1723,7 @@ class DataIntegrator:
 
             if updated_fields: 
                 keys_to_remove = []
-                fields_many2one_to_check = ['title', 'program_id', 'partner_id']
+                fields_many2one_to_check = ['title', 'program_id', 'partner_id', 'source_pos_order_id']
                 for field in updated_fields:
                     if field in fields_many2one_to_check:
                         if record[field][1] == target_record[field][1]:
