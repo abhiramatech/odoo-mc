@@ -9,20 +9,5 @@ class LoyaltyHistory(models.Model):
     _order = 'id desc'
 
     card_id = fields.Many2one(comodel_name='loyalty.card', required=True, ondelete='cascade')
-    # company_id = fields.Many2one(related='card_id.company_id')
-
-    # description = fields.Text(required=True)
-
-    issued = fields.Float()
-    used = fields.Float()
-
-    # order_model = fields.Char(readonly=True)
-    # order_id = fields.Many2oneReference(model_field='order_model', readonly=True)
-
-    # def _get_order_portal_url(self):
-    #     self.ensure_one()
-    #     return False
-
-    # def _get_order_description(self):
-    #     self.ensure_one()
-    #     return self.env[self.order_model].browse(self.order_id).display_name
+    points_before = fields.Float()
+    points_after = fields.Float()

@@ -497,7 +497,7 @@ class SalesReportDetail(models.TransientModel):
         cust_name = customer.name or ''
         cust_phone = customer.mobile or ''
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
-        points_akhir = loyalty.points
+        points_display = loyalty.points
 
         # Header laporan
         worksheet.write(0, 0, "Laporan History Loyalty Customer")
@@ -505,7 +505,7 @@ class SalesReportDetail(models.TransientModel):
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
         header = [
-            'Program Name', 'Masuk', 'Keluar', 'Akhir',
+            'Program Name', 'Masuk', 'Keluar', 'Akhir', 'Display',
         ]
         
         for col, title in enumerate(header):
@@ -513,10 +513,24 @@ class SalesReportDetail(models.TransientModel):
 
         row = 5
         for order in loyalty_history:
+            points_before = order.points_before
+            points_after = order.points_after
+
+            if points_after > points_before:
+                points_in = points_after - points_before
+                points_out = 0
+            elif points_after < points_before:
+                points_in = 0
+                points_out = points_before - points_after
+            else:
+                points_in = 0
+                points_out = 0
+            
             worksheet.write(row, 0, order.card_id.name or '')
-            worksheet.write(row, 1, order.issued or '')
+            worksheet.write(row, 1, points_in or '')
             worksheet.write(row, 2, order.used or '')
-            worksheet.write(row, 3, points_akhir or '')
+            worksheet.write(row, 3, points_out or '')
+            worksheet.write(row, 4, points_display or '')
             # worksheet.write(row, 1, order.source_pos_order_id.name or '')
             # worksheet.write(row, 2, order.source_pos_order_id.session_id.name or '')
 
