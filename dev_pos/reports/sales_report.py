@@ -486,7 +486,7 @@ class SalesReportDetail(models.TransientModel):
         if not customer:
             raise UserError("Tidak ada Customer yang dipilih.")
         
-        loyalty = self.env['loyalty.card'].search([('partner_id', '=', customer.id)]) # loyalty.card(130,)
+        loyalty = self.env['loyalty.card'].search([('partner_id', '=', customer.id), [('program_type', '=', 'loyalty')]], limit=1) # loyalty.card(130,)
         loyalty_history = self.env['loyalty.history'].search([('card_id', 'in', loyalty.ids)]) # loyalty.card(130,)
         
         output = io.BytesIO()

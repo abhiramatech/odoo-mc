@@ -536,7 +536,7 @@ class SettingConfig(models.Model):
             integrator_master.transfer_data_mc('res.partner.title', ['name', 'shortcut', 'create_date', 'write_date'], 'Master Customer Title', date_from, date_to)
             integrator_master.transfer_data_mc('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
             integrator_master.transfer_data_mc('loyalty.card', ['code', 'points_display', 'expiration_date', 'partner_id', 'points', 'program_id', 'create_date', 'write_date', 'source_pos_order_id'], 'Master Loyalty', date_from, date_to)
-            integrator_master.transfer_data_mc('loyalty.history', ['card_id', 'points_before', 'points_after','create_date', 'write_date'], 'Master Loyalty', date_from, date_to)
+            integrator_master.transfer_data_mc_history('loyalty.history', ['card_id', 'points_before', 'points_after','create_date', 'write_date'], 'Master Loyalty', date_from, date_to)
 
     def create_master_employee_from_ss_to_mc(self, mc, ss, datefrom, dateto):
         if mc and ss:

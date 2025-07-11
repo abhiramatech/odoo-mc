@@ -1572,6 +1572,27 @@ class DataIntegrator:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.target_client.server_name} to {self.source_client.server_name}", e, None)
             self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, e, None)
 
+    def transfer_data_mc_history(self, model, fields, modul, date_from, date_to):
+        try:
+            data_list = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
+                                                    self.target_client.password, model, 'search_read', [[['is_integrated', '=', False]]],
+                                                    {'fields': fields}) # , 'limit':1
+            if data_list:
+                type_fields, relation_fields = self.get_type_data_source(model, fields) # 3 calling odoo
+
+                dict_relation_source = {}
+                dict_relation_target = {}
+                for relation in relation_fields:
+                    relation_model = relation_fields[relation]
+                    many_source = self.get_relation_source_all(relation_model) # 4 (1 x relation_fields) calling odoo # pilih mau field apa aja?
+                    dict_relation_source[relation_model] = many_source
+                
+                self.process_data_async_create_mc(model, data_list, modul, type_fields, relation_fields, dict_relation_source, dict_relation_target)    
+                
+        except Exception as e:
+            self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.target_client.server_name} to {self.source_client.server_name}", e, None)
+            self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, e, None)
+    
     def transfer_data_mc(self, model, fields, modul, date_from, date_to):
         try:
             field_uniq = self.get_field_uniq_from_model(model)
@@ -1760,6 +1781,9 @@ class DataIntegrator:
                         field_uniq = self.get_field_uniq_from_model(relation_model)
                         if model == 'loyalty.card' and relation_model == 'res.partner':
                             field_uniq = 'name'
+                            
+                        if model == 'loyalty.history':
+                            field_data = field_data.split(': ')[1]
                         
                         datas_target = dict_relation_source[relation_model]
                         if isinstance(field_data, str):
