@@ -486,7 +486,7 @@ class SalesReportDetail(models.TransientModel):
         if not customer:
             raise UserError("Tidak ada Customer yang dipilih.")
         
-        loyalty = self.env['loyalty.card'].search([('partner_id', '=', customer.id), ('program_type', '=', 'loyalty')], limit=1) # loyalty.card(130,)
+        loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')], limit=1) # loyalty.card(130,)
         loyalty_history = self.env['loyalty.history'].search([('card_id', 'in', loyalty.ids)]) # loyalty.card(130,)
         
         output = io.BytesIO()
@@ -497,7 +497,7 @@ class SalesReportDetail(models.TransientModel):
         cust_name = customer.name or ''
         cust_phone = customer.mobile or ''
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
-        points_display = loyalty.points
+        # points_display = loyalty.points , 'Display',
 
         # Header laporan
         worksheet.write(0, 0, "Laporan History Loyalty Customer")
@@ -505,7 +505,7 @@ class SalesReportDetail(models.TransientModel):
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
         header = [
-            'Program Name', 'Masuk', 'Keluar', 'Akhir', 'Display',
+            'Program Name', 'Masuk', 'Keluar', 'Akhir'
         ]
         
         for col, title in enumerate(header):
@@ -530,7 +530,7 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(row, 1, points_in or '')
             worksheet.write(row, 2, order.used or '')
             worksheet.write(row, 3, points_out or '')
-            worksheet.write(row, 4, points_display or '')
+            # worksheet.write(row, 4, points_display or '')
             # worksheet.write(row, 1, order.source_pos_order_id.name or '')
             # worksheet.write(row, 2, order.source_pos_order_id.session_id.name or '')
 
