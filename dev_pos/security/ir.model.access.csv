@@ -24,4 +24,4 @@ access_mrp_unbuild_line,access_mrp.unbuild.line,model_mrp_unbuild_line,base.grou
 access_sales_report,access_sales.report,model_sales_report,base.group_user,1,1,1,1
 access_export_timbangan_line,acces_export.timbangan.line,model_export_timbangan_line,,1,1,1,1
 access_export_wizard,export.timbangan.wizard,model_export_timbangan_wizard,,1,1,1,1
-access_loyalty_history,access_loyalty.history,model_loyalty_history,base.group_user,1,1,1,1
+access_loyalty_history,access_loyalty.history,model_loyalty_history,,1,1,1,1
