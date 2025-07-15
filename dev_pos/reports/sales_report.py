@@ -162,7 +162,6 @@ class SalesReportDetail(models.TransientModel):
         header = [
             'User', 'Kasir', 'Customer Code', 'Customer Name', 'Kode Currency', 'Kode Store',
             'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal', 
-            'Sub Divisi', 'Item Kelas', 'Item Tipe',
             'Total Quantity', 'Total Bersih'
         ]
 
