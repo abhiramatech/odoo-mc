@@ -492,7 +492,7 @@ class SalesReportDetail(models.TransientModel):
         # loyalty = self.env['loyalty.card'].search([])
         # loyalty_history = self.env['loyalty.history'].search([]) # loyalty.card(130,)
         
-        raise ValidationError(_(f"{loyalty.read()} {loyalty_history.read()}"))
+        # raise ValidationError(_(f"{loyalty.read()} {loyalty_history.read()}"))
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
