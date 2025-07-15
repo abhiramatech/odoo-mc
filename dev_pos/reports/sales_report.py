@@ -488,7 +488,7 @@ class SalesReportDetail(models.TransientModel):
         
         loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')], limit=1) # loyalty.card(130,)
         loyalty_history = self.env['loyalty.history'].search([('card_id', 'in', loyalty.ids)]) # loyalty.card(130,)
-        raise ValidationError(_(f"{loyalty} {loyalty_history} {customer}"))
+        raise ValidationError(_(f"{loyalty.read()} {loyalty_history.read()} {customer.read()}"))
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
