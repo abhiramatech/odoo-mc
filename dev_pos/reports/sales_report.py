@@ -552,5 +552,5 @@ class SalesReportDetail(models.TransientModel):
             'target': 'new',
         }
         
-    def format_number(number):
+    def format_number(self, number):
         return f"{number:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
