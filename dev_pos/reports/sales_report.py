@@ -532,8 +532,8 @@ class SalesReportDetail(models.TransientModel):
             
             worksheet.write(row, 0, order.card_id.display_name or '')
             worksheet.write(row, 1, points_in or '')
-            worksheet.write(row, 2, order.used or '')
-            worksheet.write(row, 3, points_out or '')
+            worksheet.write(row, 2, points_out or '')
+            worksheet.write(row, 3, points_after or '')
             # worksheet.write(row, 4, points_display or '')
             # worksheet.write(row, 1, order.source_pos_order_id.name or '')
             # worksheet.write(row, 2, order.source_pos_order_id.session_id.name or '')
