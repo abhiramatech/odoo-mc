@@ -96,10 +96,10 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 17, order_line.product_id.product_tmpl_id.pos_categ_ids[0].name if order_line.product_id.product_tmpl_id.pos_categ_ids else '')
                 worksheet.write(row, 18, order_line.product_uom_id.name or '')
                 worksheet.write(row, 19, order_line.qty)
-                worksheet.write(row, 20, order_line.price_unit)
+                worksheet.write(row, 20, self.format_number(order_line.price_unit) if order_line.price_unit else '')
                 worksheet.write(row, 21, ", ".join(order_line.tax_ids_after_fiscal_position.mapped('name')) or '')
-                worksheet.write(row, 22, order_line.price_subtotal)
-                worksheet.write(row, 23, order_line.price_subtotal_incl)
+                worksheet.write(row, 22, self.format_number(order_line.price_subtotal) if order_line.price_subtotal else '')
+                worksheet.write(row, 23, self.format_number(order_line.price_subtotal_incl) if order_line.price_subtotal_incl else '')
                 row += 1
 
         workbook.close()
@@ -190,8 +190,8 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(row, 12, order.product_id.vit_sub_div or '')
             worksheet.write(row, 13, order.product_id.vit_item_kel or '')
             worksheet.write(row, 14, order.product_id.vit_item_type or '')
-            worksheet.write(row, 12, total_qty)
-            worksheet.write(row, 13, total_bersih)
+            worksheet.write(row, 12, total_qty or '')
+            worksheet.write(row, 13, self.format_number(total_bersih) if total_bersih else '')
             row += 1
 
         workbook.close()
@@ -286,9 +286,9 @@ class SalesReportDetail(models.TransientModel):
                 total_trx = len(order_filtered)
                 total_sales = sum(order_filtered.mapped('amount_total'))
 
-                worksheet.write(row, col, total_qty)
-                worksheet.write(row, col + 1, total_trx)
-                worksheet.write(row, col + 2, total_sales)
+                worksheet.write(row, col, total_qty or '')
+                worksheet.write(row, col + 1, total_trx or '')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '')
 
                 col += 3
             row += 1
@@ -375,9 +375,9 @@ class SalesReportDetail(models.TransientModel):
                 total_trx = len(order_filtered)
                 total_sales = sum(order_filtered.mapped('amount_total'))
 
-                worksheet.write(row, col, total_qty)
-                worksheet.write(row, col + 1, total_trx)
-                worksheet.write(row, col + 2, total_sales)
+                worksheet.write(row, col, total_qty or '')
+                worksheet.write(row, col + 1, total_trx or '')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '')
 
                 col += 3
             row += 1
@@ -449,7 +449,7 @@ class SalesReportDetail(models.TransientModel):
             
             worksheet.write(row, 0, order.program_id.name or '')
             worksheet.write(row, 1, order.code or '')
-            worksheet.write(row, 2, order.points or '')
+            worksheet.write(row, 2, self.format_number(order.points) if order.points else '')
             worksheet.write(row, 3, order.use_count or '')
             worksheet.write(row, 4, order.source_pos_order_id.account_move.name or '')
             worksheet.write(row, 5, order.source_pos_order_id.name or '')
@@ -488,11 +488,7 @@ class SalesReportDetail(models.TransientModel):
         
         loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')]) # loyalty.card(130,)
         loyalty_history = self.env['loyalty.history'].search([('card_id', 'in', loyalty.ids)]) # loyalty.card(130,)
-        
-        # loyalty = self.env['loyalty.card'].search([])
-        # loyalty_history = self.env['loyalty.history'].search([]) # loyalty.card(130,)
-        
-        # raise ValidationError(_(f"{loyalty.read()} {loyalty_history.read()}"))
+
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
         worksheet = workbook.add_worksheet()
@@ -501,7 +497,6 @@ class SalesReportDetail(models.TransientModel):
         cust_name = customer.name or ''
         cust_phone = customer.mobile or ''
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
-        # points_display = loyalty.points , 'Display',
 
         # Header laporan
         worksheet.write(0, 0, "Laporan History Loyalty Customer")
@@ -531,12 +526,9 @@ class SalesReportDetail(models.TransientModel):
                 points_out = 0
             
             worksheet.write(row, 0, order.card_id.display_name or '')
-            worksheet.write(row, 1, points_in or '')
-            worksheet.write(row, 2, points_out or '')
-            worksheet.write(row, 3, points_after or '')
-            # worksheet.write(row, 4, points_display or '')
-            # worksheet.write(row, 1, order.source_pos_order_id.name or '')
-            # worksheet.write(row, 2, order.source_pos_order_id.session_id.name or '')
+            worksheet.write(row, 1, self.format_number(points_in) if points_in else '')
+            worksheet.write(row, 2, self.format_number(points_out) if points_out else '')
+            worksheet.write(row, 3, self.format_number(points_after) if points_after else '')
 
             row += 1
 
@@ -559,3 +551,6 @@ class SalesReportDetail(models.TransientModel):
             'url': download_url,
             'target': 'new',
         }
+        
+    def format_number(number):
+        return f"{number:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
