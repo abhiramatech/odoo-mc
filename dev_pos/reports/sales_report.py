@@ -174,25 +174,25 @@ class SalesReportDetail(models.TransientModel):
             total_qty = sum(order.lines.mapped('qty'))
             total_bersih = sum(order.lines.mapped('price_subtotal_incl'))
             local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-
-            worksheet.write(row, 0, order.user_id.name or '')
-            worksheet.write(row, 1, order.employee_id.name or '')
-            worksheet.write(row, 2, order.partner_id.customer_code or '')
-            worksheet.write(row, 3, order.partner_id.name or '')
-            worksheet.write(row, 4, order.currency_id.name or '')
-            worksheet.write(row, 5, order.config_id.name or '')
-            worksheet.write(row, 6, order.account_move.name or '')
-            worksheet.write(row, 7, order.name or '')
-            worksheet.write(row, 8, order.session_id.name or '')
-            worksheet.write(row, 9, order.name if 'REFUND' in order.name.upper() else '')
-            worksheet.write(row, 10, order.partner_id.mobile or '')
-            worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
-            worksheet.write(row, 12, order.product_id.vit_sub_div or '')
-            worksheet.write(row, 13, order.product_id.vit_item_kel or '')
-            worksheet.write(row, 14, order.product_id.vit_item_type or '')
-            worksheet.write(row, 12, total_qty or '')
-            worksheet.write(row, 13, self.format_number(total_bersih) if total_bersih else '')
-            row += 1
+            for order_line in order.lines:
+                worksheet.write(row, 0, order.user_id.name or '')
+                worksheet.write(row, 1, order.employee_id.name or '')
+                worksheet.write(row, 2, order.partner_id.customer_code or '')
+                worksheet.write(row, 3, order.partner_id.name or '')
+                worksheet.write(row, 4, order.currency_id.name or '')
+                worksheet.write(row, 5, order.config_id.name or '')
+                worksheet.write(row, 6, order.account_move.name or '')
+                worksheet.write(row, 7, order.name or '')
+                worksheet.write(row, 8, order.session_id.name or '')
+                worksheet.write(row, 9, order.name if 'REFUND' in order.name.upper() else '')
+                worksheet.write(row, 10, order.partner_id.mobile or '')
+                worksheet.write(row, 11, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+                worksheet.write(row, 12, order_line.product_id.vit_sub_div or '')
+                worksheet.write(row, 13, order_line.product_id.vit_item_kel or '')
+                worksheet.write(row, 14, order_line.product_id.vit_item_type or '')
+                worksheet.write(row, 12, total_qty or '')
+                worksheet.write(row, 13, self.format_number(total_bersih) if total_bersih else '')
+                row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
@@ -551,6 +551,6 @@ class SalesReportDetail(models.TransientModel):
             'url': download_url,
             'target': 'new',
         }
-        
+
     def format_number(self, number):
-        return f"{number:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
