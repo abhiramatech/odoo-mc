@@ -530,7 +530,7 @@ class SalesReportDetail(models.TransientModel):
                 points_in = 0
                 points_out = 0
             
-            worksheet.write(row, 0, order.card_id.name or '')
+            worksheet.write(row, 0, order.card_id.display_name or '')
             worksheet.write(row, 1, points_in or '')
             worksheet.write(row, 2, order.used or '')
             worksheet.write(row, 3, points_out or '')
