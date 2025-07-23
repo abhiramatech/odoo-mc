@@ -640,7 +640,7 @@ class SalesReportDetail(models.TransientModel):
         output.close()
 
         attachment = self.env['ir.attachment'].create({
-            'name': 'Sales_Report_Hourly.xlsx',
+            'name': 'Sales_Report_Hourly_by_Categories.xlsx',
             'type': 'binary',
             'datas': base64.b64encode(xlsx_data),
             'res_model': self._name,

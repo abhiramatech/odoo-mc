@@ -322,7 +322,7 @@
         <field name="name">Generate Sales Report Hourly Category</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_category_form"/>
         <field name="target">new</field>
     </record>
 
@@ -330,7 +330,7 @@
         <field name="name">Generate Sales Report Hourly Payment</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_payment_form"/>
         <field name="target">new</field>
     </record>
 
@@ -338,7 +338,7 @@
         <field name="name">Generate Sales Report Hourly Contribution Category</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_contribution_by_category_form"/>
         <field name="target">new</field>
     </record>
 
@@ -346,7 +346,7 @@
         <field name="name">Generate Sales Report Hourly Contribution by Brand</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_contribution_by_brand_form"/>
         <field name="target">new</field>
     </record>
 
@@ -354,7 +354,7 @@
         <field name="name">Generate Sales Report Cashier Transaction</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_cashier_transaction_form"/>
         <field name="target">new</field>
     </record>
 
@@ -362,7 +362,7 @@
         <field name="name">Generate Sales Report Settlement End of Shift</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_settlement_end_of_shift_form"/>
         <field name="target">new</field>
     </record>
 
@@ -370,7 +370,7 @@
         <field name="name">Generate Sales Report Settlement End of Day</field>
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
-        <field name="view_id" ref="view_sales_report_detail_form"/>
+        <field name="view_id" ref="view_sales_report_history_settlement_end_of_day_form"/>
         <field name="target">new</field>
     </record>
 
