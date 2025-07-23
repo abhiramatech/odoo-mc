@@ -621,7 +621,7 @@ class SalesReportDetail(models.TransientModel):
                         continue
 
                     matching_lines = order.lines.filtered(
-                        lambda l: l.product_id.pos_categ_id.id == category.id
+                        lambda l: l.product_id.product_tmpl_id.pos_categ_id.id == category.id
                     )
                     if matching_lines:
                         trx_set.add(order.id)
