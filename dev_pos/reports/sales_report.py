@@ -550,3 +550,24 @@ class SalesReportDetail(models.TransientModel):
 
     def format_number(self, number):
         return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    def action_generate_sales_report_hourly_category(self):
+        raise ValidationError(_(f"action_generate_sales_report_hourly_category"))
+    
+    def action_generate_sales_report_hourly_payment(self):
+        raise ValidationError(_(f"action_generate_sales_report_hourly_payment"))
+    
+    def action_generate_sales_report_hourly_contribution_by_category(self):
+        raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_category"))
+    
+    def action_generate_sales_report_hourly_contribution_by_brand(self):
+        raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_brand"))
+    
+    def action_generate_sales_report_cashier_transaction(self):
+        raise ValidationError(_(f"action_generate_sales_report_cashier_transaction"))
+    
+    def action_generate_sales_report_settlement_end_of_shift(self):
+        raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_shift"))
+    
+    def action_generate_sales_report_settlement_end_of_day(self):
+        raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_day"))
