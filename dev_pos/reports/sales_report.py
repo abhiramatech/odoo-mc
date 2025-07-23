@@ -621,13 +621,13 @@ class SalesReportDetail(models.TransientModel):
                         continue
 
                     matching_lines = order.lines.filtered(
-                        lambda l: l.product_id.product_tmpl_id.pos_categ_id.id == category.id
+                        lambda l: category.id in l.product_id.product_tmpl_id.pos_categ_ids.ids
                     )
                     if matching_lines:
                         trx_set.add(order.id)
                         total_qty += sum(matching_lines.mapped('qty'))
                         total_sales += sum(matching_lines.mapped('price_subtotal_incl'))
-
+                
                 worksheet.write(row, col, total_qty or '')
                 worksheet.write(row, col + 1, len(trx_set) or '')
                 worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '')
