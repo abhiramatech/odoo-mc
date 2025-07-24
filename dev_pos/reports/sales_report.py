@@ -808,7 +808,7 @@ class SalesReportDetail(models.TransientModel):
         header = [
             'User', 'Kasir', 'Invoice No.', 'Order No.', 'Session', 'Tanggal', 'Kode Store', 'Nama Store',
             'Nama', 'Nominal', 'No Kartu', 'Nama Kartu', 'Expired', 'Keterangan',
-            'STanggal', 'STime', 'Urut'
+            'Tanggal Payment', 'Jam Payment', 'Urut'
         ]
 
         for col, title in enumerate(header):
@@ -832,8 +832,9 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 11, '' or '')
                 worksheet.write(row, 12, '' or '')
                 worksheet.write(row, 13, '' or '')
-                worksheet.write(row, 14, order_line or '')
-                worksheet.write(row, 15, order_line or '')
+                worksheet.write(row, 14, order_line.payment_date.strftime('%d/%m/%Y') if order_line.payment_date else '')
+                worksheet.write(row, 15, order_line.payment_date.strftime('%H:%M:%S') if order_line.payment_date else '')
+
                 worksheet.write(row, 16, '' or '')
                 row += 1
 
