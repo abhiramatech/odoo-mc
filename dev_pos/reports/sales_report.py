@@ -724,17 +724,20 @@ class SalesReportDetail(models.TransientModel):
                     if not (date_from <= order_dt.date() <= date_to):
                         continue
 
-                    matching_lines = order.lines.filtered(
-                        lambda l: category.id in l.product_id.product_tmpl_id.pos_categ_ids.ids
-                    )
+                    # Menyaring transaksi berdasarkan metode pembayaran
+                    payments = order.payment_ids.filtered(lambda p: p.payment_method_id.id == category.payment_method.id)
+                    if not payments:
+                        continue  # Jika tidak ada pembayaran dengan metode yang sesuai, lanjutkan ke order berikutnya
+
+                    matching_lines = order.lines  # Semua baris produk dalam order
                     if matching_lines:
                         trx_set.add(order.id)
                         total_qty += sum(matching_lines.mapped('qty'))
                         total_sales += sum(matching_lines.mapped('price_subtotal_incl'))
                 
-                worksheet.write(row, col, total_qty or '')
-                worksheet.write(row, col + 1, len(trx_set) or '')
-                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '')
+                worksheet.write(row, col, total_qty or '0')
+                worksheet.write(row, col + 1, len(trx_set) or '0')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '0')
 
                 col += 3
             row += 1
