@@ -763,8 +763,106 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_sales_report_hourly_contribution_by_category(self):
-        raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_category"))
-    
+        # raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_category"))
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Kode Store', 'Nama Store', 'Kategori', 'Quantity', 'Trx', 'Value Sales', 'Value Stock',
+            'ATV', 'UPT', 'AUR', 'Durasi'
+        ]
+        categories = self.env['pos.category'].search([])
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title)
+
+        row = 5
+        for order in orders:
+            local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
+            for category in categories:
+                worksheet.write(row, 0, order.user_id.name or '')
+                worksheet.write(row, 1, order.config_id.name or '')
+                worksheet.write(row, 2, order.config_id.name or '')
+                worksheet.write(row, 3, '' or '')
+                worksheet.write(row, 4, '' or '')
+                worksheet.write(row, 5, '' or '')
+                worksheet.write(row, 6, '' or '')
+                worksheet.write(row, 7, '' or '')
+                worksheet.write(row, 8, '' or '')
+                worksheet.write(row, 9, '' or '')
+                worksheet.write(row, 10, '' or '')
+                worksheet.write(row, 11, '' or '')
+
+                # worksheet.write(row, 1, order.employee_id.name or '')
+                # worksheet.write(row, 2, order.account_move.name or '')
+                # worksheet.write(row, 3, order.name or '')
+                # worksheet.write(row, 4, order.session_id.name or '')
+                # worksheet.write(row, 5, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+                
+                # worksheet.write(row, 8, order_line.payment_method_id.name or '')
+                # worksheet.write(row, 9, order_line.amount or '')
+                # worksheet.write(row, 10, '' or '')
+                # worksheet.write(row, 11, '' or '')
+                # worksheet.write(row, 12, '' or '')
+                # worksheet.write(row, 13, '' or '')
+                # worksheet.write(row, 14, order_line.payment_date.strftime('%d/%m/%Y') if order_line.payment_date else '')
+                # worksheet.write(row, 15, order_line.payment_date.strftime('%H:%M:%S') if order_line.payment_date else '')
+
+                worksheet.write(row, 16, '' or '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Cashier_Transaction.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+
     def action_generate_sales_report_hourly_contribution_by_brand(self):
         raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_brand"))
     
