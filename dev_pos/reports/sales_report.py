@@ -694,7 +694,7 @@ class SalesReportDetail(models.TransientModel):
 
         jam_list = ['{:02d}'.format(jam) for jam in range(24)]
         # kategori
-        categories = self.env['pos.category'].search([])
+        payment = self.env['pos.payment.method'].search([])
 
         # Buat header kolom
         headers = ["Nama"]
@@ -705,7 +705,7 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(4, col, title)
 
         row = 5
-        for category in categories:
+        for category in payment:
             worksheet.write(row, 0, category.name or '')
 
             col = 1
@@ -744,7 +744,7 @@ class SalesReportDetail(models.TransientModel):
         output.close()
 
         attachment = self.env['ir.attachment'].create({
-            'name': 'Sales_Report_Hourly_by_Categories.xlsx',
+            'name': 'Sales_Report_Hourly_by_Payment.xlsx',
             'type': 'binary',
             'datas': base64.b64encode(xlsx_data),
             'res_model': self._name,
