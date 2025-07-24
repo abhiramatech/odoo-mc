@@ -656,7 +656,108 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_sales_report_hourly_payment(self):
-        raise ValidationError(_(f"action_generate_sales_report_hourly_payment"))
+        # raise ValidationError(_(f"action_generate_sales_report_hourly_payment"))
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Penjualan Hourly per Kategori")
+        worksheet.write(1, 0, "[{} - {}]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        jam_list = ['{:02d}'.format(jam) for jam in range(24)]
+        # kategori
+        categories = self.env['pos.category'].search([])
+
+        # Buat header kolom
+        headers = ["Nama"]
+        for jam in jam_list:
+            headers += [f"Qty-{jam}", f"Trx-{jam}", f"Sales-{jam}"]
+
+        for col, title in enumerate(headers):
+            worksheet.write(4, col, title)
+
+        row = 5
+        for category in categories:
+            worksheet.write(row, 0, category.name or '')
+
+            col = 1
+            for jam in jam_list:
+                jam_int = int(jam)
+                total_qty = 0
+                total_sales = 0
+                trx_set = set()
+
+                for order in orders:
+                    order_dt = fields.Datetime.context_timestamp(self, order.date_order)
+
+                    # Tambahan filter jam dan tanggal
+                    if order_dt.hour != jam_int:
+                        continue
+                    if not (date_from <= order_dt.date() <= date_to):
+                        continue
+
+                    matching_lines = order.lines.filtered(
+                        lambda l: category.id in l.product_id.product_tmpl_id.pos_categ_ids.ids
+                    )
+                    if matching_lines:
+                        trx_set.add(order.id)
+                        total_qty += sum(matching_lines.mapped('qty'))
+                        total_sales += sum(matching_lines.mapped('price_subtotal_incl'))
+                
+                worksheet.write(row, col, total_qty or '')
+                worksheet.write(row, col + 1, len(trx_set) or '')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '')
+
+                col += 3
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Hourly_by_Categories.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
     
     def action_generate_sales_report_hourly_contribution_by_category(self):
         raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_category"))
