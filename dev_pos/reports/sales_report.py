@@ -725,7 +725,7 @@ class SalesReportDetail(models.TransientModel):
                         continue
 
                     # Menyaring transaksi berdasarkan metode pembayaran
-                    payments = order.payment_ids.filtered(lambda p: p.payment_method_id.id == category.payment_method.id)
+                    payments = order.payment_ids.filtered(lambda p: p.payment_method_id.name == category.name)
                     if not payments:
                         continue  # Jika tidak ada pembayaran dengan metode yang sesuai, lanjutkan ke order berikutnya
 
