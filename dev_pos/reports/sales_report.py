@@ -1055,7 +1055,169 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_sales_report_settlement_end_of_shift(self):
-        raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_shift"))
-    
+        # raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_shift"))
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Kasir', 'Tanggal', 'Kategori', 'Kode Store', 'Nama Store', 
+            'Payment Method', 'Amount', 'Expected Amount', 'Amount Difference', 'Shift Number', 'Session'
+        ]
+        end_shift = self.env['end.shift'].search([])
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title)
+
+        row = 5
+        for order in orders:
+            local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
+
+            for shift in end_shift:
+                worksheet.write(row, 0, order.user_id.name or '')
+                worksheet.write(row, 1, shift.cashier_id.name or '')
+                worksheet.write(row, 2, shift.line_ids.date or '')
+                worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {order.config_id.name}' or '')
+                worksheet.write(row, 4, order.config_id.name or '')
+                worksheet.write(row, 5, order.config_id.name or '')
+                worksheet.write(row, 6, shift.line_ids.payment_method_id.name or '')
+                worksheet.write(row, 7, shift.line_ids.amount or '')
+                worksheet.write(row, 8, shift.line_ids.expected_amount or '')
+                worksheet.write(row, 9, shift.line_ids.amount_difference or '')
+                worksheet.write(row, 10, shift.doc_num or '')
+                worksheet.write(row, 11, shift.session_id.name or '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Settlement_End_of_Shift.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+
     def action_generate_sales_report_settlement_end_of_day(self):
-        raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_day"))
+        # raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_day"))
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Tanggal', 'Kode Store', 'Nama Store', 'Payment Method', 
+            'Amount', 'Expected Amount', 'Amount Difference', 'Shift Number', 'Session'
+        ]
+        end_shift = self.env['end.shift'].search([])
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title)
+
+        row = 5
+        for order in orders:
+            local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
+
+            for shift in end_shift:
+                worksheet.write(row, 0, order.user_id.name or '')
+                worksheet.write(row, 1, shift.line_ids.date or '')
+                worksheet.write(row, 2, order.config_id.name or '')
+                worksheet.write(row, 3, order.config_id.name or '')
+                worksheet.write(row, 4, shift.line_ids.payment_method_id.name or '')
+                worksheet.write(row, 5, shift.line_ids.amount or '')
+                worksheet.write(row, 6, shift.line_ids.expected_amount or '')
+                worksheet.write(row, 7, shift.line_ids.amount_difference or '')
+                worksheet.write(row, 8, shift.doc_num or '')
+                worksheet.write(row, 9, shift.session_id.name or '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Settlement_End_of_Shift.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
