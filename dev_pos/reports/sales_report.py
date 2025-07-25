@@ -796,26 +796,27 @@ class SalesReportDetail(models.TransientModel):
 
         for order in orders:
             for line in order.lines:
-                category = line.product_id.product_tmpl_id.pos_categ_id
-                if not category:
+                categories = line.product_id.product_tmpl_id.pos_categ_ids
+                if not categories:
                     continue
 
-                key = category.name
-                data = category_data.setdefault(key, {
-                    'user': order.user_id.name or '',
-                    'store_code': order.config_id.name or '',
-                    'store_name': order.config_id.name or '',
-                    'category': key,
-                    'qty': 0,
-                    'trx_set': set(),
-                    'valuesales': 0.0,
-                    'valuestock': 0.0,  # Optional if needed
-                    'durasi': (date_to - date_from).days + 1 if date_from and date_to else 0
-                })
+                for category in categories:
+                    key = category.name
+                    data = category_data.setdefault(key, {
+                        'user': order.user_id.name or '',
+                        'store_code': order.config_id.name or '',
+                        'store_name': order.config_id.name or '',
+                        'category': key,
+                        'qty': 0,
+                        'trx_set': set(),
+                        'valuesales': 0.0,
+                        'valuestock': 0.0,  # Optional if needed
+                        'durasi': (date_to - date_from).days + 1 if date_from and date_to else 0
+                    })
 
-                data['qty'] += line.qty
-                data['trx_set'].add(order.id)
-                data['valuesales'] += line.price_subtotal_incl
+                    data['qty'] += line.qty
+                    data['trx_set'].add(order.id)
+                    data['valuesales'] += line.price_subtotal_incl
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
