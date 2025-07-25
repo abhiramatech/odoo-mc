@@ -1105,7 +1105,7 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 0, shift.session_id.user_id.name or '')
                 worksheet.write(row, 1, shift.cashier_id.name or '')
                 worksheet.write(row, 2, date_str or '')
-                worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {order.config_id.name}' or '')
+                worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {shift.session_id.config_id.name}' or '')
                 worksheet.write(row, 4, shift.session_id.config_id.name or '')
                 worksheet.write(row, 5, shift.session_id.config_id.name or '')
                 worksheet.write(row, 6, order_line.payment_method_id.name or '')
