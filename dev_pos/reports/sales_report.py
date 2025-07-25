@@ -1186,8 +1186,9 @@ class SalesReportDetail(models.TransientModel):
             for shift in end_shift:
                 for order_line in shift.line_ids:
                     local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
+                    date_str = local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else ''
                     worksheet.write(row, 0, order.user_id.name or '')
-                    worksheet.write(row, 1, local_date_order or '')
+                    worksheet.write(row, 1, date_str or '')
                     worksheet.write(row, 2, order.config_id.name or '')
                     worksheet.write(row, 3, order.config_id.name or '')
                     worksheet.write(row, 4, order_line.payment_method_id.name or '')
