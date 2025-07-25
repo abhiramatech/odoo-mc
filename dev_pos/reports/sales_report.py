@@ -771,20 +771,12 @@ class SalesReportDetail(models.TransientModel):
     def action_generate_sales_report_hourly_contribution_by_category(self):
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
-        invoice_no = self.vit_invoice_no or False
-        pos_order_ref = self.vit_pos_order_ref or False
-
-        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
         if date_from:
             domain.append(('date_order', '>=', date_from))
         if date_to:
             domain.append(('date_order', '<=', date_to))
-        if account_move:
-            domain.append(('account_move', '=', account_move.id))
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
 
         orders = self.env['pos.order'].search(domain)
 
@@ -911,25 +903,47 @@ class SalesReportDetail(models.TransientModel):
     def action_generate_sales_report_hourly_contribution_by_brand(self):
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
-        invoice_no = self.vit_invoice_no or False
-        pos_order_ref = self.vit_pos_order_ref or False
-
-        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
         if date_from:
             domain.append(('date_order', '>=', date_from))
         if date_to:
             domain.append(('date_order', '<=', date_to))
-        if account_move:
-            domain.append(('account_move', '=', account_move.id))
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
 
         orders = self.env['pos.order'].search(domain)
 
         if not orders:
             raise UserError("Tidak ada data POS di periode tersebut.")
+        
+        # Data dikumpulkan berdasarkan brand
+        brand_data = {}
+
+        for order in orders:
+            for line in order.lines:
+                tmpl = line.product_id.product_tmpl_id
+                brand_name = tmpl.brand or '-'  # akses brand (Char)
+
+                key = (brand_name, order.config_id.name)
+
+                data = brand_data.setdefault(key, {
+                    'user': order.user_id.name or '',
+                    'store_code': order.config_id.name or '',
+                    'store_name': order.config_id.name or '',
+                    'brand': brand_name,
+                    'qty': 0,
+                    'trx_set': set(),
+                    'valuesales': 0.0,
+                    'valuestock': 0.0,
+                    'persenstock': 0,
+                    'persenil': 0,
+                    'durasi': (date_to - date_from).days + 1 if date_from and date_to else 0,
+                })
+
+                data['qty'] += line.qty
+                data['trx_set'].add(order.id)
+                data['valuesales'] += line.price_subtotal_incl
+                # Jika ingin valuestock, uncomment:
+                data['valuestock'] += line.product_id.standard_price * line.qty
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -944,49 +958,44 @@ class SalesReportDetail(models.TransientModel):
         worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
+        # header = [
+        #     'User', 'Kode Store', 'Nama Store', 'Brand', 'Quantity', 'Trx', 'Value Sales', 'Value Stock',
+        #     'ATV', 'UPT', 'AUR', 'Durasi'
+        # ]
         header = [
-            'User', 'Kode Store', 'Nama Store', 'Brand', 'Quantity', 'Trx', 'Value Sales', 'Value Stock',
-            'ATV', 'UPT', 'AUR', 'Durasi'
+            'userid', 'kodelokasi', 'nama', 'brand', 'Qty', 'Trx', 'valuesales',
+            'persensales', 'valuestock', 'persenstock', 'persenIL', 'ATV', 'UPT', 'AUR', 'durasi'
         ]
-        categories = self.env['pos.category'].search([])
 
         for col, title in enumerate(header):
             worksheet.write(4, col, title)
 
         row = 5
-        for order in orders:
-            local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-            for category in categories:
-                worksheet.write(row, 0, order.user_id.name or '')
-                worksheet.write(row, 1, order.config_id.name or '')
-                worksheet.write(row, 2, order.config_id.name or '')
-                worksheet.write(row, 3, category.name or '')
-                worksheet.write(row, 4, '' or '')
-                worksheet.write(row, 5, '' or '')
-                worksheet.write(row, 6, '' or '')
-                worksheet.write(row, 7, '' or '')
-                worksheet.write(row, 8, '' or '')
-                worksheet.write(row, 9, '' or '')
-                worksheet.write(row, 10, '' or '')
-                worksheet.write(row, 11, '' or '')
+        total_valuesales = sum(d['valuesales'] for d in brand_data.values()) or 1
 
-                # worksheet.write(row, 1, order.employee_id.name or '')
-                # worksheet.write(row, 2, order.account_move.name or '')
-                # worksheet.write(row, 3, order.name or '')
-                # worksheet.write(row, 4, order.session_id.name or '')
-                # worksheet.write(row, 5, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
-                
-                # worksheet.write(row, 8, order_line.payment_method_id.name or '')
-                # worksheet.write(row, 9, order_line.amount or '')
-                # worksheet.write(row, 10, '' or '')
-                # worksheet.write(row, 11, '' or '')
-                # worksheet.write(row, 12, '' or '')
-                # worksheet.write(row, 13, '' or '')
-                # worksheet.write(row, 14, order_line.payment_date.strftime('%d/%m/%Y') if order_line.payment_date else '')
-                # worksheet.write(row, 15, order_line.payment_date.strftime('%H:%M:%S') if order_line.payment_date else '')
+        for data in brand_data.values():
+            trx_count = len(data['trx_set'])
+            ATV = data['valuesales'] / trx_count if trx_count else 0
+            UPT = data['qty'] / trx_count if trx_count else 0
+            AUR = data['valuesales'] / data['qty'] if data['qty'] else 0
+            persen_sales = (data['valuesales'] / total_valuesales) * 100 if total_valuesales else 0
 
-                worksheet.write(row, 16, '' or '')
-                row += 1
+            worksheet.write(row, 0, data['user'])
+            worksheet.write(row, 1, data['store_code'])
+            worksheet.write(row, 2, data['store_name'])
+            worksheet.write(row, 3, data['brand'])
+            worksheet.write(row, 4, data['qty'])
+            worksheet.write(row, 5, trx_count)
+            worksheet.write(row, 6, data['valuesales'])
+            worksheet.write(row, 7, persen_sales)
+            worksheet.write(row, 8, data['valuestock'])
+            worksheet.write(row, 9, data['persenstock'])
+            worksheet.write(row, 10, data['persenil'])
+            worksheet.write(row, 11, ATV)
+            worksheet.write(row, 12, UPT)
+            worksheet.write(row, 13, AUR)
+            worksheet.write(row, 14, data['durasi'])
+            row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
