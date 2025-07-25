@@ -1109,21 +1109,21 @@ class SalesReportDetail(models.TransientModel):
         row = 5
         for order in orders:
             local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-
             for shift in end_shift:
-                worksheet.write(row, 0, order.user_id.name or '')
-                worksheet.write(row, 1, shift.cashier_id.name or '')
-                worksheet.write(row, 2, shift.line_ids.payment_date or '')
-                worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {order.config_id.name}' or '')
-                worksheet.write(row, 4, order.config_id.name or '')
-                worksheet.write(row, 5, order.config_id.name or '')
-                worksheet.write(row, 6, shift.line_ids.payment_method_id.name or '')
-                worksheet.write(row, 7, shift.line_ids.amount or '')
-                worksheet.write(row, 8, shift.line_ids.expected_amount or '')
-                worksheet.write(row, 9, shift.line_ids.amount_difference or '')
-                worksheet.write(row, 10, shift.doc_num or '')
-                worksheet.write(row, 11, shift.session_id.name or '')
-                row += 1
+                for order_line in shift.line_ids:
+                    worksheet.write(row, 0, order.user_id.name or '')
+                    worksheet.write(row, 1, shift.cashier_id.name or '')
+                    worksheet.write(row, 2, order_line.payment_date or '')
+                    worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {order.config_id.name}' or '')
+                    worksheet.write(row, 4, order.config_id.name or '')
+                    worksheet.write(row, 5, order.config_id.name or '')
+                    worksheet.write(row, 6, order_line.payment_method_id.name or '')
+                    worksheet.write(row, 7, order_line.amount or '')
+                    worksheet.write(row, 8, order_line.expected_amount or '')
+                    worksheet.write(row, 9, order_line.amount_difference or '')
+                    worksheet.write(row, 10, shift.doc_num or '')
+                    worksheet.write(row, 11, shift.session_id.name or '')
+                    row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
@@ -1194,19 +1194,19 @@ class SalesReportDetail(models.TransientModel):
         row = 5
         for order in orders:
             local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-
             for shift in end_shift:
-                worksheet.write(row, 0, order.user_id.name or '')
-                worksheet.write(row, 1, shift.line_ids.payment_date or '')
-                worksheet.write(row, 2, order.config_id.name or '')
-                worksheet.write(row, 3, order.config_id.name or '')
-                worksheet.write(row, 4, shift.line_ids.payment_method_id.name or '')
-                worksheet.write(row, 5, shift.line_ids.amount or '')
-                worksheet.write(row, 6, shift.line_ids.expected_amount or '')
-                worksheet.write(row, 7, shift.line_ids.amount_difference or '')
-                worksheet.write(row, 8, shift.doc_num or '')
-                worksheet.write(row, 9, shift.session_id.name or '')
-                row += 1
+                for order_line in shift.line_ids:
+                    worksheet.write(row, 0, order.user_id.name or '')
+                    worksheet.write(row, 1, order_line.payment_date or '')
+                    worksheet.write(row, 2, order.config_id.name or '')
+                    worksheet.write(row, 3, order.config_id.name or '')
+                    worksheet.write(row, 4, order_line.payment_method_id.name or '')
+                    worksheet.write(row, 5, order_line.amount or '')
+                    worksheet.write(row, 6, order_line.expected_amount or '')
+                    worksheet.write(row, 7, order_line.amount_difference or '')
+                    worksheet.write(row, 8, shift.doc_num or '')
+                    worksheet.write(row, 9, shift.session_id.name or '')
+                    row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
