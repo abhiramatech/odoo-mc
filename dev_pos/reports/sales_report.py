@@ -769,7 +769,6 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_sales_report_hourly_contribution_by_category(self):
-        # raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_category"))
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -791,6 +790,32 @@ class SalesReportDetail(models.TransientModel):
 
         if not orders:
             raise UserError("Tidak ada data POS di periode tersebut.")
+        
+        # Kumpulkan data per kategori
+        category_data = {}
+
+        for order in orders:
+            for line in order.lines:
+                category = line.product_id.product_tmpl_id.pos_categ_id
+                if not category:
+                    continue
+
+                key = category.name
+                data = category_data.setdefault(key, {
+                    'user': order.user_id.name or '',
+                    'store_code': order.config_id.name or '',
+                    'store_name': order.config_id.name or '',
+                    'category': key,
+                    'qty': 0,
+                    'trx_set': set(),
+                    'valuesales': 0.0,
+                    'valuestock': 0.0,  # Optional if needed
+                    'durasi': (date_to - date_from).days + 1 if date_from and date_to else 0
+                })
+
+                data['qty'] += line.qty
+                data['trx_set'].add(order.id)
+                data['valuesales'] += line.price_subtotal_incl
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -801,53 +826,66 @@ class SalesReportDetail(models.TransientModel):
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
-        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(0, 0, "Laporan History Penjualan")
         worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
+        # header = [
+        #     'User', 'Kode Store', 'Nama Store', 'Kategori', 'Quantity', 'Trx', 'Value Sales', 'Value Stock',
+        #     'ATV', 'UPT', 'AUR', 'Durasi'
+        # ]
         header = [
-            'User', 'Kode Store', 'Nama Store', 'Kategori', 'Quantity', 'Trx', 'Value Sales', 'Value Stock',
-            'ATV', 'UPT', 'AUR', 'Durasi'
+            'userid', 'kodelokasi', 'nama', 'Kategori', 'Qty', 'Trx', 'valuesales',
+            'valuesales', 'valustock', 'persenstock', 'persenIL', 'ATV', 'UPT', 'AUR', 'durasi'
         ]
-        categories = self.env['pos.category'].search([])
 
         for col, title in enumerate(header):
             worksheet.write(4, col, title)
 
         row = 5
-        for order in orders:
-            local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
-            for category in categories:
-                worksheet.write(row, 0, order.user_id.name or '')
-                worksheet.write(row, 1, order.config_id.name or '')
-                worksheet.write(row, 2, order.config_id.name or '')
-                worksheet.write(row, 3, '' or '')
-                worksheet.write(row, 4, '' or '')
-                worksheet.write(row, 5, '' or '')
-                worksheet.write(row, 6, '' or '')
-                worksheet.write(row, 7, '' or '')
-                worksheet.write(row, 8, '' or '')
-                worksheet.write(row, 9, '' or '')
-                worksheet.write(row, 10, '' or '')
-                worksheet.write(row, 11, '' or '')
+        # for order in orders:
+        #     local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
+        #     for line in order.lines:
+        #         category = line.product_id.product_tmpl_id.pos_categ_id
+        #         if not category:
+        #             continue
 
-                # worksheet.write(row, 1, order.employee_id.name or '')
-                # worksheet.write(row, 2, order.account_move.name or '')
-                # worksheet.write(row, 3, order.name or '')
-                # worksheet.write(row, 4, order.session_id.name or '')
-                # worksheet.write(row, 5, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
-                
-                # worksheet.write(row, 8, order_line.payment_method_id.name or '')
-                # worksheet.write(row, 9, order_line.amount or '')
-                # worksheet.write(row, 10, '' or '')
-                # worksheet.write(row, 11, '' or '')
-                # worksheet.write(row, 12, '' or '')
-                # worksheet.write(row, 13, '' or '')
-                # worksheet.write(row, 14, order_line.payment_date.strftime('%d/%m/%Y') if order_line.payment_date else '')
-                # worksheet.write(row, 15, order_line.payment_date.strftime('%H:%M:%S') if order_line.payment_date else '')
+        #         worksheet.write(row, 0, order.user_id.name or '')
+        #         worksheet.write(row, 1, order.config_id.name or '')
+        #         worksheet.write(row, 2, order.config_id.name or '')
+        #         worksheet.write(row, 3, '' or '')
+        #         worksheet.write(row, 4, '' or '')
+        #         worksheet.write(row, 5, '' or '')
+        #         worksheet.write(row, 6, '' or '')
+        #         worksheet.write(row, 7, '' or '')
+        #         worksheet.write(row, 8, '' or '')
+        #         worksheet.write(row, 9, '' or '')
+        #         worksheet.write(row, 10, '' or '')
+        #         worksheet.write(row, 11, '' or '')
+        #         row += 1
 
-                worksheet.write(row, 16, '' or '')
-                row += 1
+        for data in category_data.values():
+            trx_count = len(data['trx_set'])
+            ATV = data['valuesales'] / trx_count if trx_count else 0
+            UPT = data['qty'] / trx_count if trx_count else 0
+            AUR = data['valuesales'] / data['qty'] if data['qty'] else 0
+
+            worksheet.write(row, 0, data['user'])
+            worksheet.write(row, 1, data['store_code'])
+            worksheet.write(row, 2, data['store_name'])
+            worksheet.write(row, 3, data['category'])
+            worksheet.write(row, 4, data['qty'])
+            worksheet.write(row, 5, trx_count)
+            worksheet.write(row, 6, data['valuesales'])
+            worksheet.write(row, 7, data['valuesales'])  # Kolom duplicate di template Anda
+            worksheet.write(row, 8, data['valuestock'])
+            worksheet.write(row, 9, 0)
+            worksheet.write(row, 10, 0)
+            worksheet.write(row, 11, ATV)
+            worksheet.write(row, 12, UPT)
+            worksheet.write(row, 13, AUR)
+            worksheet.write(row, 14, data['durasi'])
+            row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
@@ -870,7 +908,6 @@ class SalesReportDetail(models.TransientModel):
         }
 
     def action_generate_sales_report_hourly_contribution_by_brand(self):
-        # raise ValidationError(_(f"action_generate_sales_report_hourly_contribution_by_brand"))
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -902,7 +939,7 @@ class SalesReportDetail(models.TransientModel):
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
-        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(0, 0, "Laporan History Penjualan")
         worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
@@ -922,7 +959,7 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 0, order.user_id.name or '')
                 worksheet.write(row, 1, order.config_id.name or '')
                 worksheet.write(row, 2, order.config_id.name or '')
-                worksheet.write(row, 3, '' or '')
+                worksheet.write(row, 3, category.name or '')
                 worksheet.write(row, 4, '' or '')
                 worksheet.write(row, 5, '' or '')
                 worksheet.write(row, 6, '' or '')
@@ -971,7 +1008,6 @@ class SalesReportDetail(models.TransientModel):
         }
 
     def action_generate_sales_report_cashier_transaction(self):
-        # raise ValidationError(_(f"action_generate_sales_report_cashier_transaction"))
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
         invoice_no = self.vit_invoice_no or False
@@ -1003,14 +1039,13 @@ class SalesReportDetail(models.TransientModel):
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
-        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(0, 0, "Laporan Transaksi Kasir")
         worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
         header = [
             'User', 'Kasir', 'Invoice No.', 'Order No.', 'Session', 'Tanggal', 'Kode Store', 'Nama Store',
-            'Nama', 'Nominal', 'No Kartu', 'Nama Kartu', 'Expired', 'Keterangan',
-            'Tanggal Payment', 'Jam Payment', 'Urut'
+            'Payment Method', 'Nominal', 'Tanggal Payment'
         ]
 
         for col, title in enumerate(header):
@@ -1029,15 +1064,8 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 6, order.config_id.name or '')
                 worksheet.write(row, 7, order.config_id.name or '')
                 worksheet.write(row, 8, order_line.payment_method_id.name or '')
-                worksheet.write(row, 9, order_line.amount or '')
-                worksheet.write(row, 10, '' or '')
-                worksheet.write(row, 11, '' or '')
-                worksheet.write(row, 12, '' or '')
-                worksheet.write(row, 13, '' or '')
-                worksheet.write(row, 14, order_line.payment_date.strftime('%d/%m/%Y') if order_line.payment_date else '')
-                worksheet.write(row, 15, order_line.payment_date.strftime('%H:%M:%S') if order_line.payment_date else '')
-
-                worksheet.write(row, 16, '' or '')
+                worksheet.write(row, 9, self.format_number(order_line.amount) if order_line.amount else '')
+                worksheet.write(row, 10, order_line.payment_date.strftime('%Y-%m-%d %H:%M:%S') if order_line.payment_date else '')
                 row += 1
 
         workbook.close()
@@ -1061,7 +1089,6 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_sales_report_settlement_end_of_shift(self):
-        # raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_shift"))
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
 
@@ -1085,7 +1112,7 @@ class SalesReportDetail(models.TransientModel):
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
-        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(0, 0, "Laporan Settlement")
         worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
@@ -1109,9 +1136,9 @@ class SalesReportDetail(models.TransientModel):
                 worksheet.write(row, 4, shift.session_id.config_id.name or '')
                 worksheet.write(row, 5, shift.session_id.config_id.name or '')
                 worksheet.write(row, 6, order_line.payment_method_id.name or '')
-                worksheet.write(row, 7, order_line.amount or '')
-                worksheet.write(row, 8, order_line.expected_amount or '')
-                worksheet.write(row, 9, order_line.amount_difference or '')
+                worksheet.write(row, 7, self.format_number(order_line.amount) if order_line.amount else '')
+                worksheet.write(row, 8, self.format_number(order_line.expected_amount) if order_line.expected_amount else '')
+                worksheet.write(row, 9, self.format_number(order_line.amount_difference) if order_line.amount_difference else '')
                 worksheet.write(row, 10, shift.doc_num or '')
                 worksheet.write(row, 11, shift.session_id.name or '')
                 row += 1
@@ -1137,7 +1164,6 @@ class SalesReportDetail(models.TransientModel):
         }
 
     def action_generate_sales_report_settlement_end_of_day(self):
-        # raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_day"))
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
 
@@ -1161,7 +1187,7 @@ class SalesReportDetail(models.TransientModel):
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
 
         # Header laporan
-        worksheet.write(0, 0, "Laporan Penjualan")
+        worksheet.write(0, 0, "Laporan Settlement")
         worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
         worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
 
@@ -1178,15 +1204,14 @@ class SalesReportDetail(models.TransientModel):
         for shift in end_shift:
             for order_line in shift.line_ids:
                 local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
-                date_str = local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else ''
                 worksheet.write(row, 0, shift.session_id.user_id.name or '')
-                worksheet.write(row, 1, date_str or '')
+                worksheet.write(row, 1, local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else '')
                 worksheet.write(row, 2, shift.session_id.config_id.name or '')
                 worksheet.write(row, 3, shift.session_id.config_id.name or '')
                 worksheet.write(row, 4, order_line.payment_method_id.name or '')
-                worksheet.write(row, 5, order_line.amount or '')
-                worksheet.write(row, 6, order_line.expected_amount or '')
-                worksheet.write(row, 7, order_line.amount_difference or '')
+                worksheet.write(row, 5, self.format_number(order_line.amount) if order_line.amount else '')
+                worksheet.write(row, 6, self.format_number(order_line.expected_amount) if order_line.expected_amount else '')
+                worksheet.write(row, 7, self.format_number(order_line.amount_difference) if order_line.amount_difference else '')
                 worksheet.write(row, 8, shift.doc_num or '')
                 worksheet.write(row, 9, shift.session_id.name or '')
                 row += 1
@@ -1196,7 +1221,7 @@ class SalesReportDetail(models.TransientModel):
         output.close()
 
         attachment = self.env['ir.attachment'].create({
-            'name': 'Sales_Report_Settlement_End_of_Shift.xlsx',
+            'name': 'Sales_Report_Settlement_End_of_Day.xlsx',
             'type': 'binary',
             'datas': base64.b64encode(xlsx_data),
             'res_model': self._name,
