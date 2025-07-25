@@ -235,8 +235,6 @@
                     <group string="Report History Settlement End of Shift">
                         <field name="vit_date_from" style="width: 80px;"/>
                         <field name="vit_date_to" style="width: 80px;"/>
-                        <field name="vit_invoice_no"/>
-                        <field name="vit_pos_order_ref"/>
                     </group>
                 </sheet>
                 <footer>
@@ -256,8 +254,6 @@
                     <group string="Report History Settlement End of Day">
                         <field name="vit_date_from" style="width: 80px;"/>
                         <field name="vit_date_to" style="width: 80px;"/>
-                        <field name="vit_invoice_no"/>
-                        <field name="vit_pos_order_ref"/>
                     </group>
                 </sheet>
                 <footer>

@@ -1101,9 +1101,10 @@ class SalesReportDetail(models.TransientModel):
         for shift in end_shift:
             for order_line in shift.line_ids:
                 local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
+                date_str = local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else ''
                 worksheet.write(row, 0, shift.session_id.user_id.name or '')
                 worksheet.write(row, 1, shift.cashier_id.name or '')
-                worksheet.write(row, 2, local_date_order or '')
+                worksheet.write(row, 2, date_str or '')
                 worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {order.config_id.name}' or '')
                 worksheet.write(row, 4, shift.session_id.config_id.name or '')
                 worksheet.write(row, 5, shift.session_id.config_id.name or '')
@@ -1139,25 +1140,17 @@ class SalesReportDetail(models.TransientModel):
         # raise ValidationError(_(f"action_generate_sales_report_settlement_end_of_day"))
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
-        invoice_no = self.vit_invoice_no or False
-        pos_order_ref = self.vit_pos_order_ref or False
-
-        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
         if date_from:
             domain.append(('date_order', '>=', date_from))
         if date_to:
             domain.append(('date_order', '<=', date_to))
-        if account_move:
-            domain.append(('account_move', '=', account_move.id))
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
 
-        orders = self.env['pos.order'].search(domain)
+        end_shift = self.env['end.shift'].search(domain)
 
-        if not orders:
-            raise UserError("Tidak ada data POS di periode tersebut.")
+        if not end_shift:
+            raise UserError("Tidak ada data Shift POS di periode tersebut.")
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -1182,22 +1175,21 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(4, col, title)
 
         row = 5
-        for order in orders:
-            for shift in end_shift:
-                for order_line in shift.line_ids:
-                    local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
-                    date_str = local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else ''
-                    worksheet.write(row, 0, order.user_id.name or '')
-                    worksheet.write(row, 1, date_str or '')
-                    worksheet.write(row, 2, order.config_id.name or '')
-                    worksheet.write(row, 3, order.config_id.name or '')
-                    worksheet.write(row, 4, order_line.payment_method_id.name or '')
-                    worksheet.write(row, 5, order_line.amount or '')
-                    worksheet.write(row, 6, order_line.expected_amount or '')
-                    worksheet.write(row, 7, order_line.amount_difference or '')
-                    worksheet.write(row, 8, shift.doc_num or '')
-                    worksheet.write(row, 9, shift.session_id.name or '')
-                    row += 1
+        for shift in end_shift:
+            for order_line in shift.line_ids:
+                local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
+                date_str = local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else ''
+                worksheet.write(row, 0, shift.session_id.user_id.name or '')
+                worksheet.write(row, 1, date_str or '')
+                worksheet.write(row, 2, shift.session_id.config_id.name or '')
+                worksheet.write(row, 3, shift.session_id.config_id.name or '')
+                worksheet.write(row, 4, order_line.payment_method_id.name or '')
+                worksheet.write(row, 5, order_line.amount or '')
+                worksheet.write(row, 6, order_line.expected_amount or '')
+                worksheet.write(row, 7, order_line.amount_difference or '')
+                worksheet.write(row, 8, shift.doc_num or '')
+                worksheet.write(row, 9, shift.session_id.name or '')
+                row += 1
 
         workbook.close()
         xlsx_data = output.getvalue()
