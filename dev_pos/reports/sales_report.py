@@ -493,6 +493,7 @@ class SalesReportDetail(models.TransientModel):
         cust_name = customer.name or ''
         cust_phone = customer.mobile or ''
         tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+        printed_data = set()
 
         # Header laporan
         worksheet.write(0, 0, "Laporan History Loyalty Customer")
@@ -508,6 +509,11 @@ class SalesReportDetail(models.TransientModel):
 
         row = 5
         for order in loyalty_history:
+            key = (order.card_id.id, order.points_before, order.points_after)
+            if key in printed_data:
+                continue  # Skip data duplikat
+            printed_data.add(key)
+
             points_before = order.points_before
             points_after = order.points_after
 
