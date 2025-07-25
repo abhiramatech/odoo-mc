@@ -6,79 +6,79 @@
         sequence="10"/>
 
     <menuitem id="sales_report_detail"
-        name="Sales Report Detail"
+        name="Report Detail"
         action="action_generate_sales_report_detail"
         parent="sales_report_menu"
         sequence="1"/>
 
     <menuitem id="sales_report_recap"
-        name="Sales Report Recap"
+        name="Report Recap"
         action="action_generate_sales_report_recap"
         parent="sales_report_menu"
         sequence="2"/>
 
     <menuitem id="sales_report_spending"
-        name="Sales Report Spending"
+        name="Report Spending"
         action="action_generate_sales_report_spending"
         parent="sales_report_menu"
         sequence="3"/>
 
     <menuitem id="sales_report_hourly"
-        name="Sales Report Hourly"
+        name="Report Hourly"
         action="action_generate_sales_report_hourly"
         parent="sales_report_menu"
         sequence="4"/>
 
     <menuitem id="sales_report_loyalty_customer"
-        name="Sales Report Loyalty Customer"
+        name="Report Loyalty Customer"
         action="action_generate_sales_report_loyalty_customer"
         parent="sales_report_menu"
         sequence="5"/>
 
     <menuitem id="sales_report_history_loyalty_customer"
-        name="Sales Report History Loyalty Customer"
+        name="Report History Loyalty Customer"
         action="action_generate_sales_report_history_loyalty_customer"
         parent="sales_report_menu"
         sequence="6"/>
 
     <menuitem id="sales_report_hourly_category"
-        name="Sales Report Hourly Category"
+        name="Report Hourly Category"
         action="action_generate_sales_report_hourly_category"
         parent="sales_report_menu"
         sequence="7"/>
 
     <menuitem id="sales_report_hourly_payment"
-        name="Sales Report Hourly Payment"
+        name="Report Hourly Payment"
         action="action_generate_sales_report_hourly_payment"
         parent="sales_report_menu"
         sequence="8"/>
 
     <menuitem id="sales_report_hourly_contribution_by_category"
-        name="Sales Report Hourly Contribution by Category"
+        name="Report Hourly Contribution by Category"
         action="action_generate_sales_report_hourly_contribution_by_category"
         parent="sales_report_menu"
         sequence="9"/>
 
     <menuitem id="sales_report_hourly_contribution_by_brand"
-        name="Sales Report Hourly Contribution by Brand"
+        name="Report Hourly Contribution by Brand"
         action="action_generate_sales_report_hourly_contribution_by_brand"
         parent="sales_report_menu"
         sequence="10"/>
 
     <menuitem id="sales_report_cashier_transaction"
-        name="Sales Report Cashier Transaction"
+        name="Report Cashier Transaction"
         action="action_generate_sales_report_cashier_transaction"
         parent="sales_report_menu"
         sequence="11"/>
     
     <menuitem id="sales_report_settlement_end_of_shift"
-        name="Sales Report Settlement End of Shift"
+        name="Report Settlement End of Shift"
         action="action_generate_sales_report_settlement_end_of_shift"
         parent="sales_report_menu"
         sequence="12"/>
     
     <menuitem id="sales_report_settlement_end_of_day"
-        name="Sales Report Settlement End of Day"
+        name="Report Settlement End of Day"
         action="action_generate_sales_report_settlement_end_of_day"
         parent="sales_report_menu"
         sequence="13"/>
