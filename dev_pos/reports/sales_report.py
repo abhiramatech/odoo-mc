@@ -788,10 +788,13 @@ class SalesReportDetail(models.TransientModel):
 
         for order in orders:
             for line in order.lines:
-                categories = line.product_id.product_tmpl_id.pos_categ_ids
-                if not categories:
+                if not line.product_id:
                     continue
-
+                # Ambil kategori (bisa banyak), fallback ke '-'
+                tmpl = line.product_id.product_tmpl_id
+                categories = tmpl.pos_categ_ids
+                category_names = categories.mapped('name') if categories else ['-']
+                
                 for category in categories:
                     key = category.name
                     data = category_data.setdefault(key, {
@@ -870,10 +873,10 @@ class SalesReportDetail(models.TransientModel):
             worksheet.write(row, 4, data['qty'])
             worksheet.write(row, 5, trx_count)
             worksheet.write(row, 6, data['valuesales'])
-            worksheet.write(row, 7, data['valuesales'])  # Kolom duplicate di template Anda
+            worksheet.write(row, 7, data['valuesales'])  # Kolom duplikat sesuai template Anda
             worksheet.write(row, 8, data['valuestock'])
-            worksheet.write(row, 9, 0)
-            worksheet.write(row, 10, 0)
+            worksheet.write(row, 9, 0)  # persenstock
+            worksheet.write(row, 10, 0)  # persenIL
             worksheet.write(row, 11, ATV)
             worksheet.write(row, 12, UPT)
             worksheet.write(row, 13, AUR)
