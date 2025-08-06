@@ -4,6 +4,7 @@ from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
 import base64
 import io
 import xlsxwriter
+from datetime import datetime
 
 class SalesReportDetail(models.TransientModel):
     _name = 'sales.report'
@@ -365,15 +366,9 @@ class SalesReportDetail(models.TransientModel):
                 total_trx = len(order_filtered)
                 total_sales = sum(order_filtered.mapped('amount_total'))
 
-<<<<<<< HEAD
-                worksheet.write(row, col, total_qty)
-                worksheet.write(row, col + 1, total_trx)
-                worksheet.write(row, col + 2, total_sales)
-=======
                 worksheet.write(row, col, total_qty or '0')
                 worksheet.write(row, col + 1, total_trx or '0')
                 worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '0')
->>>>>>> 695f235 ([IMP] update POS reports)
 
                 col += 3
             row += 1
@@ -397,8 +392,6 @@ class SalesReportDetail(models.TransientModel):
             'url': download_url,
             'target': 'new',
         }
-<<<<<<< HEAD
-=======
         
     def action_generate_sales_report_loyalty_customer(self):
         # self.ensure_one()
@@ -1262,4 +1255,3 @@ class SalesReportDetail(models.TransientModel):
             'url': download_url,
             'target': 'new',
         }
->>>>>>> 695f235 ([IMP] update POS reports)
