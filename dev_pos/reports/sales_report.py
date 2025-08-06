@@ -365,9 +365,15 @@ class SalesReportDetail(models.TransientModel):
                 total_trx = len(order_filtered)
                 total_sales = sum(order_filtered.mapped('amount_total'))
 
+<<<<<<< HEAD
                 worksheet.write(row, col, total_qty)
                 worksheet.write(row, col + 1, total_trx)
                 worksheet.write(row, col + 2, total_sales)
+=======
+                worksheet.write(row, col, total_qty or '0')
+                worksheet.write(row, col + 1, total_trx or '0')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '0')
+>>>>>>> 695f235 ([IMP] update POS reports)
 
                 col += 3
             row += 1
@@ -391,3 +397,869 @@ class SalesReportDetail(models.TransientModel):
             'url': download_url,
             'target': 'new',
         }
+<<<<<<< HEAD
+=======
+        
+    def action_generate_sales_report_loyalty_customer(self):
+        # self.ensure_one()
+        customer = self.vit_customer_name_id or False # res.partner(2721,)
+        domain = [('program_type', '=', 'loyalty')]
+        if customer:
+            domain = [('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')]
+            cust_code = customer.customer_code
+            cust_name = customer.name
+
+        loyalty_card = self.env['loyalty.card'].search(domain)
+        if not loyalty_card:
+            raise UserError("Tidak ada data Loyalty pada customer tersebut.")
+        loyalty_card = loyalty_card.sorted(key=lambda c: c.partner_id.name or '')
+        
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Loyalty Customer")
+        worksheet.write(1, 0, f"[{cust_code} - {cust_name}]" if customer else 'All')
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'Kode', 'Nama', 'Telepon', 'Program Name', 'Point Akhir'
+        ]
+        
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for order in loyalty_card:
+            worksheet.write(row, 0, order.partner_id.customer_code or '')
+            worksheet.write(row, 1, order.partner_id.name or '')
+            worksheet.write(row, 2, order.partner_id.mobile or '')
+            worksheet.write(row, 3, order.partner_id.name or '')
+            worksheet.write(row, 4, self.format_number(order.points) if order.points else '0')
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Report_Loyalty_Customer.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+        
+    def action_generate_sales_report_history_loyalty_customer(self):
+        # self.ensure_one()
+        customer = self.vit_customer_name_id or False # res.partner(2721,)
+        if not customer:
+            raise UserError("Tidak ada Customer yang dipilih.")
+        
+        loyalty = self.env['loyalty.card'].search([('partner_id', 'in', customer.ids), ('program_type', '=', 'loyalty')]) # loyalty.card(130,)
+        loyalty_history = self.env['loyalty.history'].search([('card_id', 'in', loyalty.ids)], order='id desc') # loyalty.card(130,)
+        
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+        
+        cust_code = customer.customer_code or ''
+        cust_name = customer.name or ''
+        cust_phone = customer.mobile or ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+        # printed_data = set()
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Loyalty Customer")
+        worksheet.write(1, 0, f"[{cust_code} - {cust_name} - {cust_phone}]")
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'Kode', 'Nama', 'Program Name', 'Tanggal', 'Invoice No.', 'Order No.', 'Session',
+            'Kode Store', 'Masuk', 'Keluar', 'Akhir'
+        ]
+        
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for order in loyalty_history:
+            date_order = order.pos_order_id.date_order
+            local_date_order = ''
+            if date_order:
+                if isinstance(date_order, str):
+                    date_order = fields.Datetime.from_string(date_order)
+                if isinstance(date_order, datetime):
+                    local_date_order = date_order.strftime('%d/%m/%Y %H:%M:%S')
+            
+            # key = (order.card_id.id, order.points_before, order.points_after)
+            # if key in printed_data:
+            #     continue  # Skip data duplikat
+            # printed_data.add(key)
+
+            points_before = order.points_before
+            points_after = order.points_after
+
+            if points_after > points_before:
+                points_in = points_after - points_before
+                points_out = 0
+            elif points_after < points_before:
+                points_in = 0
+                points_out = points_before - points_after
+            else:
+                points_in = 0
+                points_out = 0
+
+            if points_in == 0 and points_out == 0:
+                continue
+            
+            worksheet.write(row, 0, order.card_id.partner_id.customer_code or '')
+            worksheet.write(row, 1, order.card_id.partner_id.name or '')
+            worksheet.write(row, 2, order.card_id.display_name or '')
+            worksheet.write(row, 3, local_date_order or '')
+            worksheet.write(row, 4, order.pos_order_id.account_move.name or '')
+            worksheet.write(row, 5, order.pos_order_id.name or '')
+            worksheet.write(row, 6, order.pos_order_id.session_id.name or '')
+            worksheet.write(row, 7, order.pos_order_id.config_id.name or '')
+            worksheet.write(row, 8, self.format_number(points_in) if points_in else '0')
+            worksheet.write(row, 9, self.format_number(points_out) if points_out else '0')
+            worksheet.write(row, 10, self.format_number(points_after) if points_after else '0')
+            # worksheet.write(row, 11, order.is_integrated or '')
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Report_History_Loyalty_Customer.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+
+    def format_number(self, number):
+        return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    def get_header_format(self, workbook):
+        return workbook.add_format({
+            'bold': True,
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter',
+            # 'bg_color': '#D7E4BC'  # Optional
+        })
+    
+    def action_generate_sales_report_hourly_category(self):
+        # raise ValidationError(_(f"action_generate_sales_report_hourly_category"))
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Penjualan Hourly per Kategori")
+        worksheet.write(1, 0, "[{} - {}]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        jam_list = ['{:02d}'.format(jam) for jam in range(24)]
+        # kategori
+        categories = self.env['pos.category'].search([])
+
+        # Buat header kolom
+        headers = ["Nama"]
+        for jam in jam_list:
+            headers += [f"Qty-{jam}", f"Trx-{jam}", f"Sales-{jam}"]
+
+        for col, title in enumerate(headers):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for category in categories:
+            worksheet.write(row, 0, category.name or '')
+
+            col = 1
+            for jam in jam_list:
+                jam_int = int(jam)
+                total_qty = 0
+                total_sales = 0
+                trx_set = set()
+
+                for order in orders:
+                    order_dt = fields.Datetime.context_timestamp(self, order.date_order)
+
+                    # Tambahan filter jam dan tanggal
+                    if order_dt.hour != jam_int:
+                        continue
+                    if not (date_from <= order_dt.date() <= date_to):
+                        continue
+
+                    matching_lines = order.lines.filtered(
+                        lambda l: category.id in l.product_id.product_tmpl_id.pos_categ_ids.ids
+                    )
+                    if matching_lines:
+                        trx_set.add(order.id)
+                        total_qty += sum(matching_lines.mapped('qty'))
+                        total_sales += sum(matching_lines.mapped('price_subtotal_incl'))
+                
+                worksheet.write(row, col, total_qty or '0')
+                worksheet.write(row, col + 1, len(trx_set) or '0')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '0')
+
+                col += 3
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Hourly_by_Categories.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+    
+    def action_generate_sales_report_hourly_payment(self):
+        # raise ValidationError(_(f"action_generate_sales_report_hourly_payment"))
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Penjualan Hourly per Kategori")
+        worksheet.write(1, 0, "[{} - {}]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        jam_list = ['{:02d}'.format(jam) for jam in range(24)]
+        # kategori
+        payment = self.env['pos.payment.method'].search([])
+
+        # Buat header kolom
+        headers = ["Nama"]
+        for jam in jam_list:
+            headers += [f"Qty-{jam}", f"Trx-{jam}", f"Sales-{jam}"]
+
+        for col, title in enumerate(headers):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for category in payment:
+            worksheet.write(row, 0, category.name or '')
+
+            col = 1
+            for jam in jam_list:
+                jam_int = int(jam)
+                total_qty = 0
+                total_sales = 0
+                trx_set = set()
+
+                for order in orders:
+                    order_dt = fields.Datetime.context_timestamp(self, order.date_order)
+
+                    # Tambahan filter jam dan tanggal
+                    if order_dt.hour != jam_int:
+                        continue
+                    if not (date_from <= order_dt.date() <= date_to):
+                        continue
+
+                    # Menyaring transaksi berdasarkan metode pembayaran
+                    payments = order.payment_ids.filtered(lambda p: p.payment_method_id.name == category.name)
+                    if not payments:
+                        continue  # Jika tidak ada pembayaran dengan metode yang sesuai, lanjutkan ke order berikutnya
+
+                    matching_lines = order.lines  # Semua baris produk dalam order
+                    if matching_lines:
+                        trx_set.add(order.id)
+                        total_qty += sum(matching_lines.mapped('qty'))
+                        total_sales += sum(matching_lines.mapped('price_subtotal_incl'))
+                
+                worksheet.write(row, col, total_qty or '0')
+                worksheet.write(row, col + 1, len(trx_set) or '0')
+                worksheet.write(row, col + 2, self.format_number(total_sales) if total_sales else '0')
+
+                col += 3
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Hourly_by_Payment.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+    
+    def action_generate_sales_report_hourly_contribution_by_category(self):
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+        
+        # Kumpulkan data per kategori
+        category_data = {}
+
+        for order in orders:
+            for line in order.lines:
+                if not line.product_id:
+                    continue
+                # Ambil kategori (bisa banyak), fallback ke '-'
+                tmpl = line.product_id.product_tmpl_id
+                categories = tmpl.pos_categ_ids
+                category_names = categories.mapped('name') if categories else ['-']
+                
+                for category in categories:
+                    key = category.name
+                    data = category_data.setdefault(key, {
+                        'user': order.user_id.name or '',
+                        'store_code': order.config_id.name or '',
+                        'store_name': order.config_id.name or '',
+                        'category': key,
+                        'qty': 0,
+                        'trx_set': set(),
+                        'valuesales': 0.0,
+                        'valuestock': 0.0,  # Optional if needed
+                        'durasi': (date_to - date_from).days + 1 if date_from and date_to else 0
+                    })
+
+                    data['qty'] += line.qty
+                    data['trx_set'].add(order.id)
+                    data['valuesales'] += line.price_subtotal_incl
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Penjualan")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Kode Store', 'Nama Store', 'Kategori', 'Quantity', 'Trx', 'Value Sales',
+            'ATV', 'UPT', 'AUR', 'Durasi'
+        ]
+        # header = [
+        #     'userid', 'kodelokasi', 'nama', 'Kategori', 'Qty', 'Trx', 'valuesales',
+        #     'valuesales', 'valustock', 'persenstock', 'persenIL', 'ATV', 'UPT', 'AUR', 'durasi'
+        # ]
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for data in category_data.values():
+            trx_count = len(data['trx_set'])
+            ATV = data['valuesales'] / trx_count if trx_count else 0
+            UPT = data['qty'] / trx_count if trx_count else 0
+            AUR = data['valuesales'] / data['qty'] if data['qty'] else 0
+
+            worksheet.write(row, 0, data['user'])
+            worksheet.write(row, 1, data['store_code'])
+            worksheet.write(row, 2, data['store_name'])
+            worksheet.write(row, 3, data['category'])
+            worksheet.write(row, 4, data['qty'])
+            worksheet.write(row, 5, trx_count)
+            worksheet.write(row, 6, data['valuesales'])
+            # worksheet.write(row, 7, data['valuestock'])
+            worksheet.write(row, 7, ATV)
+            worksheet.write(row, 8, UPT)
+            worksheet.write(row, 9, AUR)
+            worksheet.write(row, 10, data['durasi'])
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Contribution_by_Category.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+
+    def action_generate_sales_report_hourly_contribution_by_brand(self):
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+        
+        # Data dikumpulkan berdasarkan brand
+        brand_data = {}
+
+        for order in orders:
+            for line in order.lines:
+                tmpl = line.product_id.product_tmpl_id
+                brand_name = tmpl.brand or '-'  # akses brand (Char)
+
+                key = (brand_name, order.config_id.name)
+
+                data = brand_data.setdefault(key, {
+                    'user': order.user_id.name or '',
+                    'store_code': order.config_id.name or '',
+                    'store_name': order.config_id.name or '',
+                    'brand': brand_name,
+                    'qty': 0,
+                    'trx_set': set(),
+                    'valuesales': 0.0,
+                    'valuestock': 0.0,
+                    'persenstock': 0,
+                    'persenil': 0,
+                    'durasi': (date_to - date_from).days + 1 if date_from and date_to else "-",
+                })
+
+                data['qty'] += line.qty
+                data['trx_set'].add(order.id)
+                data['valuesales'] += line.price_subtotal_incl
+                # Jika ingin valuestock, uncomment:
+                data['valuestock'] += line.product_id.standard_price * line.qty
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan History Penjualan")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Kode Store', 'Nama Store', 'Brand', 'Quantity', 'Trx', 'Value Sales',
+            'ATV', 'UPT', 'AUR', 'Durasi'
+        ]
+        # header = [
+        #     'userid', 'kodelokasi', 'nama', 'brand', 'Qty', 'Trx', 'valuesales',
+        #     'persensales', 'valuestock', 'persenstock', 'persenIL', 'ATV', 'UPT', 'AUR', 'durasi'
+        # ]
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        total_valuesales = sum(d['valuesales'] for d in brand_data.values()) or 1
+
+        for data in brand_data.values():
+            trx_count = len(data['trx_set'])
+            ATV = data['valuesales'] / trx_count if trx_count else 0
+            UPT = data['qty'] / trx_count if trx_count else 0
+            AUR = data['valuesales'] / data['qty'] if data['qty'] else 0
+            persen_sales = (data['valuesales'] / total_valuesales) * 100 if total_valuesales else 0
+
+            worksheet.write(row, 0, data['user'])
+            worksheet.write(row, 1, data['store_code'])
+            worksheet.write(row, 2, data['store_name'])
+            worksheet.write(row, 3, data['brand'])
+            worksheet.write(row, 4, data['qty'])
+            worksheet.write(row, 5, trx_count)
+            worksheet.write(row, 6, data['valuesales'])
+            # worksheet.write(row, 7, data['valuestock'])
+            worksheet.write(row, 7, ATV)
+            worksheet.write(row, 8, UPT)
+            worksheet.write(row, 9, AUR)
+            worksheet.write(row, 10, data['durasi'])
+            row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Contribution_by_Brand.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+
+    def action_generate_sales_report_cashier_transaction(self):
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        invoice_no = self.vit_invoice_no or False
+        pos_order_ref = self.vit_pos_order_ref or False
+
+        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
+        if pos_order_ref:
+            domain.append(('name', '=', pos_order_ref))
+
+        orders = self.env['pos.order'].search(domain)
+
+        if not orders:
+            raise UserError("Tidak ada data POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Transaksi Kasir")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Kasir', 'Invoice No.', 'Order No.', 'Session', 'Tanggal', 'Kode Store', 'Nama Store',
+            'Payment Method', 'Nominal', 'Tanggal Payment'
+        ]
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for order in orders:
+            local_date_order = fields.Datetime.context_timestamp(self, order.date_order)
+            for order_line in order.payment_ids:
+                worksheet.write(row, 0, order.user_id.name or '')
+                worksheet.write(row, 1, order.employee_id.name or '')
+                worksheet.write(row, 2, order.account_move.name or '')
+                worksheet.write(row, 3, order.name or '')
+                worksheet.write(row, 4, order.session_id.name or '')
+                worksheet.write(row, 5, local_date_order.strftime('%d/%m/%Y %H:%M:%S'))
+                worksheet.write(row, 6, order.config_id.name or '')
+                worksheet.write(row, 7, order.config_id.name or '')
+                worksheet.write(row, 8, order_line.payment_method_id.name or '')
+                worksheet.write(row, 9, self.format_number(order_line.amount) if order_line.amount else '')
+                worksheet.write(row, 10, order_line.payment_date.strftime('%Y-%m-%d %H:%M:%S') if order_line.payment_date else '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Cashier_Transaction.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+    
+    def action_generate_sales_report_settlement_end_of_shift(self):
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+
+        domain = []
+        if date_from:
+            domain.append(('start_date', '>=', date_from))
+        if date_to:
+            domain.append(('start_date', '<=', date_to))
+
+        end_shift = self.env['end.shift'].search(domain, order='id desc')
+
+        if not end_shift:
+            raise UserError("Tidak ada data Shift POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Settlement")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Kasir', 'Tanggal', 'Kategori', 'Kode Store', 'Nama Store', 
+            'Payment Method', 'Amount', 'Expected Amount', 'Amount Difference', 'Shift Number', 'Session'
+        ]
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for shift in end_shift:
+            if shift.line_ids:
+                for order_line in shift.line_ids:
+                    local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
+                    date_str = local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else ''
+                    worksheet.write(row, 0, shift.session_id.user_id.name or '')
+                    worksheet.write(row, 1, shift.cashier_id.name or '')
+                    worksheet.write(row, 2, date_str or '')
+                    worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {shift.session_id.config_id.name}' or '')
+                    worksheet.write(row, 4, shift.session_id.config_id.name or '')
+                    worksheet.write(row, 5, shift.session_id.config_id.name or '')
+                    worksheet.write(row, 6, order_line.payment_method_id.name or '')
+                    worksheet.write(row, 7, self.format_number(order_line.amount) if order_line.amount else '')
+                    worksheet.write(row, 8, self.format_number(order_line.expected_amount) if order_line.expected_amount else '')
+                    worksheet.write(row, 9, self.format_number(order_line.amount_difference) if order_line.amount_difference else '')
+                    worksheet.write(row, 10, shift.doc_num or '')
+                    worksheet.write(row, 11, shift.session_id.name or '')
+                    row += 1
+            else:
+                # Jika tidak ada order_line, tetap tulis info shift, order_line kosong
+                worksheet.write(row, 0, shift.session_id.user_id.name or '')
+                worksheet.write(row, 1, shift.cashier_id.name or '')
+                worksheet.write(row, 2, '')  # Tidak ada payment_date
+                worksheet.write(row, 3, f'END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name} - {shift.session_id.config_id.name}' or '')
+                worksheet.write(row, 4, shift.session_id.config_id.name or '')
+                worksheet.write(row, 5, shift.session_id.config_id.name or '')
+                worksheet.write(row, 6, '')  # kosong karena tidak ada order_line
+                worksheet.write(row, 7, '')
+                worksheet.write(row, 8, '')
+                worksheet.write(row, 9, '')
+                worksheet.write(row, 10, shift.doc_num or '')
+                worksheet.write(row, 11, shift.session_id.name or '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Settlement_End_of_Shift.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+
+    def action_generate_sales_report_settlement_end_of_day(self):
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+
+        domain = []
+        if date_from:
+            domain.append(('start_date', '>=', date_from))
+        if date_to:
+            domain.append(('start_date', '<=', date_to))
+
+        end_shift = self.env['end.shift'].search(domain, order='id desc')
+
+        if not end_shift:
+            raise UserError("Tidak ada data Shift POS di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Settlement")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'User', 'Tanggal', 'Kode Store', 'Nama Store', 'Payment Method', 
+            'Amount', 'Expected Amount', 'Amount Difference', 'Shift Number', 'Session'
+        ]
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for shift in end_shift:
+            for order_line in shift.line_ids:
+                local_date_order = fields.Datetime.context_timestamp(self, order_line.payment_date)
+                worksheet.write(row, 0, shift.session_id.user_id.name or '')
+                worksheet.write(row, 1, local_date_order.strftime('%Y-%m-%d %H:%M:%S') if local_date_order else '')
+                worksheet.write(row, 2, shift.session_id.config_id.name or '')
+                worksheet.write(row, 3, shift.session_id.config_id.name or '')
+                worksheet.write(row, 4, order_line.payment_method_id.name or '')
+                worksheet.write(row, 5, self.format_number(order_line.amount) if order_line.amount else '')
+                worksheet.write(row, 6, self.format_number(order_line.expected_amount) if order_line.expected_amount else '')
+                worksheet.write(row, 7, self.format_number(order_line.amount_difference) if order_line.amount_difference else '')
+                worksheet.write(row, 8, shift.doc_num or '')
+                worksheet.write(row, 9, shift.session_id.name or '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Settlement_End_of_Day.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
+>>>>>>> 695f235 ([IMP] update POS reports)
