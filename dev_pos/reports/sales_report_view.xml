@@ -84,6 +84,181 @@
             </form>
         </field>
     </record>
+    <!-- loyalty customer --> 
+    <record id="view_sales_report_loyalty_customer_form" model="ir.ui.view">
+        <field name="name">sales.report.loyalty.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report Loyalty Customer">
+                <sheet>
+                    <group string="Report Loyalty Customer">
+                        <field name="vit_customer_name_id" options="{'no_quick_create': True}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_loyalty_customer" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_loyalty_customer_form" model="ir.ui.view">
+        <field name="name">sales.report.history.loyalty.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Loyalty Customer">
+                <sheet>
+                    <group string="Report History Loyalty Customer">
+                        <field name="vit_customer_name_id" options="{'no_quick_create': True}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_history_loyalty_customer" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+    <!-- additional --> 
+    <record id="view_sales_report_history_category_form" model="ir.ui.view">
+        <field name="name">sales.report.history.category.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Category">
+                <sheet>
+                    <group string="Report History Category">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                        <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_hourly_category" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_payment_form" model="ir.ui.view">
+        <field name="name">sales.report.history.payment.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Payment">
+                <sheet>
+                    <group string="Report History Payment">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                        <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_hourly_payment" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_contribution_by_category_form" model="ir.ui.view">
+        <field name="name">sales.report.history.contribution.category.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Contribution by Category">
+                <sheet>
+                    <group string="Report History Contribution by Category">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_hourly_contribution_by_category" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_contribution_by_brand_form" model="ir.ui.view">
+        <field name="name">sales.report.history.contribution.brand.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Contribution by Brand">
+                <sheet>
+                    <group string="Report History Contribution by Brand">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_hourly_contribution_by_brand" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_cashier_transaction_form" model="ir.ui.view">
+        <field name="name">sales.report.history.cashier.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Cashier Transaction">
+                <sheet>
+                    <group string="Report History Cashier Transaction">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                        <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_cashier_transaction" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_settlement_end_of_shift_form" model="ir.ui.view">
+        <field name="name">sales.report.history.settlement.shift.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Settlement End of Shift">
+                <sheet>
+                    <group string="Report History Settlement End of Shift">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_settlement_end_of_shift" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sales_report_history_settlement_end_of_day_form" model="ir.ui.view">
+        <field name="name">sales.report.history.settlement.day.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report History Settlement End of Day">
+                <sheet>
+                    <group string="Report History Settlement End of Day">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_settlement_end_of_day" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
 
     <!-- actions --> 
     <record id="action_generate_sales_report_detail" model="ir.actions.act_window">
@@ -117,5 +292,79 @@
         <field name="view_id" ref="view_sales_report_hourly_form"/>
         <field name="target">new</field>
     </record>
+
+    <record id="action_generate_sales_report_loyalty_customer" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Loyalty Customer</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_loyalty_customer_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_history_loyalty_customer" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report History Loyalty Customer</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_loyalty_customer_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- additional --> 
+    <record id="action_generate_sales_report_hourly_category" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Hourly Category</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_category_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_hourly_payment" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Hourly Payment</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_payment_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_hourly_contribution_by_category" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Hourly Contribution Category</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_contribution_by_category_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_hourly_contribution_by_brand" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Hourly Contribution by Brand</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_contribution_by_brand_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_cashier_transaction" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Cashier Transaction</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_cashier_transaction_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_settlement_end_of_shift" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Settlement End of Shift</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_settlement_end_of_shift_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_settlement_end_of_day" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Settlement End of Day</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_history_settlement_end_of_day_form"/>
+        <field name="target">new</field>
+    </record>
+
   </data>
 </odoo>
