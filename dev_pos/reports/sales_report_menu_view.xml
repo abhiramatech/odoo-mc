@@ -82,4 +82,10 @@
         action="action_generate_sales_report_settlement_end_of_day"
         parent="sales_report_menu"
         sequence="11"/>
+
+    <menuitem id="sales_report_stock_counting"
+        name="Report Stock Counting"
+        action="action_generate_sales_report_stock_counting"
+        parent="sales_report_menu"
+        sequence="13"/>
 </odoo>

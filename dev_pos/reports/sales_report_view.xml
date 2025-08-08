@@ -261,6 +261,25 @@
         </field>
     </record>
 
+    <record id="view_sales_report_stock_counting_form" model="ir.ui.view">
+        <field name="name">sales.report.stock.counting.form</field>
+        <field name="model">sales.report</field>
+        <field name="arch" type="xml">
+            <form string="Report Stock Counting">
+                <sheet>
+                    <group string="Report Stock Counting">
+                        <field name="vit_date_from" style="width: 80px;"/>
+                        <field name="vit_date_to" style="width: 80px;"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_sales_report_stock_counting" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
     <!-- actions --> 
     <record id="action_generate_sales_report_detail" model="ir.actions.act_window">
         <field name="name">Generate Sales Report Detail</field>
@@ -364,6 +383,14 @@
         <field name="res_model">sales.report</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_sales_report_history_settlement_end_of_day_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_generate_sales_report_stock_counting" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report Stock Counting</field>
+        <field name="res_model">sales.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_sales_report_stock_counting_form"/>
         <field name="target">new</field>
     </record>
 

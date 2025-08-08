@@ -1264,3 +1264,8 @@ class SalesReportDetail(models.TransientModel):
             'url': download_url,
             'target': 'new',
         }
+    
+    def action_generate_sales_report_stock_counting(self):
+        raise ValidationError(_(f"action_generate_sales_report_stock_counting"))
+        #  ambil yang statusnya counted -> no. counting, warehouse, lokasi, inventory date di header, detailnya product, lot/serial number, on hand,counted,difference,uom
+        
