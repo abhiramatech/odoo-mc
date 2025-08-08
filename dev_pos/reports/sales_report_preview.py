@@ -5,6 +5,15 @@ import uuid
 
 class SalesReportDetailPreview(models.TransientModel):
     _inherit = 'sales.report'
+
+    access_url = fields.Char(
+        'Portal Access URL', compute='_compute_access_url',
+        help='Customer Portal URL')
+    access_token = fields.Char('Security Token', copy=False)
+
+    def _compute_access_url(self):
+        for record in self:
+            record.access_url = '#'
  
     def action_preview_report_detail(self):
         # raise ValidationError(_(f"action_generate_report_detail_preview"))

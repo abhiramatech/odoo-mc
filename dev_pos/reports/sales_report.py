@@ -30,6 +30,9 @@ class SalesReportDetail(models.TransientModel):
         invoice_no = self.vit_invoice_no or False
         pos_order_ref = self.vit_pos_order_ref or False
 
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
         account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
@@ -131,6 +134,9 @@ class SalesReportDetail(models.TransientModel):
         invoice_no = self.vit_invoice_no or False
         pos_order_ref = self.vit_pos_order_ref or False
 
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
         account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
@@ -217,20 +223,23 @@ class SalesReportDetail(models.TransientModel):
         # self.ensure_one()
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
-        invoice_no = self.vit_invoice_no or False
-        pos_order_ref = self.vit_pos_order_ref or False
+        # invoice_no = self.vit_invoice_no or False
+        # pos_order_ref = self.vit_pos_order_ref or False
 
-        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
+        # account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
         if date_from:
             domain.append(('date_order', '>=', date_from))
         if date_to:
             domain.append(('date_order', '<=', date_to))
-        if account_move:
-            domain.append(('account_move', '=', account_move.id))
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
+        # if account_move:
+        #     domain.append(('account_move', '=', account_move.id))
+        # if pos_order_ref:
+        #     domain.append(('name', '=', pos_order_ref))
 
         orders = self.env['pos.order'].search(domain)
 
@@ -317,20 +326,23 @@ class SalesReportDetail(models.TransientModel):
         # self.ensure_one()
         date_from = self.vit_date_from or False
         date_to = self.vit_date_to or False
-        invoice_no = self.vit_invoice_no or False
-        pos_order_ref = self.vit_pos_order_ref or False
+        # invoice_no = self.vit_invoice_no or False
+        # pos_order_ref = self.vit_pos_order_ref or False
 
-        account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
+        # account_move = self.env['account.move'].search([('name', '=', invoice_no)], limit=1)
 
         domain = []
         if date_from:
             domain.append(('date_order', '>=', date_from))
         if date_to:
             domain.append(('date_order', '<=', date_to))
-        if account_move:
-            domain.append(('account_move', '=', account_move.id))
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
+        # if account_move:
+        #     domain.append(('account_move', '=', account_move.id))
+        # if pos_order_ref:
+        #     domain.append(('name', '=', pos_order_ref))
 
         orders = self.env['pos.order'].search(domain)
 
@@ -806,6 +818,9 @@ class SalesReportDetail(models.TransientModel):
 
         if not orders:
             raise UserError("Tidak ada data POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
         
         # Kumpulkan data per kategori
         category_data = {}
@@ -918,6 +933,9 @@ class SalesReportDetail(models.TransientModel):
 
         if not orders:
             raise UserError("Tidak ada data POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
         
         # Data dikumpulkan berdasarkan brand
         brand_data = {}
@@ -1041,6 +1059,9 @@ class SalesReportDetail(models.TransientModel):
 
         if not orders:
             raise UserError("Tidak ada data POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -1115,6 +1136,9 @@ class SalesReportDetail(models.TransientModel):
 
         if not end_shift:
             raise UserError("Tidak ada data Shift POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -1207,6 +1231,8 @@ class SalesReportDetail(models.TransientModel):
 
         if not end_shift:
             raise UserError("Tidak ada data Shift POS di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -1286,6 +1312,8 @@ class SalesReportDetail(models.TransientModel):
 
         if not stock_counting:
             raise UserError("Tidak ada data stock counting di periode tersebut.")
+        if not date_from or not date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output)
@@ -1315,7 +1343,7 @@ class SalesReportDetail(models.TransientModel):
                 local_inventory_date = fields.Datetime.context_timestamp(self, stock.inventory_date)
                 worksheet.write(row, 0, stock.doc_num or '')
                 worksheet.write(row, 1, stock.warehouse_id.name or '')
-                worksheet.write(row, 2, stock.location_id.name or '')
+                worksheet.write(row, 2, stock.location_id.display_name or '')
                 worksheet.write(row, 3, local_inventory_date.strftime('%Y-%m-%d %H:%M:%S') if local_inventory_date else '')
                 worksheet.write(row, 4, order_line.product_id.name or '')
                 worksheet.write(row, 5, order_line.lot_id.name or '')

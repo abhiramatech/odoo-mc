@@ -53,8 +53,8 @@
                     <group string="Report Spending">
                         <field name="vit_date_from" style="width: 80px;"/>
                         <field name="vit_date_to" style="width: 80px;"/>
-                        <field name="vit_invoice_no"/>
-                        <field name="vit_pos_order_ref"/>
+                        <!-- <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/> -->
                     </group>
                 </sheet>
                 <footer>
@@ -74,8 +74,8 @@
                     <group string="Report Hourly">
                         <field name="vit_date_from" style="width: 80px;"/>
                         <field name="vit_date_to" style="width: 80px;"/>
-                        <field name="vit_invoice_no"/>
-                        <field name="vit_pos_order_ref"/>
+                        <!-- <field name="vit_invoice_no"/>
+                        <field name="vit_pos_order_ref"/> -->
                     </group>
                 </sheet>
                 <footer>
