@@ -53,7 +53,7 @@ class SalesReportDetailPreview(models.TransientModel):
         )
         return url
     
-    def action_preview_report_detail(self):
+    def action_preview_report_detail_test(self):
         self.ensure_one()
 
         date_from = self.vit_date_from
@@ -89,3 +89,12 @@ class SalesReportDetailPreview(models.TransientModel):
         }
 
         return request.render('dev_pos.template_preview_report_detail', values)
+    
+    def action_preview_report_detail(self):
+        self.ensure_one()
+        url = f"/sales/report/detail/{self.id}"
+        return {
+            'type': 'ir.actions.act_url',
+            'target': 'self',
+            'url': url,
+        }

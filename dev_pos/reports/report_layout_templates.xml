@@ -9,14 +9,10 @@
         <table class="table table-sm table-bordered mt-3">
             <thead>
             <tr>
-                <th>User</th>
-                <th>Kasir</th>
-                <th>Customer</th>
-                <th>Order No</th>
+                <th>Order</th>
                 <th>Tanggal</th>
-                <th>Item</th>
+                <th>Produk</th>
                 <th>Qty</th>
-                <th>Harga</th>
                 <th>Subtotal</th>
             </tr>
             </thead>
@@ -24,14 +20,10 @@
             <t t-foreach="orders" t-as="order">
                 <t t-foreach="order.lines" t-as="line">
                 <tr>
-                    <td><t t-esc="order.user_id.name"/></td>
-                    <td><t t-esc="order.employee_id.name"/></td>
-                    <td><t t-esc="order.partner_id.name"/></td>
                     <td><t t-esc="order.name"/></td>
-                    <td><t t-esc="line.create_date.strftime('%d/%m/%Y')"/></td>
+                    <td><t t-esc="order.date_order.strftime('%d/%m/%Y')"/></td>
                     <td><t t-esc="line.product_id.name"/></td>
                     <td><t t-esc="line.qty"/></td>
-                    <td><t t-esc="line.price_unit"/></td>
                     <td><t t-esc="line.price_subtotal"/></td>
                 </tr>
                 </t>
