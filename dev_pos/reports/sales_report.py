@@ -17,6 +17,7 @@ class SalesReportDetail(models.TransientModel):
     vit_date_to = fields.Date(string='Date To')
     vit_invoice_no = fields.Char(string='Invoice No.')
     vit_pos_order_ref = fields.Char(string='POS Order No.')
+    vit_counting_no = fields.Char(string='Counting No.')
     
     vit_customer_name_id = fields.Many2one('res.partner', string='Customer Name')
   
@@ -1266,6 +1267,79 @@ class SalesReportDetail(models.TransientModel):
         }
     
     def action_generate_sales_report_stock_counting(self):
-        raise ValidationError(_(f"action_generate_sales_report_stock_counting"))
+        # raise ValidationError(_(f"action_generate_sales_report_stock_counting"))
         #  ambil yang statusnya counted -> no. counting, warehouse, lokasi, inventory date di header, detailnya product, lot/serial number, on hand,counted,difference,uom
-        
+        date_from = self.vit_date_from or False
+        date_to = self.vit_date_to or False
+        doc_num = self.vit_counting_no or False
+
+        domain = []
+        if date_from:
+            domain.append(('start_date', '>=', date_from))
+        if date_to:
+            domain.append(('start_date', '<=', date_to))
+        if doc_num:
+            domain.append(('doc_num', '=', doc_num))
+
+        stock_counting = self.env['inventory.stock'].search(domain)
+
+        if not stock_counting:
+            raise UserError("Tidak ada data stock counting di periode tersebut.")
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+        header_format = self.get_header_format(workbook)
+
+        tanggal_dari = self.vit_date_from.strftime("%d/%m/%Y") if self.vit_date_from else ''
+        tanggal_sampai = self.vit_date_to.strftime("%d/%m/%Y") if self.vit_date_to else ''
+        tanggal_cetak = fields.Date.today().strftime("%d %b %Y")
+
+        # Header laporan
+        worksheet.write(0, 0, "Laporan Stock Counting")
+        worksheet.write(1, 0, "[ {} - {} ]".format(tanggal_dari, tanggal_sampai))
+        worksheet.write(2, 0, "Dicetak Tanggal {}".format(tanggal_cetak))
+
+        header = [
+            'Counting No.', 'Warehouse', 'Lokasi', 'Inventory Date', 
+            'Product', 'Lot/Serial Number', 'On Hand', 'Counted', 'Difference', 'UOM'
+        ]
+
+        for col, title in enumerate(header):
+            worksheet.write(4, col, title, header_format)
+
+        row = 5
+        for stock in stock_counting:
+            for order_line in stock.inventory_counting_ids:
+                local_inventory_date = fields.Datetime.context_timestamp(self, stock.inventory_date)
+                worksheet.write(row, 0, stock.doc_num or '')
+                worksheet.write(row, 1, stock.warehouse_id.name or '')
+                worksheet.write(row, 2, stock.location_id.name or '')
+                worksheet.write(row, 3, local_inventory_date.strftime('%Y-%m-%d %H:%M:%S') if local_inventory_date else '')
+                worksheet.write(row, 4, order_line.product_id.name or '')
+                worksheet.write(row, 5, order_line.lot_id.name or '')
+                worksheet.write(row, 6, order_line.qty_hand or '0')
+                worksheet.write(row, 7, order_line.counted_qty or '0')
+                worksheet.write(row, 8, order_line.difference_qty or '0')
+                worksheet.write(row, 9, order_line.uom_id.name or '')
+                row += 1
+
+        workbook.close()
+        xlsx_data = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': 'Sales_Report_Stock_Counting.xlsx',
+            'type': 'binary',
+            'datas': base64.b64encode(xlsx_data),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+
+        download_url = '/web/content/%s?download=true' % attachment.id
+        return {
+            'type': 'ir.actions.act_url',
+            'url': download_url,
+            'target': 'new',
+        }
