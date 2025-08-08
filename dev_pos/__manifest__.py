@@ -63,6 +63,7 @@
         'views/pos_timbangan_views.xml',
         'reports/sales_report_view.xml',
         'reports/sales_report_menu_view.xml',
+        'reports/report_layout_templates.xml',
     ],
     'assets': {
         'web.assets_backend': [

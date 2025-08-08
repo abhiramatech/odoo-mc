@@ -1,0 +1,42 @@
+<template id="template_preview_report_detail" name="Preview Report Detail">
+  <t t-call="web.layout">
+    <div class="container">
+      <h2>Laporan Penjualan</h2>
+      <p>Periode: <t t-esc="date_from"/> - <t t-esc="date_to"/></p>
+      <p>Dicetak: <t t-esc="tanggal_cetak"/></p>
+
+      <table class="table table-sm table-bordered mt-3">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Kasir</th>
+            <th>Customer</th>
+            <th>Order No</th>
+            <th>Tanggal</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Harga</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <t t-foreach="orders" t-as="order">
+            <t t-foreach="order.lines" t-as="line">
+              <tr>
+                <td><t t-esc="order.user_id.name"/></td>
+                <td><t t-esc="order.employee_id.name"/></td>
+                <td><t t-esc="order.partner_id.name"/></td>
+                <td><t t-esc="order.name"/></td>
+                <td><t t-esc="line.create_date.strftime('%d/%m/%Y')"/></td>
+                <td><t t-esc="line.product_id.name"/></td>
+                <td><t t-esc="line.qty"/></td>
+                <td><t t-esc="line.price_unit"/></td>
+                <td><t t-esc="line.price_subtotal"/></td>
+              </tr>
+            </t>
+          </t>
+        </tbody>
+      </table>
+    </div>
+  </t>
+</template>
