@@ -270,6 +270,7 @@
                     <group string="Report Stock Counting">
                         <field name="vit_date_from" style="width: 80px;"/>
                         <field name="vit_date_to" style="width: 80px;"/>
+                        <field name="vit_counting_no"/>
                     </group>
                 </sheet>
                 <footer>

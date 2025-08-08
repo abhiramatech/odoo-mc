@@ -1274,6 +1274,7 @@ class SalesReportDetail(models.TransientModel):
         doc_num = self.vit_counting_no or False
 
         domain = []
+        domain.append(('state', '=', 'counted'))
         if date_from:
             domain.append(('start_date', '>=', date_from))
         if date_to:
