@@ -1,36 +1,57 @@
 <odoo>
-    <template id="template_preview_report_detail" name="Preview Report Detail">
-    <t t-call="web.layout">
-        <div class="container">
-        <h2>Laporan Penjualan</h2>
-        <p>Periode: <t t-esc="date_from"/> - <t t-esc="date_to"/></p>
-        <p>Dicetak: <t t-esc="tanggal_cetak"/></p>
+    <template id="report_sales_detail">
+        <t t-call="web.html_container">
+            <div style="text-align:center;">
+                <h3>PT KEMANG KARSA</h3>
+                <h4>Laporan Penjualan</h4>
+                <span>[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</span><br/>
+                <span>Dicetak Tanggal <t t-esc="tanggal_cetak"/></span>
+            </div>
+            <br/>
 
-        <table class="table table-sm table-bordered mt-3">
-            <thead>
-            <tr>
-                <th>Order</th>
-                <th>Tanggal</th>
-                <th>Produk</th>
-                <th>Qty</th>
-                <th>Subtotal</th>
-            </tr>
-            </thead>
-            <tbody>
             <t t-foreach="orders" t-as="order">
-                <t t-foreach="order.lines" t-as="line">
-                <tr>
-                    <td><t t-esc="order.name"/></td>
-                    <td><t t-esc="order.date_order.strftime('%d/%m/%Y')"/></td>
-                    <td><t t-esc="line.product_id.name"/></td>
-                    <td><t t-esc="line.qty"/></td>
-                    <td><t t-esc="line.price_subtotal"/></td>
-                </tr>
-                </t>
+                <table style="width:100%; border-collapse:collapse; font-size:12px; border: 1px solid black;">
+                    <tr>
+                        <th style="border:1px solid black;">No</th>
+                        <th style="border:1px solid black;">Nomor Faktur</th>
+                        <th style="border:1px solid black;">Lokasi</th>
+                        <th style="border:1px solid black;">Tanggal</th>
+                        <th style="border:1px solid black;">Customer</th>
+                        <th style="border:1px solid black;">Sales Pro</th>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid black;"><t t-esc="loop.index"/></td>
+                        <td style="border:1px solid black;"><t t-esc="order.account_move.name or ''"/></td>
+                        <td style="border:1px solid black;"><t t-esc="order.config_id.name or ''"/></td>
+                        <td style="border:1px solid black;"><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M:%S')"/></td>
+                        <td style="border:1px solid black;"><t t-esc="order.partner_id.name or ''"/></td>
+                        <td style="border:1px solid black;"><t t-esc="order.user_id.name or ''"/></td>
+                    </tr>
+                </table>
+
+                <!-- Detail Produk -->
+                <table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:5px;">
+                    <tr>
+                        <th style="border:1px solid black;">Kode Barang</th>
+                        <th style="border:1px solid black;">Nama Barang</th>
+                        <th style="border:1px solid black;">Qty</th>
+                        <th style="border:1px solid black;">Harga</th>
+                        <th style="border:1px solid black;">Subtotal</th>
+                    </tr>
+                    <t t-foreach="order.lines" t-as="line">
+                        <tr>
+                            <td style="border:1px solid black;"><t t-esc="line.product_id.default_code or ''"/></td>
+                            <td style="border:1px solid black;"><t t-esc="line.product_id.name or ''"/></td>
+                            <td style="border:1px solid black; text-align:right;"><t t-esc="line.qty"/></td>
+                            <td style="border:1px solid black; text-align:right;"><t t-esc="line.price_unit"/></td>
+                            <td style="border:1px solid black; text-align:right;"><t t-esc="line.price_subtotal_incl"/></td>
+                        </tr>
+                    </t>
+                </table>
+
+                <hr style="margin:20px 0;"/>
             </t>
-            </tbody>
-        </table>
-        </div>
-    </t>
+        </t>
     </template>
+
 </odoo>

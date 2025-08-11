@@ -37,4 +37,4 @@ class SalesReportDetailController(http.Controller):
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
         }
 
-        return request.render('nama_modul.template_preview_report_detail', values)
+        return request.render('nama_modul.report_sales_detail', values)
