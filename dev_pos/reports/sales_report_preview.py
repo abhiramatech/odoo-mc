@@ -92,7 +92,10 @@ class SalesReportDetailPreview(models.TransientModel):
     
     def action_preview_report_detail(self):
         self.ensure_one()
-        url = f"/sales/report/detail/{self.id}"
+        if not self.date_from or not self.date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+        
+        url = f"/sales/report/detail?date_from={self.date_from}&date_to={self.date_to}"
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',
