@@ -9,3 +9,4 @@ from . import data_transaksi
 from . import data_transaksiMCtoSS
 from . import manual_sync_ss_to_mc
 from . import manual_sync_mc_to_ss
+from . import sales_report
