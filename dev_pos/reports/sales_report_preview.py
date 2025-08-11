@@ -95,8 +95,8 @@ class SalesReportDetailPreview(models.TransientModel):
         if not self.vit_date_from or not self.vit_date_to:
             raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
         
-        # url = f"/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
-        url = f"/sales/report/test"
+        url = f"/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
+        # url = f"/sales/report/test"
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',
