@@ -109,7 +109,6 @@
                 <td><t t-esc="sum(order.lines.mapped('qty') or ''"/></td>
                 <td><t t-esc="sum(order.lines.mapped('price_subtotal_incl') or ''"/></td>
               </tr>
-
               <t t-set="counter" t-value="counter + 1"/>
             </t>
           </tbody>

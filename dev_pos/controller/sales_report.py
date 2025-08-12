@@ -70,4 +70,4 @@ class SalesReportDetailController(http.Controller):
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
         }
-        return request.render('dev_pos.report_sales_detail', values)
+        return request.render('dev_pos.report_sales_recap', values)
