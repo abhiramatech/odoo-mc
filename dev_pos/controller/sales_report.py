@@ -39,7 +39,7 @@ class SalesReportDetailController(http.Controller):
         return request.render('dev_pos.report_sales_detail', values)
 
     @http.route('/sales/report/recap', type='http', auth='user', website=True)
-    def portal_sales_report_detail(self, **kw):
+    def portal_sales_report_recap(self, **kw):
         date_from = kw.get('date_from')
         date_to = kw.get('date_to')
         invoice_no = kw.get('invoice_no')
