@@ -38,6 +38,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_report_recap" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_recap" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
