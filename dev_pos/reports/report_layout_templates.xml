@@ -106,8 +106,8 @@
                 <td><t t-esc="order.config_id.name"/></td>
                 <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
                 <td><t t-esc="order.partner_id.name or ''"/></td>
-                <td><t t-esc="sum(order.lines.mapped('qty') or ''"/></td>
-                <td><t t-esc="sum(order.lines.mapped('price_subtotal_incl') or ''"/></td>
+                <td><t t-esc="sum(order.lines.mapped('qty') or [0])"/></td>
+                <td><t t-esc="sum(order.lines.mapped('qty')) if order.lines else 0"/></td>
               </tr>
               <t t-set="counter" t-value="counter + 1"/>
             </t>
