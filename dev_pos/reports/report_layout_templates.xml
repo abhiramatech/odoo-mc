@@ -120,20 +120,14 @@
   <template id="report_sales_spending" name="Report Sales Spending">
     <t t-call="web.html_container">
       <style>
+        .page {
+          margin-bottom: 40px;
+          page-break-after: always;
+        }
         @media print {
-          table {
-            page-break-inside: auto;
-          }
-          tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
-          }
-          thead {
-            display: table-header-group; /* supaya header muncul di setiap halaman */
-          }
-          tfoot {
-            display: table-footer-group;
-          }
+          thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
+          tr { page-break-inside: avoid; }
         }
       </style>
 
@@ -142,37 +136,61 @@
         <h5 class="text-center">Laporan History Penjualan By Store</h5>
         <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
-        <table class="table table-bordered table-sm text-center" style="font-size:12px;">
-          <thead style="background-color: #ffd700; font-weight: bold;">
-            <tr>
-              <th>Nomor</th>
-              <th>Nama</th>
-              <t t-foreach="tanggal_list" t-as="tgl">
-                <th>Qty-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
-                <th>Trx-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
-                <th>Sales-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
-              </t>
-            </tr>
-          </thead>
-          <tbody>
-            <t t-set="counter" t-value="1"/>
-            <t t-foreach="data_rows" t-as="row">
-              <tr>
-                <td><t t-esc="counter"/></td>
-                <td><t t-esc="row['label']"/></td>
-                <t t-foreach="tanggal_list" t-as="tgl">
-                  <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
-                  <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
-                  <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_sales', '')"/></td>
+        <!-- Pisahkan data menjadi pages -->
+        <t t-set="rows_per_page" t-value="20"/>
+        <t t-set="pages" t-value="[]"/>
+        <t t-set="page" t-value="[]"/>
+
+        <t t-foreach="data_rows" t-as="row">
+          <t t-if="len(page) &lt; rows_per_page">
+            <t t-set="page" t-value="page + [row]"/>
+          </t>
+          <t t-else="">
+            <t t-set="pages" t-value="pages + [page]"/>
+            <t t-set="page" t-value="[row]"/>
+          </t>
+        </t>
+        <t t-if="page">
+          <t t-set="pages" t-value="pages + [page]"/>
+        </t>
+
+        <!-- Loop halaman -->
+        <t t-foreach="pages" t-as="p">
+          <div class="page">
+            <table class="table table-bordered table-sm text-center" style="font-size:12px;">
+              <thead style="background-color: #ffd700; font-weight: bold;">
+                <tr>
+                  <th>Nomor</th>
+                  <th>Nama</th>
+                  <t t-foreach="tanggal_list" t-as="tgl">
+                    <th>Qty-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                    <th>Trx-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                    <th>Sales-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                  </t>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-set="counter" t-value="1"/>
+                <t t-foreach="p" t-as="row">
+                  <tr>
+                    <td><t t-esc="counter"/></td>
+                    <td><t t-esc="row['label']"/></td>
+                    <t t-foreach="tanggal_list" t-as="tgl">
+                      <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
+                      <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
+                      <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_sales', '')"/></td>
+                    </t>
+                  </tr>
+                  <t t-set="counter" t-value="counter + 1"/>
                 </t>
-              </tr>
-              <t t-set="counter" t-value="counter + 1"/>
-            </t>
-          </tbody>
-        </table>
+              </tbody>
+            </table>
+          </div>
+        </t>
       </div>
     </t>
   </template>
+
 
 
   <template id="report_sales_hourly" name="Report Sales Hourly">
