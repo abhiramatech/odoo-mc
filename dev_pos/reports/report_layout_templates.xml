@@ -107,7 +107,132 @@
                 <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
                 <td><t t-esc="order.partner_id.name or ''"/></td>
                 <td><t t-esc="sum(order.lines.mapped('qty') or [0])"/></td>
-                <td><t t-esc="sum(order.lines.mapped('qty')) if order.lines else 0"/></td>
+                <td><t t-esc="sum(order.lines.mapped('price_subtotal_incl') or [0])"/></td>
+              </tr>
+              <t t-set="counter" t-value="counter + 1"/>
+            </t>
+          </tbody>
+        </table>
+      </div>
+    </t>
+  </template>
+
+  <template id="report_sales_spending" name="Report Sales Spending">
+    <t t-call="web.html_container">
+      <div class="container mt-4">
+        <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+        <h5 class="text-center">Laporan History Penjualan By Store</h5>
+        <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+        <table class="table table-bordered table-sm text-center" style="font-size:12px;">
+          <thead style="background-color: #ffd700; font-weight: bold;">
+            <tr>
+              <th>Nomor</th>
+              <th>Nama</th>
+              <t t-foreach="tanggal_list" t-as="tgl">
+                <th>Qty-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                <th>Trx-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                <th>Sales-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+              </t>
+            </tr>
+          </thead>
+          <tbody>
+            <t t-set="counter" t-value="1"/>
+            <t t-foreach="data_rows" t-as="row">
+              <tr>
+                <td><t t-esc="counter"/></td>
+                <td><t t-esc="row['label']"/></td>
+                <t t-foreach="tanggal_list" t-as="tgl">
+                  <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
+                  <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
+                  <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_sales', '')"/></td>
+                </t>
+              </tr>
+              <t t-set="counter" t-value="counter + 1"/>
+            </t>
+          </tbody>
+        </table>
+      </div>
+    </t>
+  </template>
+
+  <template id="report_sales_hourly" name="Report Sales Hourly">
+    <t t-call="web.html_container">
+      <div class="container mt-4">
+        <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+        <h5 class="text-center">Laporan Penjualan</h5>
+        <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+        <table class="table table-bordered table-sm">
+          <thead class="table-secondary">
+            <tr>
+              <th>No</th>
+              <th>Nomor Faktur</th>
+              <th>Nomor Order</th>
+              <th>Session</th>
+              <th>Lokasi</th>
+              <th>Tanggal</th>
+              <th>Customer</th>
+              <th>Quantity</th>
+              <th>Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <t t-set="counter" t-value="1"/>
+            <t t-foreach="orders" t-as="order">
+              <tr>
+                <td><t t-esc="counter"/></td>
+                <td><t t-esc="order.account_move.name or ''"/></td>
+                <td><t t-esc="order.name or ''"/></td>
+                <td><t t-esc="order.session_id.name or ''"/></td>
+                <td><t t-esc="order.config_id.name"/></td>
+                <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
+                <td><t t-esc="order.partner_id.name or ''"/></td>
+                <td><t t-esc="sum(order.lines.mapped('qty') or [0])"/></td>
+                <td><t t-esc="sum(order.lines.mapped('price_subtotal_incl') or [0])"/></td>
+              </tr>
+              <t t-set="counter" t-value="counter + 1"/>
+            </t>
+          </tbody>
+        </table>
+      </div>
+    </t>
+  </template>
+
+  <template id="report_sales_hourly_category" name="Report Sales Hourly Category">
+    <t t-call="web.html_container">
+      <div class="container mt-4">
+        <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+        <h5 class="text-center">Laporan Penjualan</h5>
+        <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+        <table class="table table-bordered table-sm">
+          <thead class="table-secondary">
+            <tr>
+              <th>No</th>
+              <th>Nomor Faktur</th>
+              <th>Nomor Order</th>
+              <th>Session</th>
+              <th>Lokasi</th>
+              <th>Tanggal</th>
+              <th>Customer</th>
+              <th>Quantity</th>
+              <th>Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <t t-set="counter" t-value="1"/>
+            <t t-foreach="orders" t-as="order">
+              <tr>
+                <td><t t-esc="counter"/></td>
+                <td><t t-esc="order.account_move.name or ''"/></td>
+                <td><t t-esc="order.name or ''"/></td>
+                <td><t t-esc="order.session_id.name or ''"/></td>
+                <td><t t-esc="order.config_id.name"/></td>
+                <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
+                <td><t t-esc="order.partner_id.name or ''"/></td>
+                <td><t t-esc="sum(order.lines.mapped('qty') or [0])"/></td>
+                <td><t t-esc="sum(order.lines.mapped('price_subtotal_incl') or [0])"/></td>
               </tr>
               <t t-set="counter" t-value="counter + 1"/>
             </t>

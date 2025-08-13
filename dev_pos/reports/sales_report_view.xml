@@ -60,6 +60,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_report_spending" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_spending" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -81,6 +82,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_report_hourly" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_hourly" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -99,6 +101,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_loyalty_customer" string="Print" type="object" class="btn-primary"/>
+                    <!-- <button name="action_preview_report_loyalty_customer" string="Preview" type="object" class="btn-secondary"/> -->
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -117,6 +120,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_history_loyalty_customer" string="Print" type="object" class="btn-primary"/>
+                    <!-- <button name="action_preview_report_history_loyalty_customer" string="Preview" type="object" class="btn-secondary"/> -->
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -138,6 +142,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_hourly_category" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_hourly_category" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -159,6 +164,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_hourly_payment" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_hourly_payment" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -178,6 +184,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_hourly_contribution_by_category" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_hourly_contribution_by_category" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -197,6 +204,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_hourly_contribution_by_brand" string="Print" type="object" class="btn-primary"/>
+                    <button name="action_preview_report_hourly_contribution_by_brand" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -218,6 +226,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_cashier_transaction" string="Print" type="object" class="btn-primary"/>
+                    <!-- <button name="action_preview_report_cashier_transaction" string="Preview" type="object" class="btn-secondary"/> -->
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -237,6 +246,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_settlement_end_of_shift" string="Print" type="object" class="btn-primary"/>
+                    <!-- <button name="action_preview_report_settlement_end_of_shift" string="Preview" type="object" class="btn-secondary"/> -->
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -256,6 +266,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_settlement_end_of_day" string="Print" type="object" class="btn-primary"/>
+                    <!-- <button name="action_preview_report_settlement_end_of_day" string="Preview" type="object" class="btn-secondary"/> -->
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -276,6 +287,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_stock_counting" string="Print" type="object" class="btn-primary"/>
+                    <!-- <button name="action_preview_report_stock_counting" string="Preview" type="object" class="btn-secondary"/> -->
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
