@@ -184,7 +184,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_hourly_contribution_by_category" string="Print" type="object" class="btn-primary"/>
-                    <button name="action_preview_report_hourly_contribution_by_category" string="Preview" type="object" class="btn-secondary"/>
+                    <button name="action_preview_report_contribution_by_category" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -204,7 +204,7 @@
                 </sheet>
                 <footer>
                     <button name="action_generate_sales_report_hourly_contribution_by_brand" string="Print" type="object" class="btn-primary"/>
-                    <button name="action_preview_report_hourly_contribution_by_brand" string="Preview" type="object" class="btn-secondary"/>
+                    <button name="action_preview_report_contribution_by_brand" string="Preview" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
