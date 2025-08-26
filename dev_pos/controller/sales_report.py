@@ -174,8 +174,16 @@ class SalesReportDetailController(http.Controller):
 
         orders = request.env['pos.order'].sudo().search(domain)
 
+        # Ambil daftar tanggal unik
+        tanggal_set = set(
+            fields.Datetime.context_timestamp(request.env.user, o.date_order).date()
+            for o in orders
+        )
+        tanggal_list = sorted(list(tanggal_set))
+
         values = {
             'orders': orders,
+            'tanggal_list': tanggal_list,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
