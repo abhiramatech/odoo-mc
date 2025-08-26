@@ -79,7 +79,6 @@ class SalesReportDetailController(http.Controller):
         # invoice_no = kw.get('invoice_no')
         # pos_order_ref = kw.get('pos_order_ref')
 
-        # Validasi parameter wajib
         if not date_from or not date_to:
             return request.not_found()
 
