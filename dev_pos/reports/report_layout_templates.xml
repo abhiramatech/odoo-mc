@@ -242,7 +242,7 @@
                   <t t-foreach="p" t-as="row">
                     <tr>
                       <td><t t-esc="counter"/></td>
-                      <td><t t-esc="row['label']"/></td>
+                      <!-- <td><t t-esc="row['label']"/></td> -->
                       <t t-foreach="tanggal_list" t-as="tgl">
                         <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
                         <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
