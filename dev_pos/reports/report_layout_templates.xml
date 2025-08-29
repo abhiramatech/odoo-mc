@@ -197,40 +197,24 @@
     </t>
   </template>
 
-  <template id="report_sales_hourly" name="Report Sales Hourly">
+  <template id="report_sales_hourly_category" name="Report Sales Hourly Category">
     <t t-call="web.html_container">
-
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
         <h5 class="text-center">Laporan History Penjualan By Store</h5>
         <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
-        <t t-set="rows_per_page" t-value="20"/>
-        <t t-set="pages" t-value="[]"/>
-        <t t-set="page" t-value="[]"/>
+        <t t-set="cols_per_page" t-value="10"/>
+        <t t-set="tanggal_chunks" t-value="[tanggal_list[i:i+cols_per_page] for i in range(0, len(tanggal_list), cols_per_page)]"/>
 
-        <t t-foreach="data_rows" t-as="row">
-          <t t-if="len(page) &lt; rows_per_page">
-            <t t-set="page" t-value="page + [row]"/>
-          </t>
-          <t t-else="">
-            <t t-set="pages" t-value="pages + [page]"/>
-            <t t-set="page" t-value="[row]"/>
-          </t>
-        </t>
-        <t t-if="page">
-          <t t-set="pages" t-value="pages + [page]"/>
-        </t>
-
-        <!-- Loop halaman -->
-        <t t-foreach="pages" t-as="p">
+        <t t-foreach="tanggal_chunks" t-as="chunk">
           <div class="page">
             <div class="table-responsive">
               <table class="table table-bordered table-sm text-center" style="font-size:12px; min-width: 1200px;">
                 <thead style="background-color: #ffd700; font-weight: bold;">
                   <tr>
                     <th>Jam</th>
-                    <t t-foreach="tanggal_list" t-as="tgl">
+                    <t t-foreach="chunk" t-as="tgl">
                       <th>Qty-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
                       <th>Trx-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
                       <th>Sales-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
@@ -239,11 +223,10 @@
                 </thead>
                 <tbody>
                   <t t-set="counter" t-value="1"/>
-                  <t t-foreach="p" t-as="row">
+                  <t t-foreach="data_rows" t-as="row">
                     <tr>
                       <td><t t-esc="counter"/></td>
-                      <!-- <td><t t-esc="row['label']"/></td> -->
-                      <t t-foreach="tanggal_list" t-as="tgl">
+                      <t t-foreach="chunk" t-as="tgl">
                         <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
                         <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
                         <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_sales', '')"/></td>
@@ -264,41 +247,44 @@
     <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-        <h5 class="text-center">Laporan Penjualan</h5>
+        <h5 class="text-center">Laporan History Penjualan By Store</h5>
         <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
-        <table class="table table-bordered table-sm">
-          <thead class="table-secondary">
-            <tr>
-              <th>No</th>
-              <th>Nomor Faktur</th>
-              <th>Nomor Order</th>
-              <th>Session</th>
-              <th>Lokasi</th>
-              <th>Tanggal</th>
-              <th>Customer</th>
-              <th>Quantity</th>
-              <th>Nominal</th>
-            </tr>
-          </thead>
-          <tbody>
-            <t t-set="counter" t-value="1"/>
-            <t t-foreach="orders" t-as="order">
-              <tr>
-                <td><t t-esc="counter"/></td>
-                <td><t t-esc="order.account_move.name or ''"/></td>
-                <td><t t-esc="order.name or ''"/></td>
-                <td><t t-esc="order.session_id.name or ''"/></td>
-                <td><t t-esc="order.config_id.name"/></td>
-                <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
-                <td><t t-esc="order.partner_id.name or ''"/></td>
-                <td><t t-esc="sum(order.lines.mapped('qty') or [0])"/></td>
-                <td><t t-esc="sum(order.lines.mapped('price_subtotal_incl') or [0])"/></td>
-              </tr>
-              <t t-set="counter" t-value="counter + 1"/>
-            </t>
-          </tbody>
-        </table>
+        <t t-set="cols_per_page" t-value="10"/>
+        <t t-set="tanggal_chunks" t-value="[tanggal_list[i:i+cols_per_page] for i in range(0, len(tanggal_list), cols_per_page)]"/>
+
+        <t t-foreach="tanggal_chunks" t-as="chunk">
+          <div class="page">
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm text-center" style="font-size:12px; min-width: 1200px;">
+                <thead style="background-color: #ffd700; font-weight: bold;">
+                  <tr>
+                    <th>Jam</th>
+                    <t t-foreach="chunk" t-as="tgl">
+                      <th>Qty-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                      <th>Trx-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                      <th>Sales-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
+                    </t>
+                  </tr>
+                </thead>
+                <tbody>
+                  <t t-set="counter" t-value="1"/>
+                  <t t-foreach="data_rows" t-as="row">
+                    <tr>
+                      <td><t t-esc="counter"/></td>
+                      <t t-foreach="chunk" t-as="tgl">
+                        <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
+                        <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
+                        <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_sales', '')"/></td>
+                      </t>
+                    </tr>
+                    <t t-set="counter" t-value="counter + 1"/>
+                  </t>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </t>
       </div>
     </t>
   </template>
