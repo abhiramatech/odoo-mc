@@ -154,7 +154,6 @@ class SalesReportDetailController(http.Controller):
         # invoice_no = kw.get('invoice_no')
         # pos_order_ref = kw.get('pos_order_ref')
 
-        # Validasi parameter wajib
         if not date_from or not date_to:
             return request.not_found()
 
@@ -180,9 +179,47 @@ class SalesReportDetailController(http.Controller):
         )
         tanggal_list = sorted(list(tanggal_set))
 
+        # Range Spending seperti di Python XLSX kamu
+        hourly = []
+        for data_hour in range(24):
+            hourly.append(data_hour)
+        # range_spending = [
+        #     (0, 50000, "0 - 50.000"),
+        #     (50001, 100000, "50.001 - 100.000"),
+        #     (100001, 250000, "100.001 - 250.000"),
+        #     (250001, 500000, "250.001 - 500.000"),
+        #     (500001, 1000000, "500.001 - 1.000.000"),
+        #     (1000001, 3000000, "1.000.001 - 3.000.000"),
+        #     (3000001, 5000000, "3.000.001 - 5.000.000"),
+        #     (5000001, 20000000, "5.000.001 - 20.000.000"),
+        #     (20000001, float('inf'), ">20.000.001"),
+        # ]
+
+        # Bentuk data_rows
+        data_rows = []
+        for hour in hourly:
+            row_data = []
+            for tgl in tanggal_list:
+                order_filtered = orders.filtered(lambda o: fields.Datetime.context_timestamp(self, o.date_order).date() == tgl and fields.Datetime.context_timestamp(self, o.date_order).hour == hour)
+
+                # total_qty = sum(sum(line.qty for line in o.lines) for o in order_filtered)
+                # total_trx = len(order_filtered)
+                # total_sales = sum(o.amount_total for o in order_filtered)
+
+                total_qty = sum(order_filtered.mapped(lambda o: sum(o.lines.mapped('qty'))))
+                total_trx = len(order_filtered)
+                total_sales = sum(order_filtered.mapped('amount_total'))
+
+                row_data[f"{tgl.strftime('%d/%m/%Y')}_qty"] = total_qty or ''
+                row_data[f"{tgl.strftime('%d/%m/%Y')}_trx"] = total_trx or ''
+                row_data[f"{tgl.strftime('%d/%m/%Y')}_sales"] = "{:,.0f}".format(total_sales) if total_sales else ''
+            
+            data_rows.append(row_data)
+
         values = {
             'orders': orders,
-            'tanggal_list': tanggal_list,
+            'tanggal_list': tanggal_list,  # dikirim ke QWeb
+            'data_rows': data_rows,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
