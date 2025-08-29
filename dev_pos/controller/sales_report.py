@@ -200,8 +200,7 @@ class SalesReportDetailController(http.Controller):
         for hour in hourly:
             row_data = []
             for tgl in tanggal_list:
-                order_filtered = orders.filtered(lambda o: fields.Datetime.context_timestamp(self, o.date_order).date() == tgl and fields.Datetime.context_timestamp(self, o.date_order).hour == hour)
-
+                order_filtered = orders.filtered(lambda o: fields.Datetime.context_timestamp(request.env.user, o.date_order).date() == tgl and fields.Datetime.context_timestamp(request.env.user, o.date_order).hour == hour)
                 # total_qty = sum(sum(line.qty for line in o.lines) for o in order_filtered)
                 # total_trx = len(order_filtered)
                 # total_sales = sum(o.amount_total for o in order_filtered)
