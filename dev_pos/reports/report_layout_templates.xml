@@ -247,45 +247,38 @@
     <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-        <h5 class="text-center">Laporan History Penjualan By Store</h5>
+        <h5 class="text-center">Laporan History Penjualan Hourly per Kategori</h5>
         <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+        <p class="text-center">Dicetak: <t t-esc="tanggal_cetak"/></p>
 
-        <t t-set="cols_per_page" t-value="10"/>
-        <t t-set="tanggal_chunks" t-value="[tanggal_list[i:i+cols_per_page] for i in range(0, len(tanggal_list), cols_per_page)]"/>
-
-        <t t-foreach="tanggal_chunks" t-as="chunk">
-          <div class="page">
-            <div class="table-responsive">
-              <table class="table table-bordered table-sm text-center" style="font-size:12px; min-width: 1200px;">
-                <thead style="background-color: #ffd700; font-weight: bold;">
-                  <tr>
-                    <th>Jam</th>
-                    <t t-foreach="chunk" t-as="tgl">
-                      <th>Qty-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
-                      <th>Trx-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
-                      <th>Sales-<t t-esc="tgl.strftime('%d/%m/%Y')"/></th>
-                    </t>
-                  </tr>
-                </thead>
-                <tbody>
-                  <t t-set="counter" t-value="1"/>
-                  <t t-foreach="data_rows" t-as="row">
-                    <tr>
-                      <td><t t-esc="counter"/></td>
-                      <t t-foreach="chunk" t-as="tgl">
-                        <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_qty', '')"/></td>
-                        <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_trx', '')"/></td>
-                        <td><t t-esc="row.get(tgl.strftime('%d/%m/%Y') + '_sales', '')"/></td>
-                      </t>
-                    </tr>
-                    <t t-set="counter" t-value="counter + 1"/>
+        <div class="table-responsive mt-4">
+          <table class="table table-bordered table-sm text-center" style="font-size:12px; min-width: 1600px;">
+            <thead style="background-color: #ffd700; font-weight: bold;">
+              <tr>
+                <th>Kategori</th>
+                <t t-foreach="jam_list" t-as="jam">
+                  <th>Qty-<t t-esc="jam"/></th>
+                  <th>Trx-<t t-esc="jam"/></th>
+                  <th>Sales-<t t-esc="jam"/></th>
+                </t>
+              </tr>
+            </thead>
+            <tbody>
+              <t t-foreach="data_rows" t-as="row">
+                <tr>
+                  <td><t t-esc="row['kategori']"/></td>
+                  <t t-foreach="jam_list" t-as="jam">
+                    <td><t t-esc="row.get(jam+'_qty', '')"/></td>
+                    <td><t t-esc="row.get(jam+'_trx', '')"/></td>
+                    <td><t t-esc="row.get(jam+'_sales', '')"/></td>
                   </t>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </t>
+                </tr>
+              </t>
+            </tbody>
+          </table>
+        </div>
       </div>
     </t>
   </template>
+
 </odoo>

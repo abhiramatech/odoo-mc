@@ -233,7 +233,6 @@ class SalesReportDetailController(http.Controller):
         invoice_no = kw.get('invoice_no')
         pos_order_ref = kw.get('pos_order_ref')
 
-        # Validasi parameter wajib
         if not date_from or not date_to:
             return request.not_found()
 
@@ -251,45 +250,59 @@ class SalesReportDetailController(http.Controller):
             domain.append(('name', '=', pos_order_ref))
 
         orders = request.env['pos.order'].sudo().search(domain)
+        if not orders:
+            return request.render('dev_pos.report_sales_hourly_category', {
+                'orders': [],
+                'tanggal_list': [],
+                'data_rows': [],
+                'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
+                'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
+                'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
+            })
 
-        # Ambil daftar tanggal unik
-        tanggal_set = set(
-            fields.Datetime.context_timestamp(request.env.user, o.date_order).date()
-            for o in orders
-        )
-        tanggal_list = sorted(list(tanggal_set))
+        jam_list = ['{:02d}'.format(j) for j in range(24)]
+        categories = request.env['pos.category'].sudo().search([])
 
-        jam_list = ['{:02d}'.format(jam) for jam in range(24)]
-        kategori_list = request.env['pos.category'].sudo().search([])
-
-        # Bentuk data_rows
         data_rows = []
-        for jam in jam_list:
-            for kategori in kategori_list:
-                order_filtered = orders.filtered(lambda o: fields.Datetime.context_timestamp(request.env.user, o.date_order).strftime('%H') == jam and any(line.product_id.pos_categ_id == kategori for line in o.lines))
-                
-                total_qty = sum(order_filtered.mapped(lambda o: sum(o.lines.filtered(lambda line: line.product_id.pos_categ_id == kategori).mapped('qty'))))
-                total_trx = len(order_filtered)
-                total_sales = sum(order_filtered.mapped('amount_total'))
+        for category in categories:
+            row_data = {'kategori': category.name}
+            for jam in jam_list:
+                jam_int = int(jam)
+                total_qty = 0
+                total_sales = 0
+                trx_set = set()
 
-                data_rows.append({
-                    'jam': jam,
-                    'kategori': kategori.name,
-                    'total_qty': total_qty or '',
-                    'total_trx': total_trx or '',
-                    'total_sales': "{:,.0f}".format(total_sales) if total_sales else ''
-                })
+                for order in orders:
+                    order_dt = fields.Datetime.context_timestamp(request.env.user, order.date_order)
+                    if order_dt.hour != jam_int:
+                        continue
+                    if not (fields.Date.from_string(date_from) <= order_dt.date() <= fields.Date.from_string(date_to)):
+                        continue
 
+                    matching_lines = order.lines.filtered(
+                        lambda l: category.id in l.product_id.product_tmpl_id.pos_categ_ids.ids
+                    )
+                    if matching_lines:
+                        trx_set.add(order.id)
+                        total_qty += sum(matching_lines.mapped('qty'))
+                        total_sales += sum(matching_lines.mapped('price_subtotal_incl'))
+
+                row_data[f"{jam}_qty"] = total_qty or ''
+                row_data[f"{jam}_trx"] = len(trx_set) or ''
+                row_data[f"{jam}_sales"] = "{:,.0f}".format(total_sales) if total_sales else ''
+            
+            data_rows.append(row_data)
 
         values = {
             'orders': orders,
-            'tanggal_list': tanggal_list,  # dikirim ke QWeb
             'data_rows': data_rows,
+            'jam_list': jam_list,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
         }
         return request.render('dev_pos.report_sales_hourly_category', values)
+
 
 
     @http.route('/sales/report/hourly_payment', type='http', auth='user', website=True)
