@@ -252,8 +252,39 @@ class SalesReportDetailController(http.Controller):
 
         orders = request.env['pos.order'].sudo().search(domain)
 
+        # Ambil daftar tanggal unik
+        tanggal_set = set(
+            fields.Datetime.context_timestamp(request.env.user, o.date_order).date()
+            for o in orders
+        )
+        tanggal_list = sorted(list(tanggal_set))
+
+        jam_list = ['{:02d}'.format(jam) for jam in range(24)]
+        kategori_list = request.env['pos.category'].sudo().search([])
+
+        # Bentuk data_rows
+        data_rows = []
+        for jam in jam_list:
+            for kategori in kategori_list:
+                order_filtered = orders.filtered(lambda o: fields.Datetime.context_timestamp(request.env.user, o.date_order).strftime('%H') == jam and any(line.product_id.pos_categ_id == kategori for line in o.lines))
+                
+                total_qty = sum(order_filtered.mapped(lambda o: sum(o.lines.filtered(lambda line: line.product_id.pos_categ_id == kategori).mapped('qty'))))
+                total_trx = len(order_filtered)
+                total_sales = sum(order_filtered.mapped('amount_total'))
+
+                data_rows.append({
+                    'jam': jam,
+                    'kategori': kategori.name,
+                    'total_qty': total_qty or '',
+                    'total_trx': total_trx or '',
+                    'total_sales': "{:,.0f}".format(total_sales) if total_sales else ''
+                })
+
+
         values = {
             'orders': orders,
+            'tanggal_list': tanggal_list,  # dikirim ke QWeb
+            'data_rows': data_rows,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
