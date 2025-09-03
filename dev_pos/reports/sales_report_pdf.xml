@@ -1,0 +1,48 @@
+<odoo>
+    <template id="report_sales_detail_pdf">
+    <t t-call="web.html_container">
+        <t t-call="web.external_layout">
+        <div class="page">
+            <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+            <h5 class="text-center">Laporan Penjualan</h5>
+            <p class="text-center">[ <t t-esc="doc.vit_date_from"/> - <t t-esc="doc.vit_date_to"/> ]</p>
+
+            <table class="table table-sm table-bordered">
+            <thead>
+                <tr>
+                <th>No</th>
+                <th>Faktur</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <t t-set="counter" t-value="1"/>
+                <t t-foreach="doc.orders" t-as="order">
+                <tr>
+                    <td><t t-esc="counter"/></td>
+                    <td><t t-esc="order.account_move.name or ''"/></td>
+                    <td><t t-esc="order.name"/></td>
+                    <td><t t-esc="order.partner_id.name or ''"/></td>
+                    <td class="text-end"><t t-esc="order.amount_total"/></td>
+                </tr>
+                <t t-set="counter" t-value="counter + 1"/>
+                </t>
+            </tbody>
+            </table>
+        </div>
+        </t>
+    </t>
+    </template>
+
+    <report
+        id="sales_report_pdf"
+        model="sales.report.wizard"
+        string="Sales Detail PDF"
+        report_type="qweb-pdf"
+        name="dev_pos.sales_report_pdf"
+        file="dev_pos.sales_report_pdf"
+    />
+
+</odoo>
