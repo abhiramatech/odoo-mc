@@ -1,7 +1,7 @@
 <odoo>
   <template id="report_sales_detail" name="Report Sales Detail">
     <t t-set="company" t-value="env.company"/>
-    <t t-call="web.html_preview_container">
+    <t t-call="web.html_container">
       <t t-set="o" t-value="res_company"/>
       <t t-call="web.external_layout">
         <div class="page">
@@ -78,7 +78,7 @@
   </template>
 
   <template id="report_sales_recap" name="Report Sales Recap">
-    <t t-call="web.html_preview_container">
+    <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
         <h5 class="text-center">Laporan Penjualan</h5>
@@ -121,7 +121,7 @@
   </template>
 
   <template id="report_sales_spending" name="Report Sales Spending">
-    <t t-call="web.html_preview_container">
+    <t t-call="web.html_container">
       <style>
         .page {
           margin-bottom: 40px;
@@ -201,7 +201,7 @@
   </template>
 
   <template id="report_sales_hourly" name="Report Sales Hourly">
-    <t t-call="web.html_preview_container">
+    <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
         <h5 class="text-center">Laporan History Penjualan By Store</h5>
@@ -247,7 +247,7 @@
   </template>
 
   <template id="report_sales_hourly_category" name="Report Sales Hourly Category">
-    <t t-call="web.html_preview_container">
+    <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
         <h5 class="text-center">Laporan History Penjualan By Store</h5>
@@ -291,7 +291,7 @@
   </template>
 
   <!-- <template id="report_sales_hourly_payment" name="Report Sales Hourly Payment">
-    <t t-call="web.html_preview_container">
+    <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
         <h5 class="text-center">Laporan History Penjualan By Store</h5>
