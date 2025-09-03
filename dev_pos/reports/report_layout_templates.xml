@@ -7,6 +7,12 @@
           <h5 class="text-center">Laporan Penjualan</h5>
           <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
+          <div class="text-center mb-3">
+            <a t-attf-href="/sales/report/detail?date_from={{date_from}}&date_to={{date_to}}" class="btn btn-primary">
+              Download PDF
+            </a>
+          </div>
+
           <table class="table table-bordered table-sm">
             <thead class="table-secondary">
               <tr>
@@ -34,7 +40,6 @@
                   <td><t t-esc="order.partner_id.name or ''"/></td>
                 </tr>
 
-                <!-- Detail Produk -->
                 <tr>
                   <td></td>
                   <td colspan="6">
@@ -74,6 +79,44 @@
       </t>
     </t>
   </template>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 
   <template id="report_sales_recap" name="Report Sales Recap">
     <t t-call="web.html_container">
