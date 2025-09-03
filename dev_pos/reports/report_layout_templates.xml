@@ -8,7 +8,7 @@
           <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
           <div class="text-center mb-3">
-            <a t-attf-href="/sales/report/detail?date_from={{date_from}}&date_to={{date_to}}" class="btn btn-primary">
+            <a t-attf-href="/sales/report/pdf?date_from={{date_from}}&date_to={{date_to}}" class="btn btn-primary">
               Download PDF
             </a>
           </div>
