@@ -3,7 +3,7 @@
     <t t-set="company" t-value="env.company"/>
     <t t-call="web.html_preview_container">
       <t t-set="o" t-value="res_company"/>
-      <t t-call="web.internal_layout">
+      <t t-call="web.external_layout">
         <div class="page">
           <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
           <h5 class="text-center">Laporan Penjualan</h5>
