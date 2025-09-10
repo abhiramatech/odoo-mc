@@ -49,9 +49,9 @@ class SalesReportDetailController(http.Controller):
 
         values = {
             'orders': orders,
-            'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
-            'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
-            'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
+            'date_from': date_from,
+            'date_to': date_to,
+            'tanggal_cetak': fields.Date.today(),
         }
 
         # render template QWeb jadi HTML
