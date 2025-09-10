@@ -74,7 +74,7 @@ class SalesReportDetailController(http.Controller):
 
         # gunakan wkhtmltopdf untuk generate PDF
         pdf = request.env['ir.actions.report']._run_wkhtmltopdf(
-            html, landscape=False
+            [html], landscape=False
         )
 
         # kirim ke browser
