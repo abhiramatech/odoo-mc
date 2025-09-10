@@ -426,7 +426,7 @@ class SalesReportDetailController(http.Controller):
     @http.route(['/my/sales/report/contribution_by_category/pdf'], type='http', auth="user", website=True)
     def portal_contribution_pdf(self, date_from=None, date_to=None, **kw):
         # render PDF dari qweb report yang sudah Anda definisikan
-        pdf = request.env.ref('your_module.action_report_contribution_pdf')._render_qweb_pdf([1])[0]
+        pdf = request.env.ref('dev_pos.action_report_contribution_pdf')._render_qweb_pdf([1])[0]
         pdfhttpheaders = [
             ('Content-Type', 'application/pdf'),
             ('Content-Length', len(pdf)),

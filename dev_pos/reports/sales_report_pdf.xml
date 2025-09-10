@@ -51,8 +51,8 @@
         string="Contribution Report"
         model="sale.order"
         report_type="qweb-pdf"
-        name="your_module.contribution_report_pdf_template"
-        file="your_module.contribution_report_pdf_template"
+        name="dev_pos.contribution_report_pdf_template"
+        file="dev_pos.contribution_report_pdf_template"
         print_report_name="'Contribution_Report_%s' % (object.name)"
     />
 
