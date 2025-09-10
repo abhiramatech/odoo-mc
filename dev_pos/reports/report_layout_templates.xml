@@ -76,7 +76,7 @@
 
   <!-- Template Portal -->
   <template id="portal_contribution_report_template" name="Contribution Report by Category">
-      <t t-call="portal.layout">
+      <t t-call="portal.portal_layout">
           <div class="o_portal_my_doc table-responsive">
               <h3>Report Contribution by Category</h3>
               <p>Periode: <t t-esc="date_from"/> s/d <t t-esc="date_to"/></p>
