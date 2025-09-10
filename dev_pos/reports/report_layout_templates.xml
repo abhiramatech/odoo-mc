@@ -1,81 +1,101 @@
 <odoo>
   <template id="report_sales_detail" name="Report Sales Detail">
-    <t t-call="web.html_container">
-      <t t-call="portal.portal_layout">
-        <div class="page">
-          <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-          <h5 class="text-center">Laporan Penjualan</h5>
-          <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+    <t t-call="portal_sidebar">
+      
+        <div class="row o_portal_invoice_sidebar">
 
-          <a t-att-href="'/my/sales/report/detail/pdf?date_from=%s&amp;date_to=%s' % (date_from, date_to)"
-              class="btn btn-primary mb-3">
-              <i class="fa fa-download"/> Download PDF
-          </a>
+          <t t-call="portal.portal_record_sidebar">
+            <div class="d-flex flex-column gap-4 mt-3">
+              <div class="d-flex flex-column gap-2">
+                <div class="o_download_pdf d-flex flex-lg-column flex-xl-row flex-wrap gap-2">
+                  <a t-att-href="'/my/sales/report/detail/pdf?date_from=%s&amp;date_to=%s' % (date_from, date_to)"
+                    class="btn btn-primary mb-3">
+                    <i class="fa fa-download"/> Download PDF
+                  </a>
+                </div>
+              </div>
+            </div>
+          </t>
 
-          <table class="table table-bordered table-sm">
-            <thead class="table-secondary">
-              <tr>
-                <th>No</th>
-                <th>Nomor Faktur</th>
-                <th>Nomor Order</th>
-                <th>Session</th>
-                <th>Lokasi</th>
-                <th>Tanggal</th>
-                <th>Jatuh Tempo</th>
-                <th>Customer</th>
-              </tr>
-            </thead>
-            <tbody>
-              <t t-set="counter" t-value="1"/>
-              <t t-foreach="orders" t-as="order">
-                <tr>
-                  <td><t t-esc="counter"/></td>
-                  <td><t t-esc="order.account_move.name or ''"/></td>
-                  <td><t t-esc="order.name or ''"/></td>
-                  <td><t t-esc="order.session_id.name or ''"/></td>
-                  <td><t t-esc="order.config_id.name"/></td>
-                  <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
-                  <td><t t-esc="order.date_order.strftime('%d/%m/%Y')"/></td>
-                  <td><t t-esc="order.partner_id.name or ''"/></td>
-                </tr>
+          <div class="o_portal_content col-12 col-lg-8 col-xxl-9">
+            <div class="o_portal_html_view position-relative bg-white shadow overflow-hidden">
+                <div class="o_portal_html_loader text-center">
+                  <i class="fa fa-circle-o-notch fa-spin fa-2x fa-fw text-black-50"></i>
+                </div>
+                <!-- <iframe id="invoice_html" class="position-relative d-block" width="100%" height="100%" frameborder="0" scrolling="no" t-att-src="invoice.get_portal_url(report_type='html')"/>
+            </div> -->
 
-                <tr>
-                  <td></td>
-                  <td colspan="6">
-                    <table class="table table-bordered table-sm mb-0">
-                      <thead>
-                        <tr class="table-light">
-                          <th>Produk</th>
-                          <th>Qty</th>
-                          <th>Harga</th>
-                          <th>Disc %</th>
-                          <th>Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <t t-foreach="order.lines" t-as="line">
-                          <tr>
-                            <td><t t-esc="line.product_id.display_name"/></td>
-                            <td class="text-end"><t t-esc="line.qty"/></td>
-                            <td class="text-end"><t t-esc="line.price_unit"/></td>
-                            <td class="text-end"><t t-esc="line.discount"/></td>
-                            <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
-                          </tr>
-                        </t>
-                        <tr>
-                          <td colspan="4" class="text-end"><b>Total</b></td>
-                          <td class="text-end"><b><t t-esc="order.amount_total"/></b></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-                <t t-set="counter" t-value="counter + 1"/>
-              </t>
-            </tbody>
-          </table>
+                <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+                <h5 class="text-center">Laporan Penjualan</h5>
+                <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+                <table class="table table-bordered table-sm">
+                  <thead class="table-secondary">
+                    <tr>
+                      <th>No</th>
+                      <th>Nomor Faktur</th>
+                      <th>Nomor Order</th>
+                      <th>Session</th>
+                      <th>Lokasi</th>
+                      <th>Tanggal</th>
+                      <th>Jatuh Tempo</th>
+                      <th>Customer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <t t-set="counter" t-value="1"/>
+                    <t t-foreach="orders" t-as="order">
+                      <tr>
+                        <td><t t-esc="counter"/></td>
+                        <td><t t-esc="order.account_move.name or ''"/></td>
+                        <td><t t-esc="order.name or ''"/></td>
+                        <td><t t-esc="order.session_id.name or ''"/></td>
+                        <td><t t-esc="order.config_id.name"/></td>
+                        <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
+                        <td><t t-esc="order.date_order.strftime('%d/%m/%Y')"/></td>
+                        <td><t t-esc="order.partner_id.name or ''"/></td>
+                      </tr>
+
+                      <tr>
+                        <td></td>
+                        <td colspan="6">
+                          <table class="table table-bordered table-sm mb-0">
+                            <thead>
+                              <tr class="table-light">
+                                <th>Produk</th>
+                                <th>Qty</th>
+                                <th>Harga</th>
+                                <th>Disc %</th>
+                                <th>Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <t t-foreach="order.lines" t-as="line">
+                                <tr>
+                                  <td><t t-esc="line.product_id.display_name"/></td>
+                                  <td class="text-end"><t t-esc="line.qty"/></td>
+                                  <td class="text-end"><t t-esc="line.price_unit"/></td>
+                                  <td class="text-end"><t t-esc="line.discount"/></td>
+                                  <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
+                                </tr>
+                              </t>
+                              <tr>
+                                <td colspan="4" class="text-end"><b>Total</b></td>
+                                <td class="text-end"><b><t t-esc="order.amount_total"/></b></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      <t t-set="counter" t-value="counter + 1"/>
+                    </t>
+                  </tbody>
+                </table>
+
+            </div>
+          </div>  
         </div>
-      </t>
+      
     </t>
   </template>
 
