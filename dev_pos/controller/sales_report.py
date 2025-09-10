@@ -43,11 +43,19 @@ class SalesReportDetailController(http.Controller):
 
         if not date_from or not date_to:
             return request.not_found()  # atau tampilkan error page
-        
-        # ambil data orders
-        orders = request.env['pos.order'].sudo().search([
+    
+        # tangkap parameter dari URL
+        date_from = request.params.get('date_from')
+        date_to = request.params.get('date_to')
+
+        # konversi ke date object
+        date_from = fields.Date.from_string(date_from) if date_from else None
+        date_to = fields.Date.from_string(date_to) if date_to else None
+
+        # ambil data sesuai filter
+        orders = request.env['sale.order'].sudo().search([
             ('date_order', '>=', date_from),
-            ('date_order', '<=', date_to)
+            ('date_order', '<=', date_to),
         ])
 
         values = {
