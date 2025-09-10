@@ -6,13 +6,13 @@ from odoo.http import request
 
 class SalesReportDetailPreview(models.TransientModel):
     _inherit = 'sales.report'
-    
+
     def action_preview_report_detail(self):
         self.ensure_one()
         if not self.vit_date_from or not self.vit_date_to:
             raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
         
-        url = f"/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
+        url = f"/my/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',

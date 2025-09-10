@@ -4,7 +4,7 @@ from odoo.tools import pdf
 
 class SalesReportDetailController(http.Controller):
 
-    @http.route('/sales/report/detail', type='http', auth='user', website=True)
+    @http.route('/my/sales/report/detail', type='http', auth='user', website=True)
     def portal_sales_report_detail(self, **kw):
         date_from = kw.get('date_from')
         date_to = kw.get('date_to')
@@ -37,6 +37,38 @@ class SalesReportDetailController(http.Controller):
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
         }
         return request.render('dev_pos.report_sales_detail', values)
+    
+    @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
+    def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):
+        # ambil data orders
+        # orders = request.env['pos.order'].sudo().search(domain)
+        orders = request.env['sale.order'].sudo().search([
+            ('date_order', '>=', date_from),
+            ('date_order', '<=', date_to)
+        ])
+
+        values = {
+            'orders': orders,
+            'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
+            'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
+            'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
+        }
+
+        # render template QWeb jadi HTML
+        html = request.env['ir.qweb']._render('dev_pos.report_sales_detail', values)
+
+        # gunakan report_wkhtmltopdf untuk konversi HTML ke PDF
+        pdf = request.env['ir.actions.report']._run_wkhtmltopdf(
+            html, landscape=False
+        )
+
+        # kirim PDF ke browser
+        pdfhttpheaders = [
+            ('Content-Type', 'application/pdf'),
+            ('Content-Length', len(pdf)),
+            ('Content-Disposition', 'attachment; filename="sales_report_detail.pdf"')
+        ]
+        return request.make_response(pdf, headers=pdfhttpheaders)
 
     @http.route('/sales/report/recap', type='http', auth='user', website=True)
     def portal_sales_report_recap(self, **kw):
