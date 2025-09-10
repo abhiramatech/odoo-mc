@@ -85,13 +85,74 @@
     <!-- Qweb Template PDF -->
     <template id="report_detail_pdf_template">
         <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="o">
                 <div class="page">
-                    <h2>Report Detail</h2>
-                    <p>Order: <t t-esc="o.name"/></p>
-                    <p>Customer: <t t-esc="o.partner_id.name"/></p>
-                    <p>Date: <t t-esc="o.date_order"/></p>
-                    <p>Total: <t t-esc="o.amount_total"/></p>
+                    <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+                    <h5 class="text-center">Laporan Penjualan</h5>
+                    <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+                    <table class="table table-bordered table-sm">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>No</th>
+                            <th>Nomor Faktur</th>
+                            <th>Nomor Order</th>
+                            <th>Session</th>
+                            <th>Lokasi</th>
+                            <th>Tanggal</th>
+                            <th>Jatuh Tempo</th>
+                            <th>Customer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-set="counter" t-value="1"/>
+                        <t t-foreach="orders" t-as="order">
+                        <tr>
+                            <td><t t-esc="counter"/></td>
+                            <td><t t-esc="order.account_move.name or ''"/></td>
+                            <td><t t-esc="order.name or ''"/></td>
+                            <td><t t-esc="order.session_id.name or ''"/></td>
+                            <td><t t-esc="order.config_id.name"/></td>
+                            <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
+                            <td><t t-esc="order.date_order.strftime('%d/%m/%Y')"/></td>
+                            <td><t t-esc="order.partner_id.name or ''"/></td>
+                        </tr>
+
+                        <tr>
+                            <td></td>
+                            <td colspan="6">
+                            <table class="table table-bordered table-sm mb-0">
+                                <thead>
+                                <tr class="table-light">
+                                    <th>Produk</th>
+                                    <th>Qty</th>
+                                    <th>Harga</th>
+                                    <th>Disc %</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <t t-foreach="order.lines" t-as="line">
+                                    <tr>
+                                    <td><t t-esc="line.product_id.display_name"/></td>
+                                    <td class="text-end"><t t-esc="line.qty"/></td>
+                                    <td class="text-end"><t t-esc="line.price_unit"/></td>
+                                    <td class="text-end"><t t-esc="line.discount"/></td>
+                                    <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
+                                    </tr>
+                                </t>
+                                <tr>
+                                    <td colspan="4" class="text-end"><b>Total</b></td>
+                                    <td class="text-end"><b><t t-esc="order.amount_total"/></b></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                            </td>
+                        </tr>
+                        <t t-set="counter" t-value="counter + 1"/>
+                        </t>
+                    </tbody>
+                    </table>
+
                 </div>
             </t>
         </t>
