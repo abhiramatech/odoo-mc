@@ -1,6 +1,6 @@
 from odoo import http, fields
 from odoo.http import request
-from odoo.tools import pdf
+from datetime import datetime
 
 class SalesReportDetailController(http.Controller):
 
@@ -38,6 +38,11 @@ class SalesReportDetailController(http.Controller):
         }
         return request.render('dev_pos.report_sales_detail', values)
     
+    def parse_date(raw_date):
+        if raw_date:
+            return datetime.strptime(raw_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+        return None
+
     @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
     def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):
 
@@ -45,12 +50,11 @@ class SalesReportDetailController(http.Controller):
             return request.not_found()  # atau tampilkan error page
     
         # tangkap parameter dari URL
-        date_from = request.params.get('date_from')
-        date_to = request.params.get('date_to')
+        raw_date_from = request.params.get('date_from')
+        raw_date_to = request.params.get('date_to')
 
-        # konversi ke date object
-        date_from = fields.Date.from_string(date_from) if date_from else None
-        date_to = fields.Date.from_string(date_to) if date_to else None
+        date_from = fields.Date.from_string(self.parse_date(raw_date_from))
+        date_to = fields.Date.from_string(self.parse_date(raw_date_to))
 
         # ambil data sesuai filter
         orders = request.env['sale.order'].sudo().search([
