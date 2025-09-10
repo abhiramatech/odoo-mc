@@ -85,12 +85,12 @@
     <!-- Qweb Template PDF -->
     <template id="report_detail_pdf_template">
         <t t-call="web.html_container">
-                <div class="page">
-                    <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-                    <h5 class="text-center">Laporan Penjualan</h5>
-                    <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+            <div class="page">
+                <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+                <h5 class="text-center">Laporan Penjualan</h5>
+                <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
-                    <table class="table table-bordered table-sm">
+                <table class="table table-bordered table-sm">
                     <thead class="table-secondary">
                         <tr>
                             <th>No</th>
@@ -122,28 +122,28 @@
                             <td colspan="6">
                             <table class="table table-bordered table-sm mb-0">
                                 <thead>
-                                <tr class="table-light">
-                                    <th>Produk</th>
-                                    <th>Qty</th>
-                                    <th>Harga</th>
-                                    <th>Disc %</th>
-                                    <th>Subtotal</th>
-                                </tr>
+                                    <tr class="table-light">
+                                        <th>Produk</th>
+                                        <th>Qty</th>
+                                        <th>Harga</th>
+                                        <th>Disc %</th>
+                                        <th>Subtotal</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
-                                <t t-foreach="order.lines" t-as="line">
+                                    <t t-foreach="order.lines" t-as="line">
+                                        <tr>
+                                            <td><t t-esc="line.product_id.display_name"/></td>
+                                            <td class="text-end"><t t-esc="line.qty"/></td>
+                                            <td class="text-end"><t t-esc="line.price_unit"/></td>
+                                            <td class="text-end"><t t-esc="line.discount"/></td>
+                                            <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
+                                        </tr>
+                                    </t>
                                     <tr>
-                                    <td><t t-esc="line.product_id.display_name"/></td>
-                                    <td class="text-end"><t t-esc="line.qty"/></td>
-                                    <td class="text-end"><t t-esc="line.price_unit"/></td>
-                                    <td class="text-end"><t t-esc="line.discount"/></td>
-                                    <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
+                                        <td colspan="4" class="text-end"><b>Total</b></td>
+                                        <td class="text-end"><b><t t-esc="order.amount_total"/></b></td>
                                     </tr>
-                                </t>
-                                <tr>
-                                    <td colspan="4" class="text-end"><b>Total</b></td>
-                                    <td class="text-end"><b><t t-esc="order.amount_total"/></b></td>
-                                </tr>
                                 </tbody>
                             </table>
                             </td>
@@ -151,10 +151,9 @@
                         <t t-set="counter" t-value="counter + 1"/>
                         </t>
                     </tbody>
-                    </table>
+                </table>
 
-                </div>
-            </t>
+            </div>
         </t>
     </template>
 
