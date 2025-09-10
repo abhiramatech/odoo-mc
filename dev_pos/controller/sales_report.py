@@ -425,13 +425,13 @@ class SalesReportDetailController(http.Controller):
 
     @http.route(['/my/sales/report/contribution_by_category/pdf'], type='http', auth="user", website=True)
     def portal_contribution_pdf(self, date_from=None, date_to=None, **kw):
-        # ambil data order sama seperti di preview
+        # ambil data orders
         orders = request.env['sale.order'].sudo().search([
             ('date_order', '>=', date_from),
             ('date_order', '<=', date_to)
         ])
 
-        # render template QWeb menjadi HTML
+        # render template QWeb jadi HTML
         html = request.env['ir.qweb']._render(
             "dev_pos.portal_contribution_report_template",
             {
@@ -441,14 +441,15 @@ class SalesReportDetailController(http.Controller):
             }
         )
 
-        # konversi HTML ke PDF
-        pdf_bytes = pdf.html_to_pdf(html)
+        # gunakan report_wkhtmltopdf untuk konversi HTML ke PDF
+        pdf = request.env['ir.actions.report']._run_wkhtmltopdf(
+            html, landscape=False
+        )
 
-        # kirim response PDF ke browser
+        # kirim PDF ke browser
         pdfhttpheaders = [
             ('Content-Type', 'application/pdf'),
-            ('Content-Length', len(pdf_bytes)),
+            ('Content-Length', len(pdf)),
             ('Content-Disposition', 'attachment; filename="contribution_report.pdf"')
         ]
-        return request.make_response(pdf_bytes, headers=pdfhttpheaders)
-        
+        return request.make_response(pdf, headers=pdfhttpheaders)
