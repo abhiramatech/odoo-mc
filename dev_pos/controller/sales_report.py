@@ -40,17 +40,16 @@ class SalesReportDetailController(http.Controller):
     
     @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
     def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):
-        # 🔎 Validasi input
+
         if not date_from or not date_to:
             return request.not_found()  # atau tampilkan error page
-
-        # Ambil data POS Orders (bisa ganti jadi sale.order kalau perlu)
+        
+        # ambil data orders
         orders = request.env['pos.order'].sudo().search([
             ('date_order', '>=', date_from),
             ('date_order', '<=', date_to)
         ])
 
-        # Data yang dilempar ke QWeb template
         values = {
             'orders': orders,
             'date_from': date_from,
@@ -58,16 +57,21 @@ class SalesReportDetailController(http.Controller):
             'tanggal_cetak': fields.Date.today(),
         }
 
-        # 📝 Render report ke PDF pakai API resmi Odoo
-        pdf_content, _ = request.env.ref('dev_pos.action_report_detail_pdf')._render_qweb_pdf(orders.ids, data=values)
+        # render template QWeb yang sudah kamu daftarkan di XML
+        html = request.env['ir.qweb']._render('dev_pos.report_detail_pdf_template', values)
 
-        # 🔽 Kirim hasil PDF ke browser
+        # gunakan wkhtmltopdf untuk generate PDF
+        pdf = request.env['ir.actions.report']._run_wkhtmltopdf(
+            html, landscape=False
+        )
+
+        # kirim ke browser
         pdfhttpheaders = [
             ('Content-Type', 'application/pdf'),
-            ('Content-Length', len(pdf_content)),
+            ('Content-Length', len(pdf)),
             ('Content-Disposition', 'attachment; filename="sales_report_detail.pdf"')
         ]
-        return request.make_response(pdf_content, headers=pdfhttpheaders)
+        return request.make_response(pdf, headers=pdfhttpheaders)
 
     @http.route('/sales/report/recap', type='http', auth='user', website=True)
     def portal_sales_report_recap(self, **kw):
