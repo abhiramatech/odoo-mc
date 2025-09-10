@@ -1,6 +1,6 @@
 from odoo import http, fields
 from odoo.http import request
-
+from odoo.tools import pdf
 
 class SalesReportDetailController(http.Controller):
 
@@ -425,13 +425,30 @@ class SalesReportDetailController(http.Controller):
 
     @http.route(['/my/sales/report/contribution_by_category/pdf'], type='http', auth="user", website=True)
     def portal_contribution_pdf(self, date_from=None, date_to=None, **kw):
-        # render PDF dari qweb report yang sudah Anda definisikan
-        pdf = request.env.ref('dev_pos.action_report_contribution_pdf')._render_qweb_pdf([1])[0]
+        # ambil data order sama seperti di preview
+        orders = request.env['sale.order'].sudo().search([
+            ('date_order', '>=', date_from),
+            ('date_order', '<=', date_to)
+        ])
+
+        # render template QWeb menjadi HTML
+        html = request.env['ir.qweb']._render(
+            "dev_pos.portal_contribution_report_template",
+            {
+                'date_from': date_from,
+                'date_to': date_to,
+                'orders': orders,
+            }
+        )
+
+        # konversi HTML ke PDF
+        pdf_bytes = pdf.html_to_pdf(html)
+
+        # kirim response PDF ke browser
         pdfhttpheaders = [
             ('Content-Type', 'application/pdf'),
-            ('Content-Length', len(pdf)),
+            ('Content-Length', len(pdf_bytes)),
             ('Content-Disposition', 'attachment; filename="contribution_report.pdf"')
         ]
-        return request.make_response(pdf, headers=pdfhttpheaders)
-
-    
+        return request.make_response(pdf_bytes, headers=pdfhttpheaders)
+        
