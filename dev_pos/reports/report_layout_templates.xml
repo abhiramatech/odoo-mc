@@ -75,42 +75,42 @@
   </template>
 
   <!-- Template Portal -->
-    <template id="portal_contribution_report_template" name="Contribution Report by Category">
-        <t t-call="portal.layout">
-            <div class="o_portal_my_doc table-responsive">
-                <h3>Report Contribution by Category</h3>
-                <p>Periode: <t t-esc="date_from"/> s/d <t t-esc="date_to"/></p>
+  <template id="portal_contribution_report_template" name="Contribution Report by Category">
+      <t t-call="portal.layout">
+          <div class="o_portal_my_doc table-responsive">
+              <h3>Report Contribution by Category</h3>
+              <p>Periode: <t t-esc="date_from"/> s/d <t t-esc="date_to"/></p>
 
-                <a t-att-href="'/my/sales/report/contribution_by_category/pdf?date_from=%s&amp;date_to=%s' % (date_from, date_to)"
-                   class="btn btn-primary mb-3">
-                   <i class="fa fa-download"/> Download PDF
-                </a>
+              <a t-att-href="'/my/sales/report/contribution_by_category/pdf?date_from=%s&amp;date_to=%s' % (date_from, date_to)"
+                  class="btn btn-primary mb-3">
+                  <i class="fa fa-download"/> Download PDF
+              </a>
 
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>No</th>
-                            <th>Order</th>
-                            <th>Customer</th>
-                            <th>Tanggal</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <t t-foreach="orders" t-as="order" t-esc-options='{"widget": "text"}'>
-                            <tr>
-                                <td><t t-esc="order.id"/></td>
-                                <td><t t-esc="order.name"/></td>
-                                <td><t t-esc="order.partner_id.name"/></td>
-                                <td><t t-esc="order.date_order"/></td>
-                                <td><t t-esc="order.amount_total"/></td>
-                            </tr>
-                        </t>
-                    </tbody>
-                </table>
-            </div>
-        </t>
-    </template>
+              <table class="table table-bordered">
+                  <thead>
+                      <tr>
+                          <th>No</th>
+                          <th>Order</th>
+                          <th>Customer</th>
+                          <th>Tanggal</th>
+                          <th>Total</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <t t-foreach="orders" t-as="order" t-esc-options='{"widget": "text"}'>
+                          <tr>
+                              <td><t t-esc="order.id"/></td>
+                              <td><t t-esc="order.name"/></td>
+                              <td><t t-esc="order.partner_id.name"/></td>
+                              <td><t t-esc="order.date_order"/></td>
+                              <td><t t-esc="order.amount_total"/></td>
+                          </tr>
+                      </t>
+                  </tbody>
+              </table>
+          </div>
+      </t>
+  </template>
 
 
 
