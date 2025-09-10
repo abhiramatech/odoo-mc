@@ -41,8 +41,7 @@ class SalesReportDetailController(http.Controller):
     @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
     def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):
         # ambil data orders
-        # orders = request.env['pos.order'].sudo().search(domain)
-        orders = request.env['sale.order'].sudo().search([
+        orders = request.env['pos.order'].sudo().search([
             ('date_order', '>=', date_from),
             ('date_order', '<=', date_to)
         ])
@@ -54,15 +53,15 @@ class SalesReportDetailController(http.Controller):
             'tanggal_cetak': fields.Date.today(),
         }
 
-        # render template QWeb jadi HTML
-        html = request.env['ir.qweb']._render('dev_pos.report_sales_detail', values)
+        # render template QWeb yang sudah kamu daftarkan di XML
+        html = request.env['ir.qweb']._render('dev_pos.report_detail_pdf_template', values)
 
-        # gunakan report_wkhtmltopdf untuk konversi HTML ke PDF
+        # gunakan wkhtmltopdf untuk generate PDF
         pdf = request.env['ir.actions.report']._run_wkhtmltopdf(
             html, landscape=False
         )
 
-        # kirim PDF ke browser
+        # kirim ke browser
         pdfhttpheaders = [
             ('Content-Type', 'application/pdf'),
             ('Content-Length', len(pdf)),

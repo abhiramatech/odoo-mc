@@ -75,7 +75,7 @@
     <report
         id="action_report_detail_pdf"
         string="Sales Report Detail PDF"
-        model="sale.order"
+        model="pos.order"
         report_type="qweb-pdf"
         name="dev_pos.report_detail_pdf_template"
         file="dev_pos.report_detail_pdf_template"
