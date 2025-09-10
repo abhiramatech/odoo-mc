@@ -375,39 +375,63 @@ class SalesReportDetailController(http.Controller):
         return request.render('dev_pos.report_sales_contribution_by_brand', values)
 
 
-    @http.route('/sales/report/contribution_by_category', type='http', auth='user', website=True)
-    def portal_sales_report_contribution_by_category(self, **kw):
-        date_from = kw.get('date_from')
-        date_to = kw.get('date_to')
-        invoice_no = kw.get('invoice_no')
-        pos_order_ref = kw.get('pos_order_ref')
+    # @http.route('/sales/report/contribution_by_category', type='http', auth='user', website=True)
+    # def portal_sales_report_contribution_by_category(self, **kw):
+    #     date_from = kw.get('date_from')
+    #     date_to = kw.get('date_to')
+    #     # invoice_no = kw.get('invoice_no')
+    #     # pos_order_ref = kw.get('pos_order_ref')
 
-        # Validasi parameter wajib
-        if not date_from or not date_to:
-            return request.not_found()
+    #     # Validasi parameter wajib
+    #     if not date_from or not date_to:
+    #         return request.not_found()
 
-        domain = [
+    #     domain = [
+    #         ('date_order', '>=', date_from),
+    #         ('date_order', '<=', date_to),
+    #     ]
+
+    #     # if invoice_no:
+    #     #     move = request.env['account.move'].sudo().search([('name', '=', invoice_no)], limit=1)
+    #     #     if move:
+    #     #         domain.append(('account_move', '=', move.id))
+
+    #     # if pos_order_ref:
+    #     #     domain.append(('name', '=', pos_order_ref))
+
+    #     orders = request.env['pos.order'].sudo().search(domain)
+
+    #     values = {
+    #         'orders': orders,
+    #         'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
+    #         'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
+    #         'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
+    #     }
+    #     return request.render('dev_pos.report_sales_contribution_by_category', values)
+
+    @http.route(['/my/sales/report/contribution_by_category'], type='http', auth="user", website=True)
+    def portal_contribution_by_category(self, date_from=None, date_to=None, **kw):
+        # ambil data order berdasarkan tanggal
+        orders = request.env['sale.order'].sudo().search([
             ('date_order', '>=', date_from),
-            ('date_order', '<=', date_to),
-        ]
+            ('date_order', '<=', date_to)
+        ])
 
-        if invoice_no:
-            move = request.env['account.move'].sudo().search([('name', '=', invoice_no)], limit=1)
-            if move:
-                domain.append(('account_move', '=', move.id))
-
-        if pos_order_ref:
-            domain.append(('name', '=', pos_order_ref))
-
-        orders = request.env['pos.order'].sudo().search(domain)
-
-        values = {
+        return request.render("dev_pos.portal_contribution_report_template", {
+            'date_from': date_from,
+            'date_to': date_to,
             'orders': orders,
-            'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
-            'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
-            'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
-        }
-        return request.render('dev_pos.report_sales_contribution_by_category', values)
+        })
 
+    @http.route(['/my/sales/report/contribution_by_category/pdf'], type='http', auth="user", website=True)
+    def portal_contribution_pdf(self, date_from=None, date_to=None, **kw):
+        # render PDF dari qweb report yang sudah Anda definisikan
+        pdf = request.env.ref('your_module.action_report_contribution_pdf')._render_qweb_pdf([1])[0]
+        pdfhttpheaders = [
+            ('Content-Type', 'application/pdf'),
+            ('Content-Length', len(pdf)),
+            ('Content-Disposition', 'attachment; filename="contribution_report.pdf"')
+        ]
+        return request.make_response(pdf, headers=pdfhttpheaders)
 
     

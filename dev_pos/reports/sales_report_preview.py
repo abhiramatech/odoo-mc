@@ -108,9 +108,9 @@ class SalesReportDetailPreview(models.TransientModel):
     def action_preview_report_contribution_by_category(self):
         self.ensure_one()
         if not self.vit_date_from or not self.vit_date_to:
-            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
-        
-        url = f"/sales/report/contribution_by_category?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
+            raise UserError(_("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To"))
+
+        url = f"/my/sales/report/contribution_by_category?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',
