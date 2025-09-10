@@ -1,6 +1,6 @@
 <odoo>
   <template id="report_sales_detail" name="Report Sales Detail">
-    <t t-call="portal.portal_sidebar">
+    <t t-call="portal.portal_layout">
       
         <div class="row o_portal_invoice_sidebar">
 
