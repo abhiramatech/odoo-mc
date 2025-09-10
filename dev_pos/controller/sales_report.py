@@ -38,7 +38,7 @@ class SalesReportDetailController(http.Controller):
         }
         return request.render('dev_pos.report_sales_detail', values)
     
-    def parse_date(raw_date):
+    def parse_date(self, raw_date):
         if raw_date:
             return datetime.strptime(raw_date, "%d/%m/%Y").strftime("%Y-%m-%d")
         return None
