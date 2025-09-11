@@ -1,6 +1,7 @@
 <odoo>
   <template id="report_sales_detail" name="Report Sales Detail">
     <t t-call="portal.portal_layout">
+      <t t-call="portal.portal_back_in_edit_mode"/>
       
         <div class="o_portal_my_doc table-responsive">
           <!-- <t t-call="portal.portal_record_sidebar">
@@ -94,7 +95,7 @@
             </div>
           </div>  
         </div> 
-      
+      </t>
     </t>
   </template>
 
