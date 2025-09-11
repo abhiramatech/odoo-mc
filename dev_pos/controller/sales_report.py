@@ -4,15 +4,15 @@ from datetime import datetime
 
 class SalesReportDetailController(http.Controller):
 
-    def back_to_pos_view(self):
-        # backend_url = f'/odoo/action-{order_sudo._get_portal_return_action().id}/{order_sudo.id}'
-        # 'url': '/web#action=point_of_sale.action_client_pos_menu',
-        # /web#action=441&model=pos.config&view_type=kanban&cids=1&menu_id=266
-        return {
-            'type': 'ir.actions.act_url',
-            'url': '/web#action=point_of_sale.action_client_pos_menu',
-            'target': 'self',
-        }
+    # def back_to_pos_view(self):
+    #     # backend_url = f'/odoo/action-{order_sudo._get_portal_return_action().id}/{order_sudo.id}'
+    #     # 'url': '/web#action=point_of_sale.action_client_pos_menu',
+    #     # /web#action=441&model=pos.config&view_type=kanban&cids=1&menu_id=266
+    #     return {
+    #         'type': 'ir.actions.act_url',
+    #         'url': '/web#action=point_of_sale.action_client_pos_menu',
+    #         'target': 'self',
+    #     }
 
     @http.route('/my/sales/report/detail', type='http', auth='user', website=True)
     def portal_sales_report_detail(self, **kw):
@@ -40,14 +40,14 @@ class SalesReportDetailController(http.Controller):
 
         orders = request.env['pos.order'].sudo().search(domain)
 
-        backend_url = self.back_to_pos_view()
+        # backend_url = self.back_to_pos_view()
 
         values = {
             'orders': orders,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
-            'backend_url': backend_url,
+            # 'backend_url': backend_url,
         }
         return request.render('dev_pos.report_sales_detail', values)
     
