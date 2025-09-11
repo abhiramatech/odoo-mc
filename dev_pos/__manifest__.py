@@ -66,7 +66,7 @@
         'reports/sales_report_menu_view.xml',
         'reports/report_layout_templates.xml',
         'reports/sales_report_pdf.xml',
-        'reports/portal_templates.xml',
+        # 'reports/portal_templates.xml',
     ],
     'assets': {
         'web.assets_backend': [
