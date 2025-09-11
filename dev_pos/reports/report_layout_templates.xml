@@ -1,8 +1,10 @@
 <odoo>
   <template id="report_sales_detail" name="Report Sales Detail">
-    <t t-call="portal.portal_layout">
+    <t t-set="o_portal_fullwidth_alert" groups="sales_team.group_sale_salesman">
+      <!-- Uses backend_url provided in rendering values -->
       <t t-call="portal.portal_back_in_edit_mode"/>
-      
+    </t>
+    <t t-call="portal.portal_layout">
         <div class="o_portal_my_doc table-responsive">
           <!-- <t t-call="portal.portal_record_sidebar">
             <div class="d-flex flex-column gap-4 mt-3">
