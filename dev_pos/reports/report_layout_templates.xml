@@ -1,9 +1,8 @@
 <odoo>
   <template id="report_sales_detail" name="Report Sales Detail">
-    <t t-set="o_portal_fullwidth_alert">
-      <!-- Uses backend_url provided in rendering values -->
+    <!-- <t t-set="o_portal_fullwidth_alert">
       <t t-call="dev_pos.portal_back_in_edit_mode"/>
-    </t>
+    </t> -->
 
     <t t-call="portal.portal_layout">
         <div class="o_portal_my_doc table-responsive">
