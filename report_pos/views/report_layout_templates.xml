@@ -80,9 +80,9 @@
                                       <t t-esc="line.product_id.display_name"/>
                                     </td>
                                     <td class="text-end"><t t-esc="line.qty"/></td>
-                                    <td class="text-end"><t t-esc="self.format_number(line.price_unit)"/></td>
+                                    <td class="text-end"><t t-esc="format_number(line.price_unit)"/></td>
                                     <td class="text-end"><t t-esc="line.discount"/></td>
-                                    <td class="text-end"><t t-esc="self.format_number(line.price_subtotal_incl)"/></td>
+                                    <td class="text-end"><t t-esc="format_number(line.price_subtotal_incl)"/></td>
                                   </tr>
                                 </t>
                                 <tr>
