@@ -1,0 +1,178 @@
+<odoo>
+    <!-- <template id="report_sales_detail_pdf">
+    <t t-call="web.html_container">
+        <t t-call="web.external_layout">
+        <div class="page">
+            <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+            <h5 class="text-center">Laporan Penjualan</h5>
+            <p class="text-center">[ <t t-esc="doc.vit_date_from"/> - <t t-esc="doc.vit_date_to"/> ]</p>
+
+            <table class="table table-sm table-bordered">
+            <thead>
+                <tr>
+                <th>No</th>
+                <th>Faktur</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <t t-set="counter" t-value="1"/>
+                <t t-foreach="doc.orders" t-as="order">
+                <tr>
+                    <td><t t-esc="counter"/></td>
+                    <td><t t-esc="order.account_move.name or ''"/></td>
+                    <td><t t-esc="order.name"/></td>
+                    <td><t t-esc="order.partner_id.name or ''"/></td>
+                    <td class="text-end"><t t-esc="order.amount_total"/></td>
+                </tr>
+                <t t-set="counter" t-value="counter + 1"/>
+                </t>
+            </tbody>
+            </table>
+        </div>
+        </t>
+    </t>
+    </template>
+
+    <report
+        id="sales_report_pdf"
+        model="sales.report.wizard"
+        string="Sales Detail PDF"
+        report_type="qweb-pdf"
+        name="report_pos.sales_report_pdf"
+        file="report_pos.sales_report_pdf"
+    /> -->
+
+    <!-- Report PDF Definition -->
+    <report
+        id="action_report_contribution_pdf"
+        string="Contribution Report"
+        model="sale.order"
+        report_type="qweb-pdf"
+        name="report_pos.contribution_report_pdf_template"
+        file="report_pos.contribution_report_pdf_template"
+        print_report_name="'Contribution_Report_%s' % (object.name)"
+    />
+
+    <!-- Qweb Template PDF -->
+    <template id="contribution_report_pdf_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="page">
+                    <h2>Contribution Report</h2>
+                    <p>Order: <t t-esc="o.name"/></p>
+                    <p>Customer: <t t-esc="o.partner_id.name"/></p>
+                    <p>Date: <t t-esc="o.date_order"/></p>
+                    <p>Total: <t t-esc="o.amount_total"/></p>
+                </div>
+            </t>
+        </t>
+    </template>
+
+
+    <report
+        id="action_report_detail_pdf"
+        string="Sales Report Detail PDF"
+        model="pos.order"
+        report_type="qweb-pdf"
+        name="report_pos.report_detail_pdf_template"
+        file="report_pos.report_detail_pdf_template"
+        print_report_name="'Report_Detail_%s' % (object.name)"
+    />
+
+    <!-- Qweb Template PDF -->
+    <template id="report_detail_pdf_template">
+        <head>
+            <style>
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .table th, .table td {
+                border: 1px solid #000;
+                padding: 5px;
+            }
+            .text-center { text-align: center; }
+            .text-end { text-align: right; }
+            .mb-0 { margin-bottom: 0; }
+            .page { page-break-after: always; padding: 15px; }
+            </style>
+        </head>
+        <body>
+
+            <div class="page">
+                <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+                <h5 class="text-center">Laporan Penjualan</h5>
+                <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+                <table class="table table-bordered table-sm">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>No</th>
+                            <th>Nomor Faktur</th>
+                            <th>Nomor Order</th>
+                            <th>Session</th>
+                            <th>Lokasi</th>
+                            <th>Tanggal</th>
+                            <th>Jatuh Tempo</th>
+                            <th>Customer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-set="counter" t-value="1"/>
+                        <t t-foreach="orders" t-as="order">
+                        <tr>
+                            <td><t t-esc="counter"/></td>
+                            <td><t t-esc="order.account_move.name or ''"/></td>
+                            <td><t t-esc="order.name or ''"/></td>
+                            <td><t t-esc="order.session_id.name or ''"/></td>
+                            <td><t t-esc="order.config_id.name"/></td>
+                            <td><t t-esc="order.date_order.strftime('%d/%m/%Y %H:%M')"/></td>
+                            <td><t t-esc="order.date_order.strftime('%d/%m/%Y')"/></td>
+                            <td><t t-esc="order.partner_id.name or ''"/></td>
+                        </tr>
+
+                        <tr>
+                            <td></td>
+                            <td colspan="6">
+                            <table class="table table-bordered table-sm mb-0">
+                                <thead>
+                                    <tr class="table-light">
+                                        <th>Produk</th>
+                                        <th>Qty</th>
+                                        <th>Harga</th>
+                                        <th>Disc %</th>
+                                        <th>Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="order.lines" t-as="line">
+                                        <tr>
+                                            <td><t t-esc="line.product_id.display_name"/></td>
+                                            <td class="text-end"><t t-esc="line.qty"/></td>
+                                            <td class="text-end"><t t-esc="line.price_unit"/></td>
+                                            <td class="text-end"><t t-esc="line.discount"/></td>
+                                            <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
+                                        </tr>
+                                    </t>
+                                    <tr>
+                                        <td colspan="4" class="text-end"><b>Total</b></td>
+                                        <td class="text-end"><b><t t-esc="order.amount_total"/></b></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            </td>
+                        </tr>
+                        <t t-set="counter" t-value="counter + 1"/>
+                        </t>
+                    </tbody>
+                </table>
+
+            </div>
+        </body>
+        
+    </template>
+
+</odoo>
