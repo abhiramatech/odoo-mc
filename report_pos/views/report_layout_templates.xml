@@ -38,12 +38,12 @@
                       <tr>
                         <th style="width: 5%;">No</th>
                         <th style="width: 15%;">Nomor Faktur</th>
-                        <th style="width: 15%;">Nomor Order</th>
+                        <th style="width: 10%;">Nomor Order</th>
                         <th style="width: 10%;">Session</th>
                         <th style="width: 10%;">Lokasi</th>
                         <th style="width: 15%;">Tanggal</th>
                         <th style="width: 15%;">Jatuh Tempo</th>
-                        <th style="width: 15%;">Customer</th>
+                        <th style="width: 20%;">Customer</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -66,17 +66,19 @@
                             <table class="table table-bordered table-sm mb-0">
                               <thead>
                                 <tr class="table-light">
-                                <th style="width: 45%;">Produk</th>
-                                <th style="width: 10%;">Qty</th>
+                                <th style="width: 55%;">Produk</th>
+                                <th style="width: 5%;">Qty</th>
                                 <th style="width: 10%;">Harga</th>
-                                <th style="width: 10%;">Disc %</th>
+                                <th style="width: 5%;">Disc %</th>
                                 <th style="width: 15%;">Subtotal</th>
                               </tr>
                               </thead>
                               <tbody>
                                 <t t-foreach="order.lines" t-as="line">
                                   <tr>
-                                    <td><t t-esc="line.product_id.display_name"/></td>
+                                    <td style="white-space: normal; word-wrap: break-word;">
+                                      <t t-esc="line.product_id.display_name"/>
+                                    </td>
                                     <td class="text-end"><t t-esc="line.qty"/></td>
                                     <td class="text-end"><t t-esc="line.price_unit"/></td>
                                     <td class="text-end"><t t-esc="line.discount"/></td>
