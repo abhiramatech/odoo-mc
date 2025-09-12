@@ -33,17 +33,17 @@
                   <h5 class="text-center">Laporan Penjualan</h5>
                   <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
-                  <table class="table table-bordered table-sm table-responsive">
+                  <table class="table table-bordered table-sm">
                     <thead class="table-secondary">
                       <tr>
-                        <th>No</th>
-                        <th>Nomor Faktur</th>
-                        <th>Nomor Order</th>
-                        <th>Session</th>
-                        <th>Lokasi</th>
-                        <th>Tanggal</th>
-                        <th>Jatuh Tempo</th>
-                        <th>Customer</th>
+                        <th style="width: 5%;">No</th>
+                        <th style="width: 15%;">Nomor Faktur</th>
+                        <th style="width: 15%;">Nomor Order</th>
+                        <th style="width: 10%;">Session</th>
+                        <th style="width: 10%;">Lokasi</th>
+                        <th style="width: 15%;">Tanggal</th>
+                        <th style="width: 15%;">Jatuh Tempo</th>
+                        <th style="width: 15%;">Customer</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -62,16 +62,16 @@
 
                         <tr>
                           <td></td>
-                          <td colspan="6">
-                            <table class="table table-bordered table-sm mb-0 table-responsive">
+                          <td colspan="7">
+                            <table class="table table-bordered table-sm mb-0">
                               <thead>
                                 <tr class="table-light">
-                                  <th>Produk</th>
-                                  <th>Qty</th>
-                                  <th>Harga</th>
-                                  <th>Disc %</th>
-                                  <th>Subtotal</th>
-                                </tr>
+                                <th style="width: 45%;">Produk</th>
+                                <th style="width: 10%;">Qty</th>
+                                <th style="width: 10%;">Harga</th>
+                                <th style="width: 10%;">Disc %</th>
+                                <th style="width: 15%;">Subtotal</th>
+                              </tr>
                               </thead>
                               <tbody>
                                 <t t-foreach="order.lines" t-as="line">
