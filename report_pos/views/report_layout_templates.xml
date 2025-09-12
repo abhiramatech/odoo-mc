@@ -6,8 +6,8 @@
     </t>
 
     <t t-call="portal.portal_layout">
-      <t t-set="breadcrumbs_searchbar" t-value="False"/>
-          <div class="o_portal_my_doc table-responsive">
+      <t t-set="no_breadcrumbs" t-value="1"/>
+          <div class="o_portal_my_doc_table table-responsive">
             <!-- <t t-call="portal.portal_record_sidebar">
               <div class="d-flex flex-column gap-4 mt-3">
                 <div class="d-flex flex-column gap-2"> -->
@@ -33,7 +33,7 @@
                   <h5 class="text-center">Laporan Penjualan</h5>
                   <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
-                  <table class="table table-bordered table-sm">
+                  <table class="table table-bordered table-sm table-responsive">
                     <thead class="table-secondary">
                       <tr>
                         <th>No</th>
@@ -63,7 +63,7 @@
                         <tr>
                           <td></td>
                           <td colspan="6">
-                            <table class="table table-bordered table-sm mb-0">
+                            <table class="table table-bordered table-sm mb-0 table-responsive">
                               <thead>
                                 <tr class="table-light">
                                   <th>Produk</th>
