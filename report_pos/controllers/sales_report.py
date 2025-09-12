@@ -9,12 +9,19 @@ class SalesReportDetailController(http.Controller):
         # cari action untuk POS Config
         action = request.env.ref("point_of_sale.action_pos_config_kanban").read()[0]
         menu = request.env.ref("point_of_sale.menu_point_root")
-
         # susun URL backend
         backend_url = "/web#action={}&model={}&view_type={}&menu_id={}".format(
             action["id"], action["res_model"], action.get("view_mode", "kanban"), menu.id
         )
         return backend_url
+    
+    def parse_date(self, raw_date):
+        if raw_date:
+            return datetime.strptime(raw_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+        return None
+    
+    def format_number(self, number):
+        return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     @http.route('/my/sales/report/detail', type='http', auth='user', website=True)
     def portal_sales_report_detail(self, **kw):
@@ -26,36 +33,32 @@ class SalesReportDetailController(http.Controller):
         # Validasi parameter wajib
         if not date_from or not date_to:
             return request.not_found()
+        
+        account_move = request.env['account.move'].sudo().search([('name', '=', invoice_no)], limit=1)
 
-        domain = [
-            ('date_order', '>=', date_from),
-            ('date_order', '<=', date_to),
-        ]
-
-        if invoice_no:
-            move = request.env['account.move'].sudo().search([('name', '=', invoice_no)], limit=1)
-            if move:
-                domain.append(('account_move', '=', move.id))
-
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
         if pos_order_ref:
             domain.append(('name', '=', pos_order_ref))
 
         orders = request.env['pos.order'].sudo().search(domain)
-        backend_url = self.back_to_pos_view()
 
         values = {
             'orders': orders,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
-            'backend_url': backend_url,
+            'backend_url': self.back_to_pos_view(),
+            'format_number': self.format_number,  # tambahkan ini
         }
         return request.render('report_pos.report_sales_detail', values)
     
-    def parse_date(self, raw_date):
-        if raw_date:
-            return datetime.strptime(raw_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-        return None
+    
 
     @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
     def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):

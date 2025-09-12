@@ -69,8 +69,8 @@
                                 <th style="width: 55%;">Produk</th>
                                 <th style="width: 5%;">Qty</th>
                                 <th style="width: 10%;">Harga</th>
-                                <th style="width: 5%;">Disc %</th>
-                                <th style="width: 15%;">Subtotal</th>
+                                <th style="width: 10%;">Disc %</th>
+                                <th style="width: 10%;">Subtotal</th>
                               </tr>
                               </thead>
                               <tbody>
@@ -80,9 +80,9 @@
                                       <t t-esc="line.product_id.display_name"/>
                                     </td>
                                     <td class="text-end"><t t-esc="line.qty"/></td>
-                                    <td class="text-end"><t t-esc="line.price_unit"/></td>
+                                    <td class="text-end"><t t-esc="self.format_number(line.price_unit)"/></td>
                                     <td class="text-end"><t t-esc="line.discount"/></td>
-                                    <td class="text-end"><t t-esc="line.price_subtotal_incl"/></td>
+                                    <td class="text-end"><t t-esc="self.format_number(line.price_subtotal_incl)"/></td>
                                   </tr>
                                 </t>
                                 <tr>
