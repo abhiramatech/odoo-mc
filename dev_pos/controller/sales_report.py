@@ -4,6 +4,11 @@ from datetime import datetime
 
 class SalesReportDetailController(http.Controller):
 
+    def parse_date(self, raw_date):
+        if raw_date:
+            return datetime.strptime(raw_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+        return None
+
     # def back_to_pos_view(self):
     #     # backend_url = f'/odoo/action-{order_sudo._get_portal_return_action().id}/{order_sudo.id}'
     #     # 'url': '/web#action=point_of_sale.action_client_pos_menu',
@@ -51,10 +56,6 @@ class SalesReportDetailController(http.Controller):
         }
         return request.render('dev_pos.report_sales_detail', values)
     
-    def parse_date(self, raw_date):
-        if raw_date:
-            return datetime.strptime(raw_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-        return None
 
     @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
     def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):
