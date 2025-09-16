@@ -16,12 +16,12 @@ class SalesReportDetailPreview(models.TransientModel):
         url = f"/my/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
 
         # jika ada invoice_no, tambahkan ke url
-        if self.invoice_no:
-            url += f"&invoice_no={self.invoice_no}"
+        if self.vit_invoice_no:
+            url += f"&invoice_no={self.vit_invoice_no}"
 
         # jika ada pos_order_ref, tambahkan ke url
-        if self.pos_order_ref:
-            url += f"&pos_order_ref={self.pos_order_ref}"
+        if self.vit_pos_order_ref:
+            url += f"&pos_order_ref={self.vit_pos_order_ref}"
 
         return {
             'type': 'ir.actions.act_url',
