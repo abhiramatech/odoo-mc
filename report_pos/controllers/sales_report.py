@@ -59,7 +59,6 @@ class SalesReportDetailController(http.Controller):
         return request.render('report_pos.report_sales_detail', values)
     
     
-
     @http.route(['/my/sales/report/detail/pdf'], type='http', auth="user", website=True)
     def portal_sales_report_detail_pdf(self, date_from=None, date_to=None, **kw):
 
@@ -113,16 +112,15 @@ class SalesReportDetailController(http.Controller):
         if not date_from or not date_to:
             return request.not_found()
 
-        domain = [
-            ('date_order', '>=', date_from),
-            ('date_order', '<=', date_to),
-        ]
+        account_move = request.env['account.move'].sudo().search([('name', '=', invoice_no)], limit=1)
 
-        if invoice_no:
-            move = request.env['account.move'].sudo().search([('name', '=', invoice_no)], limit=1)
-            if move:
-                domain.append(('account_move', '=', move.id))
-
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+        if account_move:
+            domain.append(('account_move', '=', account_move.id))
         if pos_order_ref:
             domain.append(('name', '=', pos_order_ref))
 
@@ -133,6 +131,8 @@ class SalesReportDetailController(http.Controller):
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
+            'backend_url': self.back_to_pos_view(),
+            'format_number': self.format_number,
         }
         return request.render('report_pos.report_sales_recap', values)
 

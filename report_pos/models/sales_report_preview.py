@@ -14,11 +14,9 @@ class SalesReportDetailPreview(models.TransientModel):
 
         # base url
         url = f"/my/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
-
         # jika ada invoice_no, tambahkan ke url
         if self.vit_invoice_no:
             url += f"&invoice_no={self.vit_invoice_no}"
-
         # jika ada pos_order_ref, tambahkan ke url
         if self.vit_pos_order_ref:
             url += f"&pos_order_ref={self.vit_pos_order_ref}"
@@ -36,6 +34,11 @@ class SalesReportDetailPreview(models.TransientModel):
             raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
         
         url = f"/sales/report/recap?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
+        if self.vit_invoice_no:
+            url += f"&invoice_no={self.vit_invoice_no}"
+        if self.vit_pos_order_ref:
+            url += f"&pos_order_ref={self.vit_pos_order_ref}"
+
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',
