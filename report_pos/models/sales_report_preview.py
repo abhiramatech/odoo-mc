@@ -6,33 +6,30 @@ from odoo.http import request
 
 class SalesReportDetailPreview(models.TransientModel):
     _inherit = 'sales.report'
-
+    
     def action_preview_report_detail(self):
         self.ensure_one()
         if not self.vit_date_from or not self.vit_date_to:
             raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
-        
+
+        # base url
         url = f"/my/sales/report/detail?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
+
+        # jika ada invoice_no, tambahkan ke url
+        if self.invoice_no:
+            url += f"&invoice_no={self.invoice_no}"
+
+        # jika ada pos_order_ref, tambahkan ke url
+        if self.pos_order_ref:
+            url += f"&pos_order_ref={self.pos_order_ref}"
+
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',
             'url': url,
         }
-    
-    # def action_preview_report_detail(self):
-    #     self.ensure_one()
-    #     return self.env.ref('report_pos.action_report_sales_detail').report_action(
-    #         self, data={'date_from': self.vit_date_from, 'date_to': self.vit_date_to}
-    #     )
-    
-    # def action_download_pdf(self):
-    #     self.ensure_one()
-    #     if not self.vit_date_from or not self.vit_date_to:
-    #         raise UserError("Tidak dapat mendownload report. Mohon pilih Date From dan Date To")
 
-    #     # Panggil report QWeb PDF
-    #     return self.env.ref('report_pos.report_sales_detail_pdf').report_action(self)
-    
+
     def action_preview_report_recap(self):
         self.ensure_one()
         if not self.vit_date_from or not self.vit_date_to:
