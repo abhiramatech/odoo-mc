@@ -14,4 +14,4 @@ class AccountTax(models.Model):
         if vals and 'is_integrated' not in vals:
             vals['is_integrated'] = False
         
-        return super().write(vals)
+        return super(AccountTax, self).write(vals)
