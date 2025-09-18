@@ -17,6 +17,7 @@
                         <field name="date_to"/>               
                     </group>
                     <group string="Master Console To Store Server">
+                        <field name="master_employee"/>   
                         <field name="master_item_utils"/>    
                         <field name="master_item"/>    
                         <field name="master_tag"/>

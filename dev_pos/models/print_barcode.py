@@ -48,10 +48,15 @@ class PrintBarcode(models.Model):
     ], default='landscape')
 
     # Label Strip Configuration
+    label_mode = fields.Selection([
+        ('strip', 'Label Strip (Per Product)'),
+        ('grid', 'Grid Layout (All Products)'),
+    ], string="Print Mode", default='strip', help="Strip: Each product gets its own horizontal row. Grid: All products in one page grid.")
+    
+    # Single Label Dimensions (for strip mode)
     single_label_width = fields.Float(string="Single Label Width (mm)", default=30.0)
     single_label_height = fields.Float(string="Single Label Height (mm)", default=25.0)
     label_spacing = fields.Float(string="Label Spacing (mm)", default=2.0)
-    max_labels_per_row = fields.Integer(string="Max Labels Per Row", default=4, help="Maximum number of labels per row when mixing single and multi-copy products")
 
     # Margin Config
     margin_atas = fields.Float(string="Margin Atas", default=2.0)
@@ -63,6 +68,14 @@ class PrintBarcode(models.Model):
         ('2', '2 Label'),
     ], default='1')
     jumlah_baris = fields.Float(string="Jumlah Baris", default=10.0)
+
+    # Setting Barcode (for grid mode)
+    jumlah_kolom = fields.Float(string="Jumlah Kolom", default=3.0)
+    jarak_antar_kolom = fields.Float(string="Jarak Antar Kolom", default=5.0)
+    tinggi_baris = fields.Float(string="Tinggi Baris", default=20.0)
+    jarak_antar_baris = fields.Float(string="Jarak Antar Baris", default=5.0)
+    lebar_kolom = fields.Float(string="Lebar Kolom", default=60.0)
+    jumlah_karakter = fields.Float(string="Jumlah Karakter", default=13.0)
 
     # Font Barcode
     available_fonts = fields.Selection(selection='_get_available_fonts', string="Jenis Fonts Text")
@@ -198,6 +211,18 @@ class PrintBarcode(models.Model):
             elif self.size_kertas == 'label_strip_large':
                 self.single_label_width = 60.0
                 self.single_label_height = 45.0
+
+    @api.onchange('label_mode')
+    def _onchange_label_mode(self):
+        """Update default paper size based on label mode"""
+        if self.label_mode == 'strip':
+            self.size_kertas = 'label_strip_medium'
+            self.orientasi = 'landscape'
+            self._onchange_size_kertas()
+        elif self.label_mode == 'grid':
+            self.size_kertas = 'a4'
+            self.orientasi = 'portrait'
+            self._onchange_size_kertas()
 
     @api.onchange('doc_type')
     def _onchange_doc_type(self):
@@ -480,133 +505,61 @@ class PrintBarcode(models.Model):
         return self.generate_barcode_pdf(product_data)
         
     def generate_barcode_pdf(self, product_data):
-        """Generate PDF with label strips - optimized layout for mixed copy counts"""
-        return self._generate_strip_pdf(product_data)
+        """Generate PDF with barcodes - supports both strip and grid modes"""
+        if self.label_mode == 'strip':
+            return self._generate_strip_pdf(product_data)
+        else:
+            return self._generate_grid_pdf(product_data)
     
     def _generate_strip_pdf(self, product_data):
-        """Generate PDF with label strips - optimized layout for mixed copy counts"""
+        """Generate PDF with label strips - each product gets its own horizontal row"""
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         file_path = temp_file.name
         temp_file.close()
 
+        # For strip mode, create a separate page for each product
+        # Calculate page size based on copies needed
         products = self.env['product.product'].browse(product_data.keys())
         
         # Get fonts
         font_name = self._register_font()
         
-        if not products:
+        # Start with first product to determine if we need custom page sizes
+        first_product = products[0] if products else None
+        if not first_product:
             raise ValidationError("No valid products found.")
-        
-        # Separate products by copy count
-        multi_copy_products = [p for p in products if product_data.get(p.id, 1) > 1]
-        single_copy_products = [p for p in products if product_data.get(p.id, 1) == 1]
-        
-        # Calculate maximum possible labels per row (user configurable)
-        max_labels_per_row = self.max_labels_per_row or 4  # Use user setting or default to 4
+            
         max_copies = max(product_data.values()) if product_data else 1
+        
+        # Calculate dynamic page width for strip mode
+        strip_width = (self.single_label_width * max_copies) + (self.label_spacing * (max_copies - 1)) + (self.margin_kiri + self.margin_kanan)
         strip_height = self.single_label_height + (self.margin_atas + self.margin_bawah)
         
-        # Create canvas
-        c = canvas.Canvas(file_path, pagesize=(210 * mm, strip_height * mm))  # Start with A4 width
+        # Create canvas with dynamic page size
+        c = canvas.Canvas(file_path, pagesize=(strip_width * mm, strip_height * mm))
         
-        # Track remaining single copy products
-        remaining_single_products = single_copy_products.copy()
-        
-        # Process multi-copy products and try to fit single products in same row
-        for idx, product in enumerate(multi_copy_products):
+        for product in products:
             if not product.barcode:
                 continue
                 
             copies = product_data.get(product.id, 1)
             
-            # Calculate how many single products can fit in this row with the multi-copy product
-            total_labels_this_row = copies
-            single_products_this_row = []
+            # Calculate actual page size for this product
+            actual_page_width = (self.single_label_width * copies) + (self.label_spacing * (copies - 1)) + (self.margin_kiri + self.margin_kanan)
             
-            # Try to fit single products until we reach max_labels_per_row
-            while total_labels_this_row < max_labels_per_row and remaining_single_products:
-                single_products_this_row.append(remaining_single_products.pop(0))
-                total_labels_this_row += 1
-            
-            # Calculate actual page width needed for this row
-            actual_page_width = (self.single_label_width * total_labels_this_row) + \
-                               (self.label_spacing * (total_labels_this_row - 1)) + \
-                               (self.margin_kiri + self.margin_kanan)
-            
+            # Set page size for this product
             c.setPageSize((actual_page_width * mm, strip_height * mm))
             
-            current_position = 0
-            
-            # Draw multi-copy product labels first
+            # Draw labels horizontally for this product
             for copy_num in range(copies):
-                x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
+                x_pos = self.margin_kiri + (copy_num * (self.single_label_width + self.label_spacing))
                 y_pos = self.margin_bawah
+                
                 self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
-                current_position += 1
             
-            # Draw single products that fit in this row
-            for single_product in single_products_this_row:
-                if single_product.barcode:
-                    x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
-                    y_pos = self.margin_bawah
-                    self._draw_single_label(c, single_product, x_pos * mm, y_pos * mm, font_name)
-                    current_position += 1
-            
-            # New page for next product (if not the last one or if there are remaining single products)
-            if idx < len(multi_copy_products) - 1 or remaining_single_products:
+            # New page for next product (if not the last one)
+            if product != products[-1]:
                 c.showPage()
-        
-        # Handle remaining single products (if any) - each gets its own small page
-        if remaining_single_products:
-            # Give each remaining single product its own small page
-            for idx, product in enumerate(remaining_single_products):
-                if not product.barcode:
-                    continue
-                
-                # Each single product gets its own compact page
-                # Use user-configured dimensions for single labels
-                single_page_width = self.single_label_width
-                single_page_height = self.single_label_height
-                
-                page_width = single_page_width + (self.margin_kiri + self.margin_kanan)
-                page_height = single_page_height + (self.margin_atas + self.margin_bawah)
-                
-                c.setPageSize((page_width * mm, page_height * mm))
-                
-                x_pos = self.margin_kiri
-                y_pos = self.margin_bawah
-                
-                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
-                
-                # New page for next product (if not the last one)
-                if idx < len(remaining_single_products) - 1:
-                    c.showPage()
-        
-        # Handle case where we only have single copy products - each gets its own small page
-        elif not multi_copy_products and single_copy_products:
-            # All products are single copy - give each product its own small page
-            for idx, product in enumerate(single_copy_products):
-                if not product.barcode:
-                    continue
-                
-                # Each single product gets its own compact page  
-                # Use user-configured dimensions for single labels
-                single_page_width = self.single_label_width
-                single_page_height = self.single_label_height
-                
-                page_width = single_page_width + (self.margin_kiri + self.margin_kanan)
-                page_height = single_page_height + (self.margin_atas + self.margin_bawah)
-                
-                c.setPageSize((page_width * mm, page_height * mm))
-                
-                x_pos = self.margin_kiri
-                y_pos = self.margin_bawah
-                
-                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
-                
-                # New page for next product (if not the last one)
-                if idx < len(single_copy_products) - 1:
-                    c.showPage()
         
         c.save()
 
@@ -617,6 +570,106 @@ class PrintBarcode(models.Model):
         os.unlink(file_path)
 
         filename = f"barcode_strips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        self.write({
+            'barcode_pdf': base64.b64encode(pdf_data),
+            'barcode_filename': filename
+        })
+
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content/?model=print.barcode&id={self.id}&field=barcode_pdf&filename={filename}',
+            'target': 'new',
+        }
+    
+    def _generate_grid_pdf(self, product_data):
+        """Generate PDF with grid layout - original functionality"""
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        file_path = temp_file.name
+        temp_file.close()
+
+        page_size = self._get_page_size()
+        c = canvas.Canvas(file_path, pagesize=page_size)
+        
+        page_width, page_height = page_size
+
+        usable_width = page_width - (self.margin_kiri + self.margin_kanan) * mm
+        usable_height = page_height - (self.margin_atas + self.margin_bawah) * mm
+
+        label_width = usable_width / int(self.jumlah_kolom)
+        label_height = usable_height / int(self.jumlah_baris)
+
+        products = self.env['product.product'].browse(product_data.keys())
+
+        x_start = self.margin_kiri * mm
+        y_start = page_height - self.margin_atas * mm
+
+        current_row = 0
+        current_col = 0
+
+        font_name = self._register_font()
+
+        for product in products:
+            if not product.barcode:
+                continue
+                
+            copies = product_data.get(product.id, 1)
+
+            for copy in range(copies):
+                x = x_start + current_col * (label_width + self.jarak_antar_kolom * mm)
+                y = y_start - current_row * (label_height + self.jarak_antar_baris * mm)
+
+                # Draw Product Name
+                c.setFont(font_name, self.ukuran_font_nama)
+                product_name = product.name[:25] + ("..." if len(product.name) > 25 else "")
+                c.drawCentredString(x + label_width / 2, y - self.posisi_nama_barang * mm, product_name)
+
+                # Draw Barcode
+                barcode = self._create_barcode_drawing(
+                    barcode_value,
+                    width=self.lebar_kolom * mm,
+                    height=self.ukuran_font_barcode * mm
+                )
+                barcode_x = x + (label_width - self.lebar_kolom * mm) / 2
+                barcode_y = y - (self.posisi_barcode * mm) - (self.ukuran_font_barcode * mm)
+                barcode.drawOn(c, barcode_x, barcode_y)
+
+                # Draw Barcode Number
+                c.setFont(font_name, self.ukuran_font_kode)
+                c.drawCentredString(x + label_width / 2, barcode_y - self.posisi_kode * mm, product.barcode)
+
+                # Draw Price
+                product_line = self.env['print.barcode.product.line'].search([
+                    ('barcode_id', '=', self.id),
+                    ('product_id', '=', product.id)
+                ], limit=1)
+
+                if product_line and product_line.harga_jual:
+                    c.setFont(font_name, self.ukuran_font_harga)
+                    price_text = f"Rp {product_line.harga_jual:,.0f}"
+                    c.drawCentredString(x + label_width / 2, y - self.posisi_harga * mm, price_text)
+
+                current_col += 1
+                max_cols = int(self.jumlah_kolom) or 1
+                    
+                if current_col >= max_cols:
+                    current_col = 0
+                    current_row += 1
+
+                if current_row >= int(self.jumlah_baris):
+                    c.showPage()
+                    current_row = 0
+                    current_col = 0
+                    c.setFont(font_name, self.ukuran_font_kode)
+
+        c.save()
+
+        # Read and store PDF
+        with open(file_path, 'rb') as pdf_file:
+            pdf_data = pdf_file.read()
+
+        os.unlink(file_path)
+
+        filename = f"barcode_grid_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         self.write({
             'barcode_pdf': base64.b64encode(pdf_data),
             'barcode_filename': filename
@@ -664,17 +717,6 @@ class PrintBarcode(models.Model):
         label_width = self.single_label_width * mm
         label_height = self.single_label_height * mm
         
-    def _draw_single_label(self, canvas_obj, product, x_pos, y_pos, font_name):
-        """Draw a single label at specified position"""
-        # Get product line for pricing info
-        product_line = self.env['print.barcode.product.line'].search([
-            ('barcode_id', '=', self.id),
-            ('product_id', '=', product.id)
-        ], limit=1)
-        
-        label_width = self.single_label_width * mm
-        label_height = self.single_label_height * mm
-        
         # Draw border (optional - can be controlled by a field)
         # canvas_obj.rect(x_pos, y_pos, label_width, label_height)
         
@@ -689,8 +731,7 @@ class PrintBarcode(models.Model):
         
         # Draw Barcode (center)
         if product.barcode:
-            # Calculate barcode width based on label dimensions (no hardcode reference to lebar_kolom)
-            barcode_width = label_width * 0.8  # 80% of label width
+            barcode_width = min(label_width * 0.8, self.lebar_kolom * mm)  # 80% of label width or configured width
             barcode_height = self.ukuran_font_barcode * mm * 0.6  # Smaller barcode for strip labels
             
             barcode = self._create_barcode_drawing(
