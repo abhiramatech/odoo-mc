@@ -140,6 +140,28 @@ class SettingConfig(models.Model):
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
             integrator_transaksiMCtoSS.update_location_id_mc('stock.location', ['id', 'complete_name'], 'Update ID MC', datefrom, dateto)
 
+    def create_master_employee(self, mc, ss, datefrom, dateto):
+        if mc and ss:
+            mc_client = mc
+            ss_clients = ss
+        else:
+            mc_client, ss_clients = self.get_config(False)
+
+        if datefrom and dateto:
+            date_from = datefrom
+            date_to = dateto
+            # Format date_from and date_to to include time
+            date_from = date_from.strftime("%Y-%m-%d %H:%M:%S.%f")
+            date_to = date_to.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            date_from, date_to = self.get_date(False, False)
+
+        date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
+
+        for ss_client in ss_clients:
+            integrator_master = DataIntegrator(mc_client, ss_client) # belum ditambahkan is_store dan is_cashier
+            integrator_master.transfer_data('hr.employee', ['name', 'mobile_phone', 'work_phone', 'work_email', 'create_date', 'write_date'], 'Sales Employee', date_from, date_to)
+            
     def create_master_item_utility(self, mc, ss, datefrom, dateto):
         if mc and ss:
             mc_client = mc

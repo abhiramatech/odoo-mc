@@ -12,6 +12,7 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
     date_from = fields.Date(string='Date from')
     date_to = fields.Date(string='Date To')
     #MC To Store
+    master_employee = fields.Boolean(string="Master Employee", default=False)
     master_item_utils = fields.Boolean(string="Master Item Utility", default=False)
     master_item = fields.Boolean(string="Master Item", default=False)
     master_tag = fields.Boolean(string="Master Tag", default=False)
@@ -41,10 +42,12 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
     vit_val_ts_out = fields.Boolean(string="Validate TS Out", default=False)
 
     def action_start(self):
-        store, date_from, date_to, master_item_utils, master_item, master_tag, master_barcode, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out = self.search_manual_sync()
+        store, date_from, date_to, master_employee, master_item_utils, master_item, master_tag, master_barcode, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out = self.search_manual_sync()
         mc_client, ss_clients = self.get_config(store.id)
         datefrom, dateto = self.get_date(date_from, date_to)
 
+        if master_employee:
+            self.create_master_employee(mc_client, ss_clients, datefrom, dateto)
         if master_item_utils:
             self.create_master_item_utility(mc_client, ss_clients, datefrom, dateto)
         if master_item:
@@ -118,6 +121,7 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
             store = configs.store_sync
             date_from = configs.date_from
             date_to = configs.date_to
+            master_employee = configs.master_employee
             master_item_utils = configs.master_item_utils
             master_item = configs.master_item
             master_barcode = configs.master_barcode
@@ -145,7 +149,7 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
             vit_val_goods_receipts = configs.vit_val_goods_receipts
             vit_val_goods_issue = configs.vit_val_goods_issue
             vit_val_ts_out = configs.vit_val_ts_out
-        return store, date_from, date_to, master_item_utils, master_item, master_tag, master_barcode, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
+        return store, date_from, date_to, master_employee, master_item_utils, master_item, master_tag, master_barcode, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
     
     def create(self, vals):
         if vals.get('store_sync'):

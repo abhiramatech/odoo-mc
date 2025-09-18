@@ -66,7 +66,7 @@ class SalesReportDetail(models.TransientModel):
 
         header = [
             'User', 'Kasir', 'Customer Code', 'Customer Name', 'Kode Currency', 'Kode Store','Nama Store',
-            'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal', 'Tanggal Jatuh Tempo'
+            'Invoice No.', 'Order No.', 'Session', 'No Retur', 'No HP', 'Tanggal', 'Tanggal Jatuh Tempo',
             'Sub Divisi', 'Item Kelas', 'Item Tipe',
             'Item Code', 'Nama Item', 'POS Category', 'Satuan', 'Quantity',
             'Harga', 'Disc', 'Taxes', 'Sub Total', 'Sub Total Nett'

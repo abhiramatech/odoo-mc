@@ -2,6 +2,7 @@
     'name': 'VIT POS MC',
     'version': '17.0.1.0.0',
     'category': 'Point of Sale',
+    'sequence': 1,
     'summary': """Belong to VIT""",
     'author': 'Visi Intech',
     'company': 'Visi Intech',
@@ -61,8 +62,11 @@
         'views/product_product_view.xml',
         'views/mrp_unbuild_line_view.xml',
         'views/pos_timbangan_views.xml',
-        'reports/sales_report_view.xml',
-        'reports/sales_report_menu_view.xml',
+        # 'reports/sales_report_view.xml',
+        # 'reports/sales_report_menu_view.xml',
+        # 'reports/report_layout_templates.xml',
+        # 'reports/sales_report_pdf.xml',
+        # 'reports/portal_templates.xml',
     ],
     'assets': {
         'web.assets_backend': [
