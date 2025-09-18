@@ -57,6 +57,11 @@
                                         <field name="label_spacing"/>
                                     </group>
                                 </group>
+                                <div class="alert alert-info" role="alert">
+                                    <strong>Strip Mode:</strong> Each product will create label strips based on copy count.
+                                    Single copy products will merge with multi-copy products if space allows.
+                                    Perfect for label printers and sticker sheets.
+                                </div>
                             </page>
                             
                             <!-- Margin Configuration Page -->
@@ -73,6 +78,9 @@
                                         <field name="jumlah_baris"/>
                                     </group>
                                 </group>
+                                <div class="alert alert-warning" role="alert">
+                                    <strong>Note:</strong> Legacy settings are maintained for compatibility but not used in current strip layout.
+                                </div>
                             </page>
                             
                             <!-- Barcode Settings Page -->
@@ -90,6 +98,10 @@
                                         <label for="single_label_width" string="Note: Strip settings are configured in Printer Configuration tab"/>
                                     </group>
                                 </group>
+                                <div class="alert alert-info" role="alert">
+                                    <strong>Strip Layout:</strong> The system automatically calculates optimal positioning based on your label dimensions.
+                                    Use the Printer Configuration tab for size settings and Font Configuration for styling.
+                                </div>
                             </page>
                             
                             <!-- Font Configuration Page -->
@@ -161,8 +173,9 @@
                 <tree string="Print Barcode">
                     <field name="label_mode"/>
                     <field name="pilihan"/>
-                    <field name="nama_printer"/>
+                    <field name="printer_list"/>
                     <field name="size_kertas"/>
+                    <!-- <field name="max_labels_per_row"/> -->
                     <field name="barcode_filename"/>
                 </tree>
             </field>

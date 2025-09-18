@@ -611,8 +611,7 @@ class PrintBarcode(models.Model):
         for product in products:
             if not product.barcode:
                 continue
-
-            barcode_value = product.barcode.strip()
+                
             copies = product_data.get(product.id, 1)
 
             for copy in range(copies):
@@ -664,6 +663,7 @@ class PrintBarcode(models.Model):
 
         c.save()
 
+        # Read and store PDF
         with open(file_path, 'rb') as pdf_file:
             pdf_data = pdf_file.read()
 
