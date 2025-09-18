@@ -18,6 +18,15 @@
           <attribute name="force_save">1</attribute>
           <attribute name="readonly">True</attribute>
         </xpath>
+        <xpath expr="//page[@name='hr_settings']" position="after" >
+          <page string="Access Right" name="access_right">
+            <group>
+                <field name="is_sales"/>
+                <field name="is_cashier"/>
+                <field name="is_pic"/>
+            </group>
+          </page>
+        </xpath>
       </field>
     </record>
 

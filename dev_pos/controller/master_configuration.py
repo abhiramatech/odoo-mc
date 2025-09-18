@@ -160,7 +160,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client) # belum ditambahkan is_store dan is_cashier
-            integrator_master.transfer_data('hr.employee', ['name', 'mobile_phone', 'work_phone', 'work_email', 'create_date', 'write_date'], 'Sales Employee', date_from, date_to)
+            integrator_master.transfer_data('hr.employee', ['name', 'mobile_phone', 'work_phone', 'work_email', 'is_sales', 'is_cashier', 'create_date', 'write_date'], 'Sales Employee', date_from, date_to)
             
     def create_master_item_utility(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -579,7 +579,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
-            integrator_master.transfer_data_mc('hr.employee', ['name', 'mobile_phone', 'work_phone', 'work_email', 'create_date', 'write_date'], 'Sales Employee', date_from, date_to)
+            integrator_master.transfer_data_mc('hr.employee', ['name', 'mobile_phone', 'work_phone', 'work_email', 'is_cashier', 'is_pic', 'create_date', 'write_date'], 'Sales Employee', date_from, date_to)
 
     def create_purchase_order_from_mc_to_ss(self, mc, ss, datefrom, dateto):
         if mc and ss:
