@@ -27,7 +27,6 @@
                         </div>
                         <group>
                             <group>
-                                <field name="label_mode" widget="radio"/>
                                 <field name="start_date"/>
                                 <field name="end_date"/>
                                 <field name="doc_type" widget="radio"/>
@@ -51,10 +50,11 @@
                                         <field name="tinggi" invisible="size_kertas != 'custom'"/>
                                         <field name="orientasi" widget="radio"/>
                                     </group>
-                                    <group string="Label Strip Settings" invisible="label_mode != 'strip'">
+                                    <group string="Label Strip Settings">
                                         <field name="single_label_width"/>
                                         <field name="single_label_height"/>
                                         <field name="label_spacing"/>
+                                        <field name="max_labels_per_row"/>
                                     </group>
                                 </group>
                                 <div class="alert alert-info" role="alert">
@@ -73,7 +73,7 @@
                                         <field name="margin_kiri"/>
                                         <field name="margin_kanan"/>
                                     </group>
-                                    <group string="Grid Layout Settings" invisible="label_mode != 'grid'">
+                                    <group string="Legacy Settings">
                                         <field name="label" widget="radio"/>
                                         <field name="jumlah_baris"/>
                                     </group>
@@ -86,16 +86,13 @@
                             <!-- Barcode Settings Page -->
                             <page string="Barcode Settings" invisible="pilihan not in ('setting')">
                                 <group>
-                                    <group string="Grid Layout Settings" invisible="label_mode != 'grid'">
-                                        <field name="jumlah_kolom"/>
-                                        <field name="jarak_antar_kolom"/>
-                                        <field name="tinggi_baris"/>
-                                        <field name="jarak_antar_baris"/>
-                                        <field name="lebar_kolom"/>
-                                        <field name="jumlah_karakter"/>
-                                    </group>
-                                    <group string="Strip Layout Settings" invisible="label_mode != 'strip'">
-                                        <label for="single_label_width" string="Note: Strip settings are configured in Printer Configuration tab"/>
+                                    <group string="Layout Settings">
+                                        <label for="max_labels_per_row" string="Maximum Labels Per Row"/>
+                                        <div>
+                                            <field name="max_labels_per_row" class="oe_inline"/>
+                                            <span class="text-muted"> labels</span>
+                                        </div>
+                                        <separator string="Note: All other layout settings are configured in other tabs"/>
                                     </group>
                                 </group>
                                 <div class="alert alert-info" role="alert">
@@ -118,8 +115,8 @@
                                         <field name="ukuran_font_harga"/>
                                     </group>
                                 </group>
-                                <separator string="Position Settings (Grid Mode Only)" invisible="label_mode != 'grid'"/>
-                                <group invisible="label_mode != 'grid'">
+                                <separator string="Position Settings (Advanced)"/>
+                                <group>
                                     <group string="Vertical Positions">
                                         <field name="posisi_nama_barang"/>
                                         <field name="posisi_barcode"/>
@@ -131,9 +128,9 @@
                                         <field name="tinggi_nama_barnag"/>
                                     </group>
                                 </group>
-                                <div invisible="label_mode != 'strip'" class="alert alert-info" role="alert">
-                                    <strong>Note:</strong> In Strip Mode, positions are automatically calculated based on label dimensions.
-                                    Font sizes above will still apply.
+                                <div class="alert alert-info" role="alert">
+                                    <strong>Strip Mode:</strong> Positions are automatically optimized for strip labels.
+                                    Font sizes and position fine-tuning above will still apply for advanced customization.
                                 </div>
                             </page>
                             
@@ -149,13 +146,14 @@
                                     </tree>
                                 </field>
                                 <div class="mt16">
-                                    <div class="alert alert-info" role="alert" invisible="label_mode != 'strip'">
-                                        <strong>Strip Mode:</strong> Each product will create a separate horizontal strip with the specified number of copies.
-                                        Perfect for label printers and sticker sheets.
-                                    </div>
-                                    <div class="alert alert-info" role="alert" invisible="label_mode != 'grid'">
-                                        <strong>Grid Mode:</strong> All product labels will be arranged in a grid layout on standard paper sizes.
-                                        Ideal for office printers and full-page layouts.
+                                    <div class="alert alert-info" role="alert">
+                                        <strong>Smart Layout:</strong> 
+                                        <ul>
+                                            <li><strong>Multi-copy products:</strong> Create horizontal strips with specified copies</li>
+                                            <li><strong>Single-copy products:</strong> Merge with multi-copy products when space allows</li>
+                                            <li><strong>All single-copy:</strong> Each product gets its own compact page</li>
+                                        </ul>
+                                        <strong>Max Labels Per Row:</strong> <span class="badge badge-primary"><field name="max_labels_per_row" readonly="1"/></span>
                                     </div>
                                 </div>
                             </page>
@@ -171,11 +169,10 @@
             <field name="model">print.barcode</field>
             <field name="arch" type="xml">
                 <tree string="Print Barcode">
-                    <field name="label_mode"/>
                     <field name="pilihan"/>
                     <field name="printer_list"/>
                     <field name="size_kertas"/>
-                    <!-- <field name="max_labels_per_row"/> -->
+                    <field name="max_labels_per_row"/>
                     <field name="barcode_filename"/>
                 </tree>
             </field>
@@ -188,12 +185,12 @@
             <field name="arch" type="xml">
                 <search string="Print Barcode">
                     <field name="pilihan"/>
-                    <field name="label_mode"/>
                     <field name="size_kertas"/>
+                    <field name="printer_list"/>
                     <group expand="0" string="Group By">
-                        <filter string="Print Mode" name="group_label_mode" context="{'group_by': 'label_mode'}"/>
                         <filter string="Configuration Type" name="group_pilihan" context="{'group_by': 'pilihan'}"/>
                         <filter string="Paper Size" name="group_size_kertas" context="{'group_by': 'size_kertas'}"/>
+                        <filter string="Printer" name="group_printer" context="{'group_by': 'printer_list'}"/>
                     </group>
                 </search>
             </field>
@@ -209,9 +206,11 @@
                     Create your first barcode configuration
                 </p>
                 <p>
-                    Choose between:
-                    <br/>• <strong>Strip Mode</strong>: Each product gets its own horizontal label strip (perfect for sticker labels)
-                    <br/>• <strong>Grid Mode</strong>: All products arranged in a grid on standard paper
+                    <strong>Strip Layout Features:</strong>
+                    <br/>• Smart layout optimization for mixed copy counts
+                    <br/>• User-configurable label dimensions and spacing
+                    <br/>• Automatic space utilization for efficient printing
+                    <br/>• Support for various paper sizes and label types
                 </p>
             </field>
         </record>
@@ -222,19 +221,10 @@
             <field name="res_model">print.barcode</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
-            <field name="context">{'default_pilihan': 'print', 'default_label_mode': 'strip'}</field>
+            <field name="context">{'default_pilihan': 'print'}</field>
         </record>
 
-        <!-- Action Window for Grid Mode Printing -->
-        <record id="action_print_product_barcode_grid" model="ir.actions.act_window">
-            <field name="name">Print Product Barcode Grid</field>
-            <field name="res_model">print.barcode</field>
-            <field name="view_mode">form</field>
-            <field name="target">new</field>
-            <field name="context">{'default_pilihan': 'print', 'default_label_mode': 'grid'}</field>
-        </record>
-
-        <!-- Add "Print Barcode" buttons to product form view -->
+        <!-- Add "Print Barcode" button to product form view -->
         <record id="product_template_form_view_barcode_print" model="ir.ui.view">
             <field name="name">product.template.form.barcode.print</field>
             <field name="model">product.template</field>
@@ -242,11 +232,7 @@
             <field name="arch" type="xml">
                 <div name="button_box" position="inside">
                     <button class="oe_stat_button" name="%(action_print_product_barcode_strip)d" 
-                            type="action" icon="fa-tags" string="Print Label Strips"
-                            context="{'default_active_ids': active_ids}">
-                    </button>
-                    <button class="oe_stat_button" name="%(action_print_product_barcode_grid)d" 
-                            type="action" icon="fa-barcode" string="Print Barcode Grid"
+                            type="action" icon="fa-tags" string="Print Barcode Labels"
                             context="{'default_active_ids': active_ids}">
                     </button>
                 </div>
