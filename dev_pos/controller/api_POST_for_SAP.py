@@ -103,108 +103,122 @@ class POSTMasterItem(http.Controller):
             if not config:
                 return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
             
-            uid = request.session.authenticate(request.session.db, config.vit_config_username, config.vit_config_password_api)
+            uid = request.session.authenticate(
+                request.session.db, config.vit_config_username, config.vit_config_password_api
+            )
             if not uid:
                 return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
 
             env = request.env(user=request.env.ref('base.user_admin').id)
-            
-            data = request.get_json_data()
-            product_code = data.get('product_code')
+            json_data = request.get_json_data()
+            items = json_data.get('items', [])
 
-            if env['product.template'].sudo().search([('default_code', '=', product_code)], limit=1):
-                return {'status': "Failed", 'code': 400, 'message': f"Duplicate item code: {product_code}."}
-            
-            category = env['product.category'].sudo().search([('complete_name', '=', data.get('category_name'))], limit=1)
-            if not category:
-                return {'status': "Failed", 'code': 400, 'message': f"Category not found: {data.get('category_name')}."}
-            
-            # Handle pos_categ_id or pos_categ_ids - mendukung kedua format
-            pos_categ_command = []
-            pos_categ_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
-            
-            # Pastikan dalam bentuk list
-            if not isinstance(pos_categ_data, list):
-                pos_categ_data = [pos_categ_data]
-                
-            for categ_id in pos_categ_data:
-                if env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1):
-                    pos_categ_command.append((4, categ_id))
-                else:
-                    return {'status': "Failed", 'code': 400, 'message': f"POS category with ID {categ_id} not found."}
+            if not isinstance(items, list):
+                return {'status': "Failed", 'code': 400, 'message': "Invalid format: 'items' must be a list."}
 
-            # Handle taxes - mendukung taxes_name atau taxes_names
-            tax_command = []
-            tax_names = data.get('taxes_names', [])
-            if 'taxes_name' in data:
-                if isinstance(data['taxes_name'], list):
-                    tax_names = data['taxes_name']
-                else:
-                    tax_names = [data['taxes_name']]
-                    
-            for tax_name in tax_names:
-                tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
-                if tax:
-                    tax_command.append((4, tax.id))
-                else:
-                    return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_name}' not found."}
+            created = []
+            errors = []
 
-            tax_command_vendor = []
-            for tax_vendor in data.get('supplier_taxes_id', []):
-                vendor_tax = env['account.tax'].sudo().search([('name', '=', tax_vendor)], limit=1)
-                if vendor_tax:
-                    tax_command_vendor.append((4, vendor_tax.id))
-                else:
-                    return {'status': "Failed", 'code': 400, 'message': f"Tax with name '{tax_vendor}' not found."}
+            for data in items:
+                try:
+                    product_code = data.get('product_code')
+                    if env['product.template'].sudo().search([('default_code', '=', product_code)], limit=1):
+                        errors.append(f"Duplicate item code: {product_code}")
+                        continue
 
-            # Mendukung standard_price atau cost
-            cost = data.get('standard_price', data.get('cost', 0.0))
-                
-            item_data = {
-                'name': data.get('product_name'),
-                'active': data.get('active'),
-                'default_code': product_code,
-                'detailed_type': data.get('product_type'),
-                'invoice_policy': data.get('invoice_policy'),
-                'create_date': data.get('create_date'),
-                'list_price': data.get('sales_price'),
-                'standard_price': cost,
-                'uom_id': data.get('uom_id'),
-                'uom_po_id': data.get('uom_po_id'),
-                'pos_categ_ids': pos_categ_command,
-                'categ_id': category.id,
-                'taxes_id': tax_command,
-                'supplier_taxes_id': tax_command_vendor,
-                'available_in_pos': data.get('available_in_pos'),
-                'image_1920': data.get('image_1920'),
-                'barcode': data.get('barcode'),
-                'create_uid': uid,
-                'vit_sub_div': data.get('vit_sub_div'),
-                'vit_item_kel': data.get('vit_item_kel'),
-                'vit_item_type': data.get('vit_item_type')
-            }
+                    category = env['product.category'].sudo().search([('complete_name', '=', data.get('category_name'))], limit=1)
+                    if not category:
+                        errors.append(f"Category not found: {data.get('category_name')}")
+                        continue
 
-            item = env['product.template'].sudo().create(item_data)
+                    # POS categories
+                    pos_categ_command = []
+                    pos_categ_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
+                    if not isinstance(pos_categ_data, list):
+                        pos_categ_data = [pos_categ_data]
+                    for categ_id in pos_categ_data:
+                        if env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1):
+                            pos_categ_command.append((4, categ_id))
+                        else:
+                            errors.append(f"POS category with ID {categ_id} not found.")
+                            break
+                    else:
+                        # taxes
+                        tax_command = []
+                        tax_names = data.get('taxes_names', [])
+                        if 'taxes_name' in data:
+                            if isinstance(data['taxes_name'], list):
+                                tax_names = data['taxes_name']
+                            else:
+                                tax_names = [data['taxes_name']]
+                        for tax_name in tax_names:
+                            tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
+                            if tax:
+                                tax_command.append((4, tax.id))
+                            else:
+                                errors.append(f"Tax with name '{tax_name}' not found.")
+                                break
+                        else:
+                            # supplier taxes
+                            tax_command_vendor = []
+                            for tax_vendor in data.get('supplier_taxes_id', []):
+                                vendor_tax = env['account.tax'].sudo().search([('name', '=', tax_vendor)], limit=1)
+                                if vendor_tax:
+                                    tax_command_vendor.append((4, vendor_tax.id))
+                                else:
+                                    errors.append(f"Tax with name '{tax_vendor}' not found.")
+                                    break
+                            else:
+                                # All validation passed, proceed
+                                cost = data.get('standard_price', data.get('cost', 0.0))
+                                item_data = {
+                                    'name': data.get('product_name'),
+                                    'active': data.get('active'),
+                                    'default_code': product_code,
+                                    'detailed_type': data.get('product_type'),
+                                    'invoice_policy': data.get('invoice_policy'),
+                                    'create_date': data.get('create_date'),
+                                    'list_price': data.get('sales_price'),
+                                    'standard_price': cost,
+                                    'uom_id': data.get('uom_id'),
+                                    'uom_po_id': data.get('uom_po_id'),
+                                    'pos_categ_ids': pos_categ_command,
+                                    'categ_id': category.id,
+                                    'taxes_id': tax_command,
+                                    'supplier_taxes_id': tax_command_vendor,
+                                    'available_in_pos': data.get('available_in_pos'),
+                                    'image_1920': data.get('image_1920'),
+                                    'barcode': data.get('barcode'),
+                                    'create_uid': uid,
+                                    'vit_sub_div': data.get('vit_sub_div'),
+                                    'vit_item_kel': data.get('vit_item_kel'),
+                                    'vit_item_type': data.get('vit_item_type')
+                                }
 
-             # Handle multi barcodes
-            multi_barcodes = data.get('multi_barcodes', [])
-            for barcode in multi_barcodes:
-                env['multiple.barcode'].sudo().create({
-                    'barcode': barcode,
-                    'product_tmpl_id': item.id
-                })
-            
+                                item = env['product.template'].sudo().create(item_data)
+
+                                for barcode in data.get('multi_barcodes', []):
+                                    env['multiple.barcode'].sudo().create({
+                                        'barcode': barcode,
+                                        'product_tmpl_id': item.id
+                                    })
+
+                                created.append({'id': item.id, 'product_code': product_code})
+
+                except Exception as e_inner:
+                    errors.append(f"Error for item {data.get('product_code')}: {str(e_inner)}")
+
             return {
-                'code': 200,
-                'status': 'success',
-                'message': 'Item created successfully',
-                'id': item.id,
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'created_items': created,
+                'errors': errors
             }
-        
+
         except Exception as e:
             request.env.cr.rollback()
-            _logger.error(f"Failed to create Item: {str(e)}")
-            return {'status': "Failed", 'code': 500, 'message': f"Failed to create Item: {str(e)}"}
+            _logger.error(f"Failed to create items: {str(e)}")
+            return {'status': "Failed", 'code': 500, 'message': f"Failed to create items: {str(e)}"}
 
 class POSTMasterPricelist(http.Controller):
     @http.route('/api/master_pricelist', type='json', auth='none', methods=['POST'], csrf=False)
@@ -386,36 +400,52 @@ class POSTMasterCustomer(http.Controller):
                 return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
 
             env = request.env(user=request.env.ref('base.user_admin').id)
-            
-            data = data = request.get_json_data()
-            customer_code = data.get('customer_code')
 
-            if env['res.partner'].sudo().search([('customer_code', '=', customer_code)], limit=1):
-                return {'status': "Failed", 'code': 400, 'message': f"Duplicate Customer code: {customer_code}"}
+            json_data = request.get_json_data()
+            items = json_data.get('items', [])
 
-            customer_data = {
-                'name': data.get('name'),
-                'customer_code': customer_code,
-                'street': data.get('street'),
-                'phone': data.get('phone'),
-                'email': data.get('email'),
-                'mobile': data.get('mobile'),
-                'website': data.get('website'),
-                'create_uid': uid
-            }
+            if not isinstance(items, list):
+                return {'status': "Failed", 'code': 400, 'message': "Invalid format: 'items' must be a list."}
 
-            customer = env['res.partner'].sudo().create(customer_data)
+            created = []
+            errors = []
+
+            for data in items:
+                try:
+                    customer_code = data.get('customer_code')
+                    if env['res.partner'].sudo().search([('customer_code', '=', customer_code)], limit=1):
+                        errors.append(f"Duplicate Customer code: {customer_code}")
+                        continue
+
+                    customer_data = {
+                        'name': data.get('name'),
+                        'customer_code': customer_code,
+                        'street': data.get('street'),
+                        'phone': data.get('phone'),
+                        'email': data.get('email'),
+                        'mobile': data.get('mobile'),
+                        'website': data.get('website'),
+                        'create_uid': uid
+                    }
+
+                    customer = env['res.partner'].sudo().create(customer_data)
+                    created.append({'id': customer.id, 'customer_code': customer_code})
+
+                except Exception as e_inner:
+                    errors.append(f"Error for {data.get('customer_code')}: {str(e_inner)}")
 
             return {
-                'code': 200,
-                'status': 'success',
-                'message': 'Customer created successfully',
-                'id': customer.id,
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'created_customers': created,
+                'errors': errors
             }
+
         except Exception as e:
             request.env.cr.rollback()
-            _logger.error(f"Failed to create Customer: {str(e)}")
-            return {'status': "Failed", 'code': 500, 'message': f"Failed to create Customer: {str(e)}"}
+            _logger.error(f"Failed to create Customers: {str(e)}")
+            return {'status': "Failed", 'code': 500, 'message': f"Failed to create Customers: {str(e)}"}
+
     
 class POSTMasterWarehouse(http.Controller):
     @http.route('/api/master_warehouse', type='json', auth='none', methods=['POST'], csrf=False)
