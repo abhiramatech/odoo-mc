@@ -18,7 +18,7 @@
           <attribute name="force_save">1</attribute>
           <attribute name="readonly">True</attribute>
         </xpath>
-        <xpath expr="//page[@name='hr_settings']" position="after" >
+        <xpath expr="//notebook" position="inside">
           <page string="Access Right" name="access_right">
             <group>
                 <field name="is_sales"/>
