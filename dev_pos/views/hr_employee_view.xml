@@ -18,7 +18,7 @@
           <attribute name="force_save">1</attribute>
           <attribute name="readonly">True</attribute>
         </xpath>
-        <xpath expr="//page[@name='public']" position="after">
+        <!-- <xpath expr="//page[@name='public']" position="after">
           <page string="Access Right" name="access_right">
             <group>
                 <field name="is_sales"/>
@@ -26,7 +26,7 @@
                 <field name="is_pic"/>
             </group>
           </page>
-        </xpath>
+        </xpath> -->
       </field>
     </record>
 
