@@ -9,3 +9,9 @@ class AccountTax(models.Model):
 
     is_integrated = fields.Boolean(string="Integrated", default=False, readonly=True, tracking=True)
     index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
+    
+    def write(self, vals):
+        if vals and 'is_integrated' not in vals:
+            vals['is_integrated'] = False
+        
+        return super().write(vals)
