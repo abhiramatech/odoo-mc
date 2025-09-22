@@ -1441,7 +1441,8 @@ class UnbuildOrder(http.Controller):
             domain = [('state', '=', 'done')]
 
             if q:
-                domain += [('name', 'ilike', str(q), ('state', '=', 'done'))]
+                domain += [('name', 'ilike', str(q)), ('state', '=', 'done')]
+
 
             if createdDateFrom or createdDateTo:
                 created_date_from = fields.Date.from_string(createdDateFrom) if createdDateFrom else fields.Date.today()
@@ -1507,7 +1508,7 @@ class UnbuildOrder(http.Controller):
                 raise werkzeug.exceptions.NotFound(_("Unbuild Order not found"))
 
             unbuild_order_lines = unbuild_order.unbuild_line_ids
-            doc_num = unbuild_order.name,
+            doc_num = unbuild_order.name
 
             jakarta_tz = pytz.timezone('Asia/Jakarta')
             create_date_utc = unbuild_order.create_date
@@ -1537,15 +1538,11 @@ class UnbuildOrder(http.Controller):
                 'product_code': unbuild_order.product_id.default_code,
                 'product_qty': unbuild_order.product_qty,
                 'bom_id': unbuild_order.bom_id.id,
-                'location_id': unbuild_order.location_src_id.id,
-                'location_name': unbuild_order.location_src_id.complete_name,
+                'location_id': unbuild_order.location_id.id,
+                'location_name': unbuild_order.location_id.complete_name,
                 'location_dest_id': unbuild_order.location_dest_id.id,
                 'location_dest': unbuild_order.location_dest_id.complete_name,
-                'picking_type_id': unbuild_order.picking_type_id.id,
-                'picking_type': unbuild_order.picking_type_id.name,
                 'create_date': str(create_date_jakarta),
-                'user_id': unbuild_order.user_id.id,
-                'user_name': unbuild_order.user_id.name,
                 'unbuild_lines': data_unbuild_order_lines
             }
             return werkzeug.wrappers.Response(
@@ -1557,9 +1554,9 @@ class UnbuildOrder(http.Controller):
         except Exception as e:
             return serialize_error_response(str(e))
         
-class ManufactureOrder(http.Controller):
+class ManufacturingOrderAPI(http.Controller):
     @http.route(['/api/manufacture_order/'], type='http', auth='public', methods=['GET'], csrf=False)
-    def get_manufacture_order(self, createdDateFrom=None, createdDateTo=None, pageSize=200, page=1, q=None, is_integrated=None,**params):
+    def get_manufacturing_order(self, createdDateFrom=None, createdDateTo=None, pageSize=200, page=1, q=None, is_integrated=None,**params):
         try:
             check_authorization()
 
@@ -1567,10 +1564,10 @@ class ManufactureOrder(http.Controller):
                 return serialize_response([], 0, 0)
 
             date_format = '%Y-%m-%d'
-            domain = [('state', '=', 'done')]
+            domain = [('picking_type_id.name', '=', 'Manufacturing'), ('state', '=', 'done')]
 
             if q:
-                domain += [('name', 'ilike', str(q), ('state', '=', 'done'))]
+                domain += [('name', 'ilike', str(q))]
 
             if createdDateFrom or createdDateTo:
                 created_date_from = fields.Date.from_string(createdDateFrom) if createdDateFrom else fields.Date.today()
@@ -1578,7 +1575,7 @@ class ManufactureOrder(http.Controller):
 
                 domain += [('create_date', '>=', created_date_from.strftime(date_format)),
                            ('create_date', '<=', created_date_to.strftime(date_format)),
-                           ('state', '=', 'done')]
+                           ('picking_type_id.name', '=', 'Manufacturing'), ('state', '=', 'done')]
                 
             if is_integrated is not None:
                 is_integrated_bool = str(is_integrated).lower() == 'true'
@@ -1596,23 +1593,22 @@ class ManufactureOrder(http.Controller):
                 order_data = {
                     'id': order.id,
                     'doc_num': order.name,
-                    'source_document': order.vit_trxid,
                     'product_id': order.product_id.id,
-                    'product_code': order.product_id.default_code,
-                    'product_qty': order.product_qty,
+                    'product': order.product_id.name,
+                    'quantity': order.product_qty,
                     'bom_id': order.bom_id.id,
+                    'bom': order.bom_id.product_tmpl_id.name,
+                    # 'location_id': order.location_id.id,
+                    # 'location': order.location_id.name,
                     'location_id': order.location_src_id.id,
                     'location_name': order.location_src_id.complete_name,
                     'location_dest_id': order.location_dest_id.id,
                     'location_dest': order.location_dest_id.complete_name,
                     'picking_type_id': order.picking_type_id.id,
                     'picking_type': order.picking_type_id.name,
+                    'start_date': str(order.date_start),
+                    'end_date': str(order.date_finished),
                     'create_date': str(create_date_jakarta),
-                    'date_start': str(order.date_start),
-                    'date_finished': str(order.date_finished),
-                    'user_id': order.user_id.id,
-                    'user_name': order.user_id.name,
-                    'state': order.state,
                     'is_integrated': order.is_integrated
                 }
                 data_manufacture_order.append(order_data)
@@ -1639,17 +1635,32 @@ class ManufactureOrder(http.Controller):
 
             manufacture_order = request.env['mrp.production'].sudo().browse(order_id)
             if not manufacture_order:
-                raise werkzeug.exceptions.NotFound(_("Manufacture Order not found"))
+                raise werkzeug.exceptions.NotFound(_("Manufacturing order not found"))
+            
+            # Ensure the order is a 'Return' type
+            if manufacture_order.picking_type_id.name != 'Manufacturing':
+                raise werkzeug.exceptions.NotFound(_("Manufacturing is not a Manufacturing"))
 
             manufacture_order_lines = manufacture_order.move_raw_ids
-            doc_num = manufacture_order.name,
+            doc_num = manufacture_order.name
+            product_id = manufacture_order.product_id.id,
+            product = manufacture_order.product_id.name,
+            quantity = manufacture_order.product_qty,
+            bom_id = manufacture_order.bom_id.id,
+            bom =  manufacture_order.bom_id.product_tmpl_id.name,
+            location_id = manufacture_order.location_src_id.id
+            location = manufacture_order.location_src_id.complete_name
+            location_dest_id = manufacture_order.location_dest_id.id
+            location_dest = manufacture_order.location_dest_id.complete_name
+            picking_type_id = manufacture_order.picking_type_id.id
+            picking_type = manufacture_order.picking_type_id.name
+            start_date = str(manufacture_order.date_start),
+            end_date = str(manufacture_order.date_finished),
 
             jakarta_tz = pytz.timezone('Asia/Jakarta')
             create_date_utc = manufacture_order.create_date
             create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
             created_date = str(create_date_jakarta)
-            date_done = str(manufacture_order.date_start)
-            date_done = str(manufacture_order.date_finished)
 
             data_manufacture_order_lines = []
             for line_number, line in enumerate(manufacture_order_lines, start=1):
@@ -1657,37 +1668,39 @@ class ManufactureOrder(http.Controller):
                     'line_number': line_number,
                     'id': line.id,
                     'doc_no': doc_num,
-                    'product_id': line.product_id.id,
-                    'product_code': line.product_id.default_code,
                     'location_id': line.location_id.id,
-                    'location': line.location_id.complete_name,
-                    'product_uom_qty': line.product_uom_qty,
+                    'location': line.location_id.name,
+                    'location_dest_id': line.location_dest_id.id,
+                    'location_dest': line.location_dest_id.complete_name,
+                    'product_id': line.product_id.id,
+                    'product_code': line.product_id.default_code or "",
+                    'product_name': line.product_id.name,
+                    'to_consume_qty': line.product_uom_qty,
                     'quantity': line.quantity,
-                    'picked': line.picked,
+                    'product_uom': line.product_uom.name,
+                    'picked': line.picked
                 }
                 data_manufacture_order_lines.append(line_data)
 
             response_data = {
                 'status': 200,
                 'message': 'success',
-                'doc_num':  manufacture_order.name,
-                'source_document': manufacture_order.vit_trxid,
-                'product_id': manufacture_order.product_id.id,
-                'product_code': manufacture_order.product_id.default_code,
-                'product_qty': manufacture_order.product_qty,
-                'bom_id': manufacture_order.bom_id.id,
-                'location_id': manufacture_order.location_src_id.id,
-                'location_name': manufacture_order.location_src_id.complete_name,
-                'location_dest_id': manufacture_order.location_dest_id.id,
-                'location_dest': manufacture_order.location_dest_id.complete_name,
-                'picking_type_id': manufacture_order.picking_type_id.id,
-                'picking_type': manufacture_order.picking_type_id.name,
-                'create_date': str(create_date_jakarta),
-                'date_start': str(manufacture_order.date_start),
-                'date_finished': str(manufacture_order.date_finished),
-                'user_id': manufacture_order.user_id.id,
-                'user_name': manufacture_order.user_id.name,
-                'manufacture_lines': data_manufacture_order_lines
+                'doc_num': doc_num,
+                'product_id': product_id,
+                'product': product,
+                'quantity': quantity,
+                'bom_id': bom_id,
+                'bom': bom,
+                'location_id': location_dest_id,
+                'location': location_dest,
+                'location_dest_id': location_id,
+                'location_dest': location,
+                'picking_type_id': picking_type_id,
+                'picking_type': picking_type,
+                'created_date': created_date,
+                'start_date': start_date,
+                'end_date': end_date,
+                'items': data_manufacture_order_lines
             }
             return werkzeug.wrappers.Response(
                 status=200,
@@ -1819,6 +1832,9 @@ class InvoiceOrder(http.Controller):
 
             data_invoice_lines = []
             for line_number, line in enumerate(invoice_lines, start=1):
+                if line.quantity == 0:
+                    continue
+
                 pickings = request.env['stock.picking'].sudo().search([('pos_order_id', '=', invoicing.pos_order_ids[0].id), ('origin', '=', invoicing.ref), ('move_ids_without_package.product_id', '=', line.product_id.id)], limit=1)
                 location_id = location = location_dest_id = location_dest = None
 

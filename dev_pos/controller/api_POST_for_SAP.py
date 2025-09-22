@@ -1,10 +1,12 @@
-from odoo import http
+from odoo import http, api, SUPERUSER_ID
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from odoo.http import request
 import requests
 from datetime import datetime
 import json
 import logging
 import base64
+from odoo.exceptions import AccessError
 
 _logger = logging.getLogger(__name__)
 
@@ -98,7 +100,7 @@ class POSTMasterItem(http.Controller):
     @http.route('/api/master_item', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_item(self, **kw):
         try:
-            # Authentication
+            # Autentikasi
             config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
             if not config:
                 return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
@@ -112,12 +114,12 @@ class POSTMasterItem(http.Controller):
             env = request.env(user=request.env.ref('base.user_admin').id)
             json_data = request.get_json_data()
             items = json_data.get('items', [])
-
             if not isinstance(items, list):
                 return {'status': "Failed", 'code': 400, 'message': "Invalid format: 'items' must be a list."}
 
-            created = []
-            errors = []
+            registry = request.registry
+            created = []  # Daftar untuk item yang berhasil dibuat
+            errors = []   # Daftar untuk error
 
             for data in items:
                 try:
@@ -152,7 +154,7 @@ class POSTMasterItem(http.Controller):
                             else:
                                 tax_names = [data['taxes_name']]
                         for tax_name in tax_names:
-                            tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
+                            tax = env['account.tax'].search([('name', '=', tax_name)], limit=1)
                             if tax:
                                 tax_command.append((4, tax.id))
                             else:
@@ -216,7 +218,6 @@ class POSTMasterItem(http.Controller):
             }
 
         except Exception as e:
-            request.env.cr.rollback()
             _logger.error(f"Failed to create items: {str(e)}")
             return {'status': "Failed", 'code': 500, 'message': f"Failed to create items: {str(e)}"}
 
@@ -397,9 +398,7 @@ class POSTMasterCustomer(http.Controller):
             
             uid = request.session.authenticate(request.session.db, config.vit_config_username, config.vit_config_password_api)
             if not uid:
-                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
-
-            env = request.env(user=request.env.ref('base.user_admin').id)
+                return {'status': 'Failed', 'code': 401, 'message': 'Authentication failed.'}
 
             json_data = request.get_json_data()
             items = json_data.get('items', [])
@@ -410,7 +409,7 @@ class POSTMasterCustomer(http.Controller):
             created = []
             errors = []
 
-            for data in items:
+            def process_customer(data):
                 try:
                     customer_code = data.get('customer_code')
                     if env['res.partner'].sudo().search([('customer_code', '=', customer_code)], limit=1):
@@ -867,21 +866,28 @@ class POSTPurchaseOrderFromSAP(http.Controller):
     @http.route('/api/purchase_order', type='json', auth='none', methods=['POST'], csrf=False)
     def post_purchase_order(self, **kw):
         try:
-            # Authentication
-            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            # 🔐 Authentication
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
             if not config:
                 return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
-            
-            uid = request.session.authenticate(request.session.db, config.vit_config_username, config.vit_config_password_api)
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
             if not uid:
                 return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
 
             env = request.env(user=request.env.ref('base.user_admin').id)
-            
+
+            # 📥 Get JSON payload
             data = request.get_json_data()
             customer_code = data.get('customer_code')
             vendor_reference = data.get('vendor_reference')
-            currency_id = data.get('currency_id')
+            currency_name = data.get('currency_id')        # nama currency, ex: "IDR"
             date_order = data.get('date_order')
             transaction_id = data.get('transaction_id')
             expected_arrival = data.get('expected_arrival')
@@ -889,13 +895,13 @@ class POSTPurchaseOrderFromSAP(http.Controller):
             location_id = data.get('location_id')
             order_line = data.get('order_line', [])
 
-            # Check if PO already exists
+            # 🔎 Check duplicate PO
             existing_po = env['purchase.order'].sudo().search([
-                ('vit_trxid', '=', transaction_id), 
+                ('vit_trxid', '=', transaction_id),
                 ('picking_type_id.name', '=', picking_type_name),
                 ('picking_type_id.default_location_dest_id', '=', location_id)
             ], limit=1)
-            
+
             if existing_po:
                 return {
                     'code': 500,
@@ -904,8 +910,10 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                     'id': existing_po.id,
                 }
 
-            # Validate customer
-            customer_id = env['res.partner'].sudo().search([('customer_code', '=', customer_code)], limit=1).id 
+            # 🔎 Validate customer
+            customer_id = env['res.partner'].sudo().search(
+                [('customer_code', '=', customer_code)], limit=1
+            ).id
             if not customer_id:
                 return {
                     'status': "Failed",
@@ -913,9 +921,19 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                     'message': f"Customer with code '{customer_code}' not found.",
                 }
 
-            # Validate picking type
+            # 🔎 Validate currency
+            currency = env['res.currency'].sudo().search([('name', '=', currency_name)], limit=1)
+            if not currency:
+                return {
+                    'status': "Failed",
+                    'code': 500,
+                    'message': f"Currency with name '{currency_name}' not found.",
+                }
+            currency_id = currency.id
+
+            # 🔎 Validate picking type
             picking_types = env['stock.picking.type'].sudo().search([
-                ('name', '=', picking_type_name), 
+                ('name', '=', picking_type_name),
                 ('default_location_dest_id', '=', location_id)
             ], limit=1)
 
@@ -926,11 +944,13 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                     'message': f"Picking type with name '{picking_type_name}' and location_id '{location_id}' not found.",
                 }
 
-            # Validate all products first before creating PO
+            # 🔎 Validate all products first
             missing_products = []
             for line in order_line:
                 product_code = line.get('product_code')
-                product_id = env['product.product'].sudo().search([('default_code', '=', product_code)], limit=1)
+                product_id = env['product.product'].sudo().search(
+                    [('default_code', '=', product_code)], limit=1
+                )
                 if not product_id:
                     missing_products.append(product_code)
 
@@ -941,37 +961,38 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                     'message': f"Products with codes {', '.join(missing_products)} not found. Purchase Order creation cancelled.",
                 }
 
-            # Create purchase order lines
+            # 🧾 Build purchase order lines
             purchase_order_lines = []
             for line in order_line:
                 product_code = line.get('product_code')
                 product_uom_qty = line.get('product_uom_qty')
                 price_unit = line.get('price_unit')
-                taxes_ids = line.get('taxes_ids')
+                taxes_name = line.get('taxes_ids')
 
                 # Validate tax
-                tax_name = env['account.tax'].sudo().search([('name', '=', taxes_ids)], limit=1)
-                if not tax_name:
+                tax = env['account.tax'].sudo().search([('name', '=', taxes_name)], limit=1)
+                if not tax:
                     return {
                         'status': "Failed",
                         'code': 500,
-                        'message': f"Failed to create PO. Tax not found: {taxes_ids}.",
+                        'message': f"Failed to create PO. Tax not found: {taxes_name}.",
                     }
 
-                taxes_ids = [tax_name.id]
+                product_id = env['product.product'].sudo().search(
+                    [('default_code', '=', product_code)], limit=1
+                )
 
-                product_id = env['product.product'].sudo().search([('default_code', '=', product_code)], limit=1)
                 purchase_order_line = {
                     'name': product_id.name,
                     'product_id': product_id.id,
                     'product_qty': product_uom_qty,
                     'price_unit': price_unit,
-                    'taxes_id': [(6, 0, taxes_ids)],
-                    'product_uom': product_id.uom_id.id,  # Added product UOM
+                    'taxes_id': [(6, 0, [tax.id])],
+                    'product_uom': product_id.uom_id.id,
                 }
                 purchase_order_lines.append((0, 0, purchase_order_line))
 
-            # Create purchase order
+            # 📝 Create purchase order
             purchase_order = env['purchase.order'].sudo().create({
                 'partner_id': customer_id,
                 'partner_ref': vendor_reference,
@@ -985,12 +1006,11 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                 'order_line': purchase_order_lines,
             })
 
-            # Confirm purchase order
+            # ✅ Confirm purchase order
             purchase_order.button_confirm()
-            
-            # Update related pickings
+
+            # 🔄 Update related pickings
             picking_ids = env['stock.picking'].sudo().search([('purchase_id', '=', purchase_order.id)])
-            
             if picking_ids:
                 for picking in picking_ids:
                     for move in picking.move_ids_without_package:

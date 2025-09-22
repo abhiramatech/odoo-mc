@@ -2,28 +2,26 @@ from odoo import http
 from odoo.http import request
 import json
 from odoo.exceptions import AccessError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .api_utils import check_authorization, paginate_records, serialize_response, serialize_error_response
 import logging
 _logger = logging.getLogger(__name__)
 
 class MasterCustomerPATCH(http.Controller):
-    @http.route(['/api/master_customer/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)
-    def update_master_customer(self, return_id, **kwargs):
+    @http.route(['/api/master_customer'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_master_customer(self, **kwargs):
         try:
-            # Get configuration
-            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
             if not config:
-                return {
-                    'status': "Failed",
-                    'code': 500,
-                    'message': "Configuration not found.",
-                }
-            
-            username = config.vit_config_username
-            password = config.vit_config_password_api
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
 
-            # Manual authentication
-            uid = request.session.authenticate(request.session.db, username, password)
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
             if not uid:
                 return {
                     'status': "Failed",
@@ -92,10 +90,12 @@ class MasterCustomerPATCH(http.Controller):
             }
         
 class MasterItemPATCH(http.Controller):
-    @http.route(['/api/master_item/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)
-    def update_master_item(self, return_id, **kwargs):
+    @http.route(['/api/master_item'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_master_item(self, **kwargs):
         try:
-            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
             if not config:
                 return {
                     'status': "Failed",
@@ -107,7 +107,11 @@ class MasterItemPATCH(http.Controller):
             password = config.vit_config_password_api
 
             # Manual authentication
-            uid = request.session.authenticate(request.session.db, username, password)
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
             if not uid:
                 return {
                     'status': "Failed",
@@ -115,7 +119,6 @@ class MasterItemPATCH(http.Controller):
                     'message': "Authentication failed.",
                 }
 
-            # Use superuser environment
             env = request.env(user=request.env.ref('base.user_admin').id)
 
             # Parse the incoming data

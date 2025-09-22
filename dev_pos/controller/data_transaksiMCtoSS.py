@@ -3265,8 +3265,13 @@ class DataTransaksiMCtoSS:
                                                             {'fields': ['id', 'product_tmpl_id', 'default_code']})
             print(product_source)
             # Step 2: Create a dictionary to map product_id to default_code
-            product_source_dict = {product['id']: product['default_code'] for product in product_source if 'default_code' in product}
-            print(product_source_dict)
+            # Hapus pemakaian product_tmpl_id, langsung pakai default_code → product_id
+            product_source_dict = {
+                product['id']: product['default_code']
+                for product in product_source if 'default_code' in product
+            }
+            source_default_codes = list(set(product_source_dict.values()))
+
             # Step 3: Create a mapping from default_code to product_tmpl_id
             default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
@@ -3274,13 +3279,10 @@ class DataTransaksiMCtoSS:
             # Step 4: Fetch product.template data from target_client using default_code
             # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
             product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                self.target_client.uid, self.target_client.password,
-                'product.product', 'search_read',
-                [[
-                    ['default_code', 'in', default_codes],
-                    ['active', '=', True]
-                ]],
-                {'fields': ['id', 'default_code', 'active']})
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'product.product', 'search_read',
+                                                                [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
+                                                                {'fields': ['id', 'default_code']})
 
             # Step 5 (baru): Mapping dari default_code ke product.product.id
             default_code_to_target_product_id = {
