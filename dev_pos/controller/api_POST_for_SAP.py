@@ -414,7 +414,8 @@ class POSTMasterCustomer(http.Controller):
                     customer_code = data.get('customer_code')
                     if env['res.partner'].sudo().search([('customer_code', '=', customer_code)], limit=1):
                         errors.append(f"Duplicate Customer code: {customer_code}")
-                        continue
+                        # continue
+                        return
 
                     customer_data = {
                         'name': data.get('name'),
