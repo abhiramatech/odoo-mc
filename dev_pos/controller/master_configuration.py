@@ -600,8 +600,10 @@ class SettingConfig(models.Model):
         date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
 
         for ss_client in ss_clients:
-            integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.purchase_order_from_mc('purchase.order', ['name', 'partner_id', 'partner_ref', 'currency_id', 'date_approve', 'date_planned', 'picking_type_id', 'vit_trxid'], 'Transaksi Purchase Order', date_from, date_to)
+            # integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
+            # integrator_transaksiMCtoSS.purchase_order_from_mc('purchase.order', ['name', 'partner_id', 'partner_ref', 'currency_id', 'date_approve', 'date_planned', 'picking_type_id', 'vit_trxid'], 'Transaksi Purchase Order', date_from, date_to)
+            integrator_master = DataIntegrator(mc_client, ss_client)
+            integrator_master.transfer_data('purchase.order', ['name', 'partner_id', 'partner_ref', 'currency_id', 'date_approve', 'date_planned', 'picking_type_id', 'vit_trxid', 'order_line', 'create_date', 'write_date'], 'Transaksi Purchase Order', date_from, date_to)
 
     def delete_log_note(self):
         mc_client, ss_clients = self.get_config(False)
