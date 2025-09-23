@@ -1,14 +1,25 @@
 <odoo>
   <data>
 
-    <record model="ir.ui.view" id="view_res_partner_form">
-      <field name="name">res.partner.form</field>
-      <field name="model">res.partner</field>
-      <field name="inherit_id" ref="base.view_partner_form"/>
+    <record model="ir.ui.view" id="view_hr_employee_form">
+      <field name="name">hr.employee.form</field>
+      <field name="model">hr.employee</field>
+      <field name="inherit_id" ref="hr.view_employee_form"/>
       <field name="arch" type="xml">
-        <xpath expr="//field[@name='category_id']" position="after">
+        <xpath expr="//field[@name='coach_id']" position="after">
             <field name="is_integrated"/>
             <field name="index_store" widget="many2many_tags"/>
+        </xpath>
+        <xpath expr="//page[@name='hr_settings']" position="after">
+            <page string="Access Right" name="access_right" groups="base.group_erp_manager">
+                <group>
+                    <group>
+                        <field name="is_sales"/>
+                        <field name="is_cashier"/>
+                        <field name="is_pic"/>
+                    </group>
+                </group>
+            </page>
         </xpath>
         <xpath expr="//field[@name='is_integrated']" position="attributes">
           <attribute name="force_save">1</attribute>
@@ -18,17 +29,9 @@
           <attribute name="force_save">1</attribute>
           <attribute name="readonly">True</attribute>
         </xpath>
-        <!-- <xpath expr="//page[@name='public']" position="after">
-          <page string="Access Right" name="access_right">
-            <group>
-                <field name="is_sales"/>
-                <field name="is_cashier"/>
-                <field name="is_pic"/>
-            </group>
-          </page>
-        </xpath> -->
       </field>
     </record>
+
 
   </data>
 </odoo>

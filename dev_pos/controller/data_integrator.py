@@ -134,6 +134,10 @@ class DataIntegrator:
                                                     self.source_client.uid, self.source_client.password, model,
                                                     'read', [batch_ids], {'fields': fields})
                     data_list.extend(batch_data)
+            elif model == 'purchase.order':
+                data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                    self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['state', '=', 'purchase'], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
+                                                    {'fields': fields})  # , 'limit': 1 , 'limit': 100 debug False 
             else:
                 data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
                                                     self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
@@ -188,6 +192,9 @@ class DataIntegrator:
             elif model == 'res.partner':
                 filter = []
                 fields = ['customer_code', 'name']
+            elif model == 'purchase.order.line':
+                filter = []
+                fields = ['product_id', 'name', 'product_qty', 'qty_received', 'qty_invoiced', 'product_uom', 'price_unit', 'taxes_id']
             else:
                 filter = []
                 field_uniq_relation_source_all = self.get_field_uniq_from_model(model)
@@ -207,6 +214,8 @@ class DataIntegrator:
                 fields = ['product_tmpl_id', 'min_quantity', 'fixed_price', 'date_start', 'date_end', 'compute_price', 'percent_price', 'base', 'price_discount', 'price_surcharge', 'price_round', 'price_min_margin', 'price_max_margin', 'applied_on', 'categ_id', 'product_id', 'id_mc']
             elif model == 'account.tax.repartition.line':
                 fields = ['tax_id','factor_percent','repartition_type', 'account_id','tag_ids', 'document_type', 'use_in_tax_closing']
+            elif model == 'purchase.order.line':
+                fields = ['product_id', 'name', 'product_qty', 'qty_received', 'qty_invoiced', 'product_uom', 'price_unit', 'taxes_id']
             else:
                 field_uniq_relation_source_all = self.get_field_uniq_from_model(model)
                 fields = [field_uniq_relation_source_all]
@@ -350,6 +359,10 @@ class DataIntegrator:
                     elif model == 'account.tax':
                         model_line = 'account.tax.repartition.line'
                         fields_line = ['tax_id','factor_percent','repartition_type', 'account_id','tag_ids', 'document_type', 'use_in_tax_closing']
+                        type_fields_line, relation_fields_line = self.get_type_data_source(model_line, fields_line)
+                    elif model == 'purchase.order':
+                        model_line = 'purchase.order.line'
+                        fields_line = ['product_id', 'name', 'product_qty', 'qty_received', 'qty_invoiced', 'product_uom', 'price_unit', 'taxes_id']
                         type_fields_line, relation_fields_line = self.get_type_data_source(model_line, fields_line)
                         
                     for relation_line in relation_fields_line:
@@ -502,11 +515,15 @@ class DataIntegrator:
                 record['invoice_repartition_line_ids'] = self.transfer_tax_lines_invoice(filtered_taxes_invoice, 'account.tax.repartition.line', record, dict_relation_source_line, dict_relation_target_line, type_fields_line, relation_fields_line)
                 filtered_taxes_refund = [item for item in dict_relation_source.get('account.tax.repartition.line', []) if item['id'] in record.get('refund_repartition_line_ids', [])]
                 record['refund_repartition_line_ids'] = self.transfer_tax_lines_refund(filtered_taxes_refund, 'account.tax.repartition.line', record, dict_relation_source_line, dict_relation_target_line, type_fields_line, relation_fields_line)    
+            if model == 'purchase.order':
+                filtered_purchase = [item for item in dict_relation_source.get('purchase.order.line', []) if item['id'] in record.get('order_line', [])]
+                record['order_line'] = self.transfer_pricelist_lines(filtered_purchase, 'purchase.order.line', [record], dict_relation_source_line, dict_relation_target_line, type_fields_line, relation_fields_line)
             elif model == 'product.tag':
                 filtered_product_tag = [item for item in dict_relation_source.get('product.template', []) if item['id'] in record.get('product_template_ids', [])]
             valid_record = self.validate_record_data(record, model, [record], type_fields, relation_fields, dict_relation_source, dict_relation_target)
             if valid_record:
-                record['id_mc'] = id_mc
+                if model != 'purchase.order':
+                    record['id_mc'] = id_mc
                 return record
         except Exception as e:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred while processing record: {e}", None)
@@ -685,7 +702,17 @@ class DataIntegrator:
                 relation_model = relation_fields[field_name]
 
                 if field_metadata == 'many2one' and isinstance(field_value, list):
-                    field_data = field_value[1] if field_value else False
+                    if model == 'purchase.order' and field_name == 'partner_id':
+                        field_data_id = field_value[0] if field_value else False
+                        field_datas = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                            self.source_client.uid, self.source_client.password,
+                                            'res.partner', 'search_read',
+                                            [[('id', '=', field_data_id)]], {'fields': ['customer_code']})
+                        field_data = field_datas and field_datas[0].get('customer_code', False)
+                    else:
+                        field_data = field_value[1] if field_value else False
+                        if model == 'purchase.order' and field_name == 'picking_type_id':
+                            field_data = field_data.split(': ')[1]
                 elif field_metadata == 'many2many' and isinstance(field_value, list):
                     name_datas_source = dict_relation_source.get(relation_model, [])
                     if model == 'product.tag':
@@ -1128,6 +1155,11 @@ class DataIntegrator:
                     
                     if (field_metadata == 'many2one') and isinstance(field_value, list):
                         field_data = field_value[1] if field_value else False
+                        if model == 'purchase.order.line' and field_name == 'product_id':
+                            # result = re.search(r'\[(.*?)\]', field_data) didalam siku
+                            result = re.search(r'\] (.*)', field_data)
+                            if result:
+                                field_data = result.group(1)  # Output: 8997207960317 from [...]
                     elif (field_metadata == 'many2many') and isinstance(field_value, list):
                         field_data_list = []
                         for field_data in field_value:

@@ -1669,7 +1669,7 @@ class ManufacturingOrderAPI(http.Controller):
                     'id': line.id,
                     'doc_no': doc_num,
                     'location_id': line.location_id.id,
-                    'location': line.location_id.name,
+                    'location': line.location_id.complete_name,
                     'location_dest_id': line.location_dest_id.id,
                     'location_dest': line.location_dest_id.complete_name,
                     'product_id': line.product_id.id,

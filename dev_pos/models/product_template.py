@@ -10,3 +10,4 @@ class ProductTemplate(models.Model):
     vit_sub_div = fields.Char(string="Sub Category")
     vit_item_kel = fields.Char(string="Kelompok")
     vit_item_type = fields.Char(string="Type")
+    vit_is_discount = fields.Boolean(string="Discount")

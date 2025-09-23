@@ -996,3 +996,114 @@ class PurchaseOrderPATCH(http.Controller):
                 'message': str(e),
                 'id': return_id
             }
+        
+class ManufactureOrderPATCH(http.Controller):
+    @http.route(['/api/manufacture_order/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_manufacture_order(self, return_id, **kwargs):
+        try:
+            # Get configuration
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
+
+            username = config.vit_config_username
+            password = config.vit_config_password_api
+
+            # Manual authentication
+            uid = request.session.authenticate(request.session.db, username, password)
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            env = request.env(user=request.env.ref('base.user_admin').id)
+            data = request.get_json_data()
+            is_integrated = data.get('is_integrated')
+
+            if not isinstance(is_integrated, bool):
+                return {
+                    'code': 400,
+                    'status': 'error',
+                    'message': 'Invalid data: is_integrated must be a boolean',
+                    'id': return_id
+                }
+
+            mo = env['mrp.production'].sudo().search([('id', '=', return_id)], limit=1)
+            if not mo.exists():
+                return {
+                    'code': 404,
+                    'status': 'error',
+                    'message': 'Manufacture Order not found',
+                    'id': return_id
+                }
+
+            mo.write({
+                'is_integrated': is_integrated,
+                'write_uid': uid
+            })
+
+            return {
+                'code': 200,
+                'status': 'success',
+                'message': 'Manufacture Order updated successfully',
+                'id': return_id
+            }
+
+        except Exception as e:
+            _logger.error(f"Error updating Manufacture Order: {str(e)}")
+            return {'code': 500, 'status': 'error', 'message': str(e), 'id': return_id}
+
+
+class UnbuildOrderPATCH(http.Controller):
+    @http.route(['/api/unbuild_order/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_unbuild_order(self, return_id, **kwargs):
+        try:
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
+
+            username = config.vit_config_username
+            password = config.vit_config_password_api
+
+            uid = request.session.authenticate(request.session.db, username, password)
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            env = request.env(user=request.env.ref('base.user_admin').id)
+            data = request.get_json_data()
+            is_integrated = data.get('is_integrated')
+
+            if not isinstance(is_integrated, bool):
+                return {
+                    'code': 400,
+                    'status': 'error',
+                    'message': 'Invalid data: is_integrated must be a boolean',
+                    'id': return_id
+                }
+
+            unbuild = env['mrp.unbuild'].sudo().search([('id', '=', return_id)], limit=1)
+            if not unbuild.exists():
+                return {
+                    'code': 404,
+                    'status': 'error',
+                    'message': 'Unbuild Order not found',
+                    'id': return_id
+                }
+
+            unbuild.write({
+                'is_integrated': is_integrated,
+                'write_uid': uid
+            })
+
+            return {
+                'code': 200,
+                'status': 'success',
+                'message': 'Unbuild Order updated successfully',
+                'id': return_id
+            }
+
+        except Exception as e:
+            _logger.error(f"Error updating Unbuild Order: {str(e)}")
+            return {'code': 500, 'status': 'error', 'message': str(e), 'id': return_id}

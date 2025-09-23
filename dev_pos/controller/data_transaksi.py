@@ -811,21 +811,61 @@ class DataTransaksi:
                 if existing_pos_order_invoice:
                     existing_pos_order_invoice_dict[record['id']] = existing_pos_order_invoice[0]['id']
 
+            # Enhanced product fetching logic to handle service products
             product_ids = [line['product_id'][0] for line in pos_order_lines if line.get('product_id')]
+            
+            # Fetch products from source with additional fields including detailed_type and name
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         'product.product', 'search_read',
                                                         [[['id', 'in', product_ids]]],
-                                                        {'fields': ['id', 'default_code']})
-            product_source_dict = {product['id']: product['default_code'] for product in product_source}
+                                                        {'fields': ['id', 'default_code', 'name', 'detailed_type']})
+            
+            # Create mapping for source products
+            product_source_dict = {}
+            service_products = []
+            regular_products = []
+            
+            for product in product_source:
+                product_id = product['id']
+                if product.get('detailed_type') == 'service':
+                    # For service products, use name as identifier
+                    product_source_dict[product_id] = {
+                        'identifier': product.get('name', ''),
+                        'type': 'service',
+                        'name': product.get('name', '')
+                    }
+                    service_products.append(product.get('name', ''))
+                else:
+                    # For regular products, use default_code as identifier
+                    product_source_dict[product_id] = {
+                        'identifier': product.get('default_code', ''),
+                        'type': 'regular',
+                        'name': product.get('name', '')
+                    }
+                    if product.get('default_code'):
+                        regular_products.append(product.get('default_code'))
 
-            # Pemetaan ke target_client berdasarkan default_code
-            product_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                        self.target_client.uid, self.target_client.password,
-                                                        'product.product', 'search_read',
-                                                        [[['default_code', 'in', list(product_source_dict.values())]]],
-                                                        {'fields': ['id', 'default_code']})
-            product_target_dict = {prod['default_code']: prod['id'] for prod in product_target}
+            # Fetch target products - search by default_code for regular products
+            product_target_dict = {}
+            if regular_products:
+                product_target_regular = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'product.product', 'search_read',
+                                                                [[['default_code', 'in', regular_products]]],
+                                                                {'fields': ['id', 'default_code']})
+                for prod in product_target_regular:
+                    product_target_dict[prod['default_code']] = prod['id']
+
+            # Fetch target products - search by name for service products
+            if service_products:
+                product_target_service = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'product.product', 'search_read',
+                                                                [[['name', 'in', service_products], ['detailed_type', '=', 'service']]],
+                                                                {'fields': ['id', 'name']})
+                for prod in product_target_service:
+                    product_target_dict[prod['name']] = prod['id']
 
             tax_ids = [tax_id for product in pos_order_lines for tax_id in product.get('tax_ids', [])]
             source_taxes = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
@@ -844,6 +884,7 @@ class DataTransaksi:
                                                                 {'fields': ['id', 'id_mc', 'name']})
             payment_method_source_dict = {payment['id']: payment['id_mc'] for payment in payment_method_source}
             pos_order_ids = []
+            
             # Function to process each record
             def process_record(record):
                 if record['id'] in existing_pos_order_invoice_dict:
@@ -857,21 +898,24 @@ class DataTransaksi:
 
                 # Check if all products exist in the target database
                 for line in pos_order_invoice_lines:
-                    source_product_code = product_source_dict.get(line.get('product_id')[0])
-                    target_product_id = product_target_dict.get(source_product_code)
-
-                    if not target_product_id:
-                        missing_products.append(source_product_code)
+                    source_product_id = line.get('product_id')[0] if isinstance(line.get('product_id'), list) else line.get('product_id')
+                    source_product_info = product_source_dict.get(source_product_id)
+                    
+                    if not source_product_info:
+                        missing_products.append(f"Product ID {source_product_id} not found in source")
                         continue
 
-                    if missing_products:
-                        missing_products_str = ", ".join(map(str, missing_products))
-                        message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Invoice', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Invoice', message, write_date)
-                        return
+                    identifier = source_product_info.get('identifier')
+                    target_product_id = product_target_dict.get(identifier)
+
+                    if not target_product_id:
+                        product_type = source_product_info.get('type', 'unknown')
+                        product_name = source_product_info.get('name', 'Unknown')
+                        if product_type == 'service':
+                            missing_products.append(f"Service: {product_name}")
+                        else:
+                            missing_products.append(f"Product: {identifier or product_name}")
+                        continue
 
                     tax_ids_mc = [source_taxes_dict.get(tax_id) for tax_id in line.get('tax_ids', []) if tax_id in source_taxes_dict]
                     pos_order_line_data = {
@@ -887,16 +931,14 @@ class DataTransaksi:
                     }
                     pos_order_invoice_line_ids.append((0, 0, pos_order_line_data))
 
-                    # print(pos_order_invoice_line_ids)
-
-                    if missing_products:
-                        missing_products_str = ", ".join(map(str, missing_products))
-                        message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
-                        print(message)
-                        write_date = self.get_write_date(model_name, record['id'])
-                        self.set_log_mc.create_log_note_failed(record, 'Invoice', message, write_date)
-                        self.set_log_ss.create_log_note_failed(record, 'Invoice', message, write_date)
-                        return
+                if missing_products:
+                    missing_products_str = ", ".join(map(str, missing_products))
+                    message = f"Terdapat produk tidak ditemukan dalam target database: {missing_products_str}"
+                    print(message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Invoice', message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Invoice', message, write_date)
+                    return
 
                 # # # Fetch and process payments
                 pos_order_payments = pos_payments_dict.get(record['id'], [])
@@ -922,7 +964,7 @@ class DataTransaksi:
                 partner_id = partners_source_dict.get(record.get('partner_id')[0] if isinstance(record.get('partner_id'), list) else record.get('partner_id'))
                 session_id = sessions_source_dict.get(record.get('session_id')[0] if isinstance(record.get('session_id'), list) else record.get('session_id'))
                 employee_id = employees_source_dict.get(record.get('employee_id')[0] if isinstance(record.get('employee_id'), list) else record.get('employee_id'))
-                pricelist_id = employees_source_dict.get(record.get('pricelist_id')[0] if isinstance(record.get('pricelist_id'), list) else None)
+                pricelist_id = pricelist_source_dict.get(record.get('pricelist_id')[0] if isinstance(record.get('pricelist_id'), list) else None)
 
                 print(partner_id, session_id, employee_id, pricelist_id)
 
@@ -997,6 +1039,7 @@ class DataTransaksi:
                     self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Invoice', write_date)
                 except Exception as e:
                     message_exception = f"Terjadi kesalahan saat membuat invoice: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
                     self.set_log_mc.create_log_note_failed(record, 'Invoice', message_exception, write_date)
                     self.set_log_ss.create_log_note_failed(record, 'Invoice', message_exception, write_date)
 

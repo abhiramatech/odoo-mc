@@ -11,22 +11,37 @@ class LoyaltyRewardInherit(models.Model):
 
         values = super()._get_discount_product_values()
 
-        # Mendapatkan produk terakhir untuk menghitung default_code
+        # Ambil produk terakhir untuk menghitung default_code
         last_product = self.env['product.product'].search([], order='id desc', limit=1)
         last_code = last_product.default_code if last_product and last_product.default_code else 'Promo-000'
-        
-        # Menangani kasus jika last_code tidak sesuai format
+
         try:
             last_index = int(last_code.split('-')[1])
         except (IndexError, ValueError):
-            last_index = 0  # Atau nilai lain yang sesuai jika parsing gagal
-        
-        # Menambahkan default_code pada nilai produk
+            last_index = 0
+
+        # Tambahkan default_code + flag discount
         for i, val in enumerate(values):
             new_index = last_index + i + 1
-            val['default_code'] = generate_default_code(new_index)
-        
+            val.update({
+                'default_code': generate_default_code(new_index),
+                'vit_is_discount': True,  # ✅ tambahkan flag
+            })
+
         return values
+
+    def write(self, vals):
+        """Saat update reward, generate default_code baru & tandai vit_is_discount"""
+        res = super().write(vals)
+        for reward in self:
+            if reward.discount_line_product_id:
+                values = reward._get_discount_product_values()
+                if values:
+                    reward.discount_line_product_id.write({
+                        'default_code': values[0].get('default_code'),
+                        'vit_is_discount': True,  # ✅ update flag juga
+                    })
+        return res
     
     # def write(self, vals):
     #     res = super().write(vals)

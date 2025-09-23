@@ -10,6 +10,115 @@ from odoo.exceptions import AccessError
 
 _logger = logging.getLogger(__name__)
 
+class POSTEmployee(http.Controller):
+    @http.route('/api/hr_employee', type='json', auth='none', methods=['POST'], csrf=False)
+    def post_employee(self, **kw):
+        try:
+            # Authentication
+            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            if not config:
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
+            
+            uid = request.session.authenticate(request.session.db, config.vit_config_username, config.vit_config_password_api)
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            env = request.env(user=request.env.ref('base.user_admin').id)
+            
+            data = request.get_json_data()
+
+            # Validate 'items' must be a list
+            items = data.get('items', [])
+            if not isinstance(items, list):
+                return {'status': "Failed", 'code': 400, 'message': "'items' must be a list."}
+
+            created = []  # To store successfully created employees
+            failed = []   # To store failed employees
+
+            # Process each item
+            for data in items:
+                try:
+                    # Validate required fields
+                    required_fields = ['employee_code', 'name', 'job_title', 'department_id']
+                    missing_fields = [field for field in required_fields if not data.get(field)]
+                    if missing_fields:
+                        failed.append({
+                            'data': data,
+                            'message': f"Missing required fields: {', '.join(missing_fields)}",
+                            'id': None  # ID is not created, so set it to None
+                        })
+                        continue
+
+                    # Validate department
+                    department_id = data.get('department_id')
+                    department = env['hr.department'].sudo().browse(department_id)
+                    if not department.exists():
+                        failed.append({
+                            'data': data,
+                            'message': f"Department with ID {department_id} not found.",
+                            'id': None  # ID is not created, so set it to None
+                        })
+                        continue
+
+                    # Check if employee name already exists
+                    existing_employee = env['hr.employee'].sudo().search([('name', '=', data.get('name'))], limit=1)
+                    if existing_employee:
+                        failed.append({
+                            'data': data,
+                            'message': f"Employee with name '{data.get('name')}' already exists.",
+                            'id': existing_employee.id  # Provide the existing employee's ID
+                        })
+                        continue
+
+                    # Create employee
+                    employee_data = {
+                        'employee_code': data.get('employee_code'),
+                        'name': data.get('name'),
+                        'job_title': data.get('job_title'),
+                        'department_id': department.id,
+                        'work_email': data.get('work_email'),
+                        'work_phone': data.get('work_phone'),
+                        'mobile_phone': data.get('mobile_phone'),
+                        'create_uid': uid,
+                        'address_home_id': data.get('address_home_id'),
+                        'gender': data.get('gender'),
+                        'birthdate': data.get('birthdate'),
+                        'is_sales': data.get('is_sales', False)
+                    }
+
+                    employee = env['hr.employee'].sudo().create(employee_data)
+
+                    created.append({
+                        'id': employee.id,
+                        'employee_code': employee.employee_code,
+                        'name': employee.name,
+                    })
+
+                except Exception as e:
+                    failed.append({
+                        'data': data,
+                        'message': f"Error: {str(e)}",
+                        'id': None  # ID is not created, so set it to None
+                    })
+
+            # Return response
+            return {
+                'code': 200,
+                'status': 'success',
+                'created_employees': created,  # List of successfully created employees
+                'failed_employees': failed    # List of employees that failed to create with ID and reason
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Failed to create employees: {str(e)}", exc_info=True)
+            return {
+                'status': "Failed", 
+                'code': 500, 
+                'message': f"Failed to create employees: {str(e)}"
+            }
+
+
 class POSTMasterBoM(http.Controller):
     @http.route('/api/master_bom', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_bom(self, **kw):

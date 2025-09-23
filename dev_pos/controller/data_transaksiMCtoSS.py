@@ -18,7 +18,7 @@ class DataTransaksiMCtoSS:
             transaksi_bom_master = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                 self.source_client.uid, self.source_client.password,
                 model_name, 'search_read',
-                [[['is_integrated', '=', False], ['create_date', '>=', date_from], ['create_date', '<=', date_to]]],
+                [[['is_integrated', '=', False]]],
                 {'fields': fields})
 
             if not transaksi_bom_master:
@@ -140,7 +140,7 @@ class DataTransaksiMCtoSS:
                     'product_qty': record.get('product_qty') or 1.0,
                     'code': record.get('code'),
                     'type': record.get('type'),
-                    'id_mc': record.get('id'),
+                    # 'id_mc': record.get('id'),
                     'consumption': record.get('consumption'),
                     'produce_delay': record.get('produce_delay'),
                     'days_to_prepare_mo': record.get('days_to_prepare_mo'),
@@ -158,12 +158,54 @@ class DataTransaksiMCtoSS:
                     print(f"💥 Gagal create BoM ID {record['id']}: {e}")
 
                 try:
-                    self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                    index_store_ids = record.get('index_store', [])
+                    
+                    # Ambil setting config yang aktif untuk target integrasi
+                    setting_config_ids = self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
                         self.source_client.uid, self.source_client.password,
-                        'mrp.bom', 'write', [[record['id']], {'is_integrated': True}])
-                    print(f"📝 BoM {record['id']} ditandai sebagai integrated")
+                        'setting.config', 'search_read',
+                        [[['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                        {'fields': ['id']}
+                    )
+                    setting_config_ids = [config['id'] for config in setting_config_ids]
+
+                    # Update index_store dengan setting config IDs yang aktif
+                    self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        'mrp.bom', 'write',
+                        [[record['id']], {
+                            'index_store': [(6, 0, setting_config_ids)]
+                        }]
+                    )
+                    print(f"📌 Field index_store diperbarui untuk BoM ID {record['id']}.")
+
+                    # Periksa apakah semua setting config sudah tercakup di index_store
+                    if len(index_store_ids) + 1 >= len(setting_config_ids):  # `+1` karena mungkin baru ditambahkan 1 saat ini
+                        self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'mrp.bom', 'write',
+                            [[record['id']], {
+                                'is_integrated': True,
+                                'index_store': [(5, 0, 0)]  # clear
+                            }]
+                        )
+                        print(f"✅ BoM ID {record['id']} telah diintegrasi ke semua target.")
+                    else:
+                        self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'mrp.bom', 'write',
+                            [[record['id']], {
+                                'is_integrated': False
+                            }]
+                        )
+                        print(f"⌛ BoM ID {record['id']} belum terintegrasi ke semua target.")
                 except Exception as e:
-                    print(f"⚠️ Gagal update is_integrated untuk BoM {record['id']}: {e}")
+                    print(f"⚠️ Gagal update index_store/is_integrated untuk BoM {record['id']}: {e}")
+
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(process_bom, record) for record in transaksi_bom_master]
@@ -206,7 +248,7 @@ class DataTransaksiMCtoSS:
             try:
                 start_time = time.time()
 
-                # Buat inventory stock di target
+                # Buat timbangan config di target
                 new_timbangan_id = self.target_client.call_odoo(
                     'object', 'execute_kw', self.target_client.db,
                     self.target_client.uid, self.target_client.password,
@@ -214,13 +256,52 @@ class DataTransaksiMCtoSS:
                     [timbangan_data]
                 )
 
-                # Update flag is_integrated di source
+                # Ambil index_store saat ini (list of setting.config id yang sudah integrasi)
+                index_store_ids = rec.get('index_store', [])
+
+                # Ambil semua setting.config yang aktif
+                setting_config_ids = self.source_client.call_odoo(
+                    'object', 'execute_kw', self.source_client.db,
+                    self.source_client.uid, self.source_client.password,
+                    'setting.config', 'search_read',
+                    [[['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                    {'fields': ['id']}
+                )
+                setting_config_ids = [config['id'] for config in setting_config_ids]
+
+                # Update record source → tambahkan index_store (mengganti keseluruhan isian)
                 self.source_client.call_odoo(
                     'object', 'execute_kw', self.source_client.db,
                     self.source_client.uid, self.source_client.password,
                     model_name, 'write',
-                    [[rec_id], {'is_integrated': True}]
+                    [[rec_id], {
+                        'index_store': [(6, 0, setting_config_ids)],
+                    }]
                 )
+                print(f"📌 index_store diperbarui untuk {model_name} ID {rec_id}")
+
+                # Cek apakah semua setting.config sudah tercakup
+                if len(index_store_ids) + 1 >= len(setting_config_ids):  # `+1` karena yang sekarang baru diproses
+                    self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        model_name, 'write',
+                        [[rec_id], {
+                            'is_integrated': True,
+                            'index_store': [(5, 0, 0)]  # Clear
+                        }]
+                    )
+                    print(f"✅ {model_name} ID {rec_id} telah berhasil diintegrasi ke semua target.")
+                else:
+                    self.source_client.call_odoo(
+                        'object', 'execute_kw', self.source_client.db,
+                        self.source_client.uid, self.source_client.password,
+                        model_name, 'write',
+                        [[rec_id], {
+                            'is_integrated': False
+                        }]
+                    )
+                    print(f"⌛ {model_name} ID {rec_id} belum terintegrasi ke semua target.")
 
                 end_time = time.time()
                 duration = end_time - start_time
@@ -229,7 +310,7 @@ class DataTransaksiMCtoSS:
 
                 write_date = self.get_write_date(model_name, rec_id)
                 self.set_log_mc.create_log_note_success(rec, start_time, end_time, duration, 'Timbangan Configuration', write_date)
-                self.set_log_ss.create_log_note_success(rec, start_time, end_time, duration, 'Timbangan Configurationk', write_date)
+                self.set_log_ss.create_log_note_success(rec, start_time, end_time, duration, 'Timbangan Configuration', write_date)
 
             except Exception as e:
                 error_message = str(e)
@@ -2032,28 +2113,36 @@ class DataTransaksiMCtoSS:
             def process_ts_in_record(record):
                 if record['id'] in existing_ts_in_dict:
                     return
+
                 ts_in_inventory_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                                self.source_client.uid, self.source_client.password,
-                                                                'stock.move', 'search_read',
-                                                                [[['picking_id', '=', record['id']]]],
-                                                                {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
-                
+                                                                    self.source_client.uid, self.source_client.password,
+                                                                    'stock.move', 'search_read',
+                                                                    [[['picking_id', '=', record['id']]]],
+                                                                    {'fields': ['product_id', 'product_uom_qty', 'quantity', 'name']})
+
                 location_id = "Partners/Vendors"
                 location_id_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                    self.target_client.uid, self.target_client.password,
-                                                                    'stock.location', 'search_read',
-                                                                    [[['complete_name', '=', location_id ]]],
-                                                                    {'fields': ['id'], 'limit': 1})
-                
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'stock.location', 'search_read',
+                                                                [[['complete_name', '=', location_id]]],
+                                                                {'fields': ['id'], 'limit': 1})
+
                 location_id = location_id_source[0]['id']
-                location_dest_id = location_dest_source_dict.get(str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(record.get('location_dest_id')))
+                location_dest_id = location_dest_source_dict.get(
+                    str(record.get('location_dest_id')[0]) if isinstance(record.get('location_dest_id'), list) else str(
+                        record.get('location_dest_id')))
                 
-                picking_type_id = picking_type_source_dict.get(str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')))
+                picking_type_id = picking_type_source_dict.get(
+                    str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(
+                        record.get('picking_type_id')))
                 
                 print(location_id, location_dest_id, picking_type_id)
+                
                 missing_products = []
                 ts_in_inventory_line_ids = []
                 should_skip_create = False
+                
+                # Process each line in ts_in_inventory_lines
                 for line in ts_in_inventory_lines:
                     source_product_code = product_source_dict.get(line.get('product_id')[0])
 
@@ -2063,8 +2152,9 @@ class DataTransaksiMCtoSS:
                     if not target_product_id:
                         missing_products.append(source_product_code)
                         should_skip_create = True
-                        continue
+                        continue  # Skip this product if not found in target system
 
+                    # Prepare the inventory line data for stock.picking
                     ts_in_inventory_line_data = {
                         'product_id': int(target_product_id),
                         'product_uom_qty': line.get('product_uom_qty'),
@@ -2075,19 +2165,23 @@ class DataTransaksiMCtoSS:
                     }
                     ts_in_inventory_line_ids.append((0, 0, ts_in_inventory_line_data))
 
+                # If any products were missing, log the issue and skip creating stock.picking
                 if should_skip_create:
                     missing_products_str = ", ".join(missing_products)
                     message = f"Terdapat produk tidak aktif dalam TS Out/TS In: {missing_products_str}"
                     print(message)
+                    
+                    # Get the write date for the transaction and log the failure
                     write_date = self.get_write_date(model_name, record['id'])
                     self.set_log_mc.create_log_note_failed(record, 'TS Out/TS In', message, write_date)
                     self.set_log_ss.create_log_note_failed(record, 'TS Out/TS In', message, write_date)
-
+                    return  # CRITICAL FIX: Exit the function here to prevent document creation
+                
+                # ONLY proceed with document creation if no products are missing
+                # Prepare the transfer data for stock.picking creation
                 target_location = record.get('target_location')
 
                 ts_in_transfer_data = {
-                    # 'name': record.get('name', False) + ' - ' + datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d %H:%M:%S"),
-                    # 'partner_id': customer_target_id,
                     'scheduled_date': record.get('scheduled_date', False),
                     'date_done': record.get('date_done', False),
                     'vit_trxid': record.get('name', False),
@@ -2103,21 +2197,24 @@ class DataTransaksiMCtoSS:
                 print(ts_in_transfer_data)
 
                 try:
+                    # Create the new stock.picking entry
                     new_ts_in_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                    self.target_client.uid, self.target_client.password,
-                                                                    'stock.picking', 'create',
-                                                                    [ts_in_transfer_data])
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'stock.picking', 'create',
+                                                                [ts_in_transfer_data])
                     print(f"Goods Receipt baru telah dibuat dengan ID: {new_ts_in_id}")
 
+                    # Fetch the vit_trxid for the newly created stock.picking entry
                     new_ts_in_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                            self.target_client.uid, self.target_client.password,
-                                                            'stock.picking', 'read',
-                                                            [new_ts_in_id, ['name']])
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'stock.picking', 'read',
+                                                                [new_ts_in_id, ['name']])
 
                     if new_ts_in_id:
                         vit_trxid = new_ts_in_id[0]['name']
 
                         start_time = time.time()
+                        # Update the source system with the new vit_trxid
                         self.source_client.call_odoo(
                             'object', 'execute_kw', self.source_client.db,
                             self.source_client.uid, self.source_client.password,
@@ -2132,10 +2229,15 @@ class DataTransaksiMCtoSS:
                         self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'TS Out/TS In', write_date)
                     else:
                         print(f"Tidak dapat mengambil 'vit_trxid' untuk stock.picking ID {new_ts_in_id}")
-                    
+
                 except Exception as e:
                     print(f"Gagal membuat atau memposting TS In baru: {e}")
+                    write_date = self.get_write_date(model_name, record['id'])
+                    message_exception = f"Gagal membuat atau memposting TS In baru: {e}"
+                    self.set_log_mc.create_log_note_failed(record, 'TS Out/TS In', message_exception, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'TS Out/TS In', message_exception, write_date)
 
+            # Execute the function with a ThreadPoolExecutor for concurrent processing
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(process_ts_in_record, record) for record in transaksi_ts_in]
                 concurrent.futures.wait(futures)
