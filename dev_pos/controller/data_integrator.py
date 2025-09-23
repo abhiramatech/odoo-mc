@@ -522,7 +522,8 @@ class DataIntegrator:
                 filtered_product_tag = [item for item in dict_relation_source.get('product.template', []) if item['id'] in record.get('product_template_ids', [])]
             valid_record = self.validate_record_data(record, model, [record], type_fields, relation_fields, dict_relation_source, dict_relation_target)
             if valid_record:
-                record['id_mc'] = id_mc
+                if model != 'purchase.order':
+                    record['id_mc'] = id_mc
                 return record
         except Exception as e:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred while processing record: {e}", None)
@@ -710,6 +711,8 @@ class DataIntegrator:
                         field_data = field_datas and field_datas[0].get('customer_code', False)
                     else:
                         field_data = field_value[1] if field_value else False
+                        if model == 'purchase.order' and field_name == 'picking_type_id':
+                            field_data = field_data.split(': ')[1]
                 elif field_metadata == 'many2many' and isinstance(field_value, list):
                     name_datas_source = dict_relation_source.get(relation_model, [])
                     if model == 'product.tag':
@@ -1152,6 +1155,11 @@ class DataIntegrator:
                     
                     if (field_metadata == 'many2one') and isinstance(field_value, list):
                         field_data = field_value[1] if field_value else False
+                        if model == 'purchase.order.line' and field_name == 'product_id':
+                            # result = re.search(r'\[(.*?)\]', field_data) didalam siku
+                            result = re.search(r'\] (.*)', field_data)
+                            if result:
+                                field_data = result.group(1)  # Output: 8997207960317 from [...]
                     elif (field_metadata == 'many2many') and isinstance(field_value, list):
                         field_data_list = []
                         for field_data in field_value:
