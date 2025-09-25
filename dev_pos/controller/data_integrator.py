@@ -23,7 +23,8 @@ class DataIntegrator:
                 'stock.location': 'complete_name',
                 'account.account': 'code',
                 'loyalty.card': 'code',
-                'multiple.barcode': 'barcode'
+                'multiple.barcode': 'barcode',
+                'purchase.order': 'vit_trxid',
             }
             return field_uniq_mapping.get(model, 'name')
         except Exception as e:
@@ -34,7 +35,8 @@ class DataIntegrator:
     def get_existing_data(self, model, field_uniq, fields, existing_datalist):
         try:
             fields_target = fields.copy() # kalau tidak pakai copy makan value fields akan berubah juga sama seperti fields_target
-            fields_target.extend(['id_mc'])
+            if model != 'purchase.order':
+                fields_target.extend(['id_mc'])
             existing_datalist = list(existing_datalist)  # ubah set ke list
 
             # Step 1: Cari semua ID yang memenuhi kondisi
@@ -135,9 +137,14 @@ class DataIntegrator:
                                                     'read', [batch_ids], {'fields': fields})
                     data_list.extend(batch_data)
             elif model == 'purchase.order':
+                data_master_conf = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                        self.source_client.password, 'setting.config', 'search_read', [[]]) # ['vit_config_server', '!=', 'mc'], ['vit_linked_server', '=', 'True']
+            
+                ss_data = [item for item in data_master_conf if item['vit_config_server'] != 'mc' and item['vit_linked_server']]
+                index_field_store_name = next((item['vit_config_server_name'] for item in ss_data if item['vit_config_server_name'] == self.target_client.server_name), None)
                 data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-                                                    self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['state', '=', 'purchase'], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
-                                                    {'fields': fields})  # , 'limit': 1 , 'limit': 100 debug False 
+                                                    self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['state', '=', 'purchase'], ['is_integrated', '=', False], ['picking_type_id.warehouse_id.name', '=', index_field_store_name], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
+                                                    {'fields': fields})  # , 'limit': 1 , 'limit': 100 debug False [field_uniq, '!=', False], 
             else:
                 data_list = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
                                                     self.source_client.password, model, 'search_read', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]],
@@ -424,20 +431,26 @@ class DataIntegrator:
                         log_record = self.set_log_mc.log_record_success(data_create, start_time, end_time, duration, modul, write_date, self.source_client.server_name, self.target_client.server_name)
                         log_data_created.append(log_record)
                         id_mc_for_update_isintegrated.append(id_mc)
-                
-                    self.update_indexstore_source(model, id_mc_for_update_isintegrated, index_store_field)
-                    if model == 'product.pricelist':
-                        self.update_indexstore_source('product.pricelist.item', id_line_for_update_isintegrated, index_store_field)
-                    
-                    if self.target_client.server_name == last_master_url:
-                        index_store_data = self.get_index_store_data(model, id_mc_for_update_isintegrated, len_master)
-                        self.update_isintegrated_source(model, index_store_data)
+
+                    if model == 'purchase.order':
+                        self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                            self.source_client.password, model, 'write', [id_mc_for_update_isintegrated, {'is_integrated': True}])
+                        self.set_log_mc.create_log_note_success(log_data_created)
+                        self.set_log_ss.create_log_note_success(log_data_created)
+                    else:
+                        self.update_indexstore_source(model, id_mc_for_update_isintegrated, index_store_field)
                         if model == 'product.pricelist':
-                            index_store_data = self.get_index_store_data('product.pricelist.item', id_line_for_update_isintegrated, len_master)
-                            self.update_isintegrated_source('product.pricelist.item', index_store_data)
+                            self.update_indexstore_source('product.pricelist.item', id_line_for_update_isintegrated, index_store_field)
                         
-                    self.set_log_mc.create_log_note_success(log_data_created)
-                    self.set_log_ss.create_log_note_success(log_data_created)
+                        if self.target_client.server_name == last_master_url:
+                            index_store_data = self.get_index_store_data(model, id_mc_for_update_isintegrated, len_master)
+                            self.update_isintegrated_source(model, index_store_data)
+                            if model == 'product.pricelist':
+                                index_store_data = self.get_index_store_data('product.pricelist.item', id_line_for_update_isintegrated, len_master)
+                                self.update_isintegrated_source('product.pricelist.item', index_store_data)
+                            
+                        self.set_log_mc.create_log_note_success(log_data_created)
+                        self.set_log_ss.create_log_note_success(log_data_created)
             # #     # self.set_log_mc.delete_data_log_failed(record['name'])
             # #     # self.set_log_ss.delete_data_log_failed(record['name'])
         except Exception as e:
@@ -1199,9 +1212,9 @@ class DataIntegrator:
                                     if datas_target_notyet_result is not None:
                                         datas_target_result.append(datas_target_notyet_result)
                                     else:
-                                        write_date = record['write_date']
-                                        self.set_log_mc.create_log_note_failed(record, model, f"{field_uniq} {field_data} in {relation_model} not exist", write_date)
-                                        self.set_log_ss.create_log_note_failed(record, model, f"{field_uniq} {field_data} in {relation_model} not exist", write_date)
+                                        # write_date = record['write_date']
+                                        self.set_log_mc.create_log_note_failed(record, model, f"{field_uniq} {field_data} in {relation_model} not exist", None)
+                                        self.set_log_ss.create_log_note_failed(record, model, f"{field_uniq} {field_data} in {relation_model} not exist", None)
                             
                             # datas = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                             #                     self.target_client.uid, self.target_client.password,
