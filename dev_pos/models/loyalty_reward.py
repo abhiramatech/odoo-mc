@@ -25,7 +25,7 @@ class LoyaltyRewardInherit(models.Model):
             new_index = last_index + i + 1
             val.update({
                 'default_code': generate_default_code(new_index),
-                'vit_is_discount': True,  # ✅ tambahkan flag
+                'vit_is_discount': True,  # tambahkan flag
             })
 
         return values
@@ -39,40 +39,6 @@ class LoyaltyRewardInherit(models.Model):
                 if values:
                     reward.discount_line_product_id.write({
                         'default_code': values[0].get('default_code'),
-                        'vit_is_discount': True,  # ✅ update flag juga
+                        'vit_is_discount': True,  # update flag juga
                     })
         return res
-    
-    # def write(self, vals):
-    #     res = super().write(vals)
-
-    #     if 'description' in vals:
-    #         self._create_missing_discount_line_products()
-    #         for reward in self:
-    #             product = reward.discount_line_product_id
-    #             if product:
-    #                 # Update the name of the discount product
-    #                 product.write({'name': reward.description})
-
-    #                 # Update default_code for the discount product
-    #                 last_code = product.default_code or ''
-    #                 if last_code:
-    #                     try:
-    #                         last_index = int(last_code.split('-')[1])
-    #                     except (IndexError, ValueError):
-    #                         last_index = 0
-    #                 else:
-    #                     last_index = 0
-
-    #                 new_code = f'Promo-{str(last_index + 1).zfill(3)}'
-    #                 product.write({'default_code': new_code})
-
-    #     if 'active' in vals:
-    #         if vals['active']:
-    #             if self.discount_line_product_id:
-    #                 self.discount_line_product_id.action_unarchive()
-    #         else:
-    #             if self.discount_line_product_id:
-    #                 self.discount_line_product_id.action_archive()
-
-    #     return res

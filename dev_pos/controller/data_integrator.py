@@ -358,7 +358,7 @@ class DataIntegrator:
                     fields_line = ['name', 'default_code', 'description']
                     type_fields_line, relation_fields_line = self.get_type_data_source(model_line, fields_line)
                 
-                if model == 'account.tax' or model == 'product.pricelist':
+                if model == 'account.tax' or model == 'product.pricelist' or model == 'purchase.order':
                     if model == 'product.pricelist':
                         model_line = 'product.pricelist.item'
                         fields_line = ['product_tmpl_id', 'min_quantity', 'fixed_price', 'date_start', 'date_end', 'compute_price', 'percent_price', 'base', 'price_discount', 'price_surcharge', 'price_round', 'price_min_margin', 'applied_on', 'categ_id', 'product_id']
@@ -541,6 +541,8 @@ class DataIntegrator:
             if valid_record:
                 if model != 'purchase.order':
                     record['id_mc'] = id_mc
+                if model == 'purchase.order' and record['order_line'] == None:
+                        return None
                 return record
         except Exception as e:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred while processing record: {e}", None)
@@ -1958,6 +1960,8 @@ class SetLogMC:
                 key = record.get('code')
             elif record.get('complete_name'):
                 key = record.get('complete_name')
+            elif record.get('vit_trxid'):
+                key = record.get('vit_trxid')
             else:
                 key = record.get('name')
 
@@ -2099,6 +2103,8 @@ class SetLogSS:
                 key = record.get('code')
             elif record.get('complete_name'):
                 key = record.get('complete_name')
+            elif record.get('vit_trxid'):
+                key = record.get('vit_trxid')
             else:
                 key = record.get('name')
 

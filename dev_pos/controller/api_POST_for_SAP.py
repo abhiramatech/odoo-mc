@@ -210,7 +210,9 @@ class POSTMasterItem(http.Controller):
     def post_master_item(self, **kw):
         try:
             # Autentikasi
-            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
             if not config:
                 return {
                     'code': 500,
@@ -218,7 +220,11 @@ class POSTMasterItem(http.Controller):
                     'message': 'Configuration not found.'
                 }
 
-            uid = request.session.authenticate(request.session.db, config.vit_config_username, config.vit_config_password_api)
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
             if not uid:
                 return {
                     'code': 401,
@@ -228,120 +234,138 @@ class POSTMasterItem(http.Controller):
 
             json_data = request.get_json_data()
             items = json_data.get('items', [])
-            if not isinstance(items, list):
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
                 return {
                     'code': 400,
                     'status': 'Failed',
-                    'message': "'items' must be a list."
+                    'message': "'items' must be a list or object."
                 }
 
-            registry = request.registry
-            created = []  # Daftar untuk item yang berhasil dibuat
-            errors = []   # Daftar untuk error
+            vals_list, created, errors = [], [], []
 
-            def process_item(data):
+            # 🔹 Validasi & siapkan data
+            for data in items:
                 try:
-                    with registry.cursor() as cr:
-                        env = api.Environment(cr, SUPERUSER_ID, {})
-                        product_code = data.get('product_code')
-                        existing_product = env['product.template'].search([('default_code', '=', product_code)], limit=1)
-                        if existing_product:
-                            errors.append({'id': existing_product.id, 'product_code': product_code, 'message': f"Duplicate item code: {product_code}"})
-                            return None
+                    product_code = data.get('product_code')
+                    if not product_code:
+                        errors.append({
+                            'id': None,
+                            'product_code': None,
+                            'message': "Missing product_code"
+                        })
+                        continue
 
-                        category_name = data.get('category_name')
-                        category = env['product.category'].search([('complete_name', '=', category_name)], limit=1)
-                        if category:
-                            category_id = category.id
-                        else:
-                            _logger.error(f"Category not found in database: {category_name}")
-                            category_id = False
-
-                        pos_categ_command = []
-                        pos_categ_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
-                        if not isinstance(pos_categ_data, list):
-                            pos_categ_data = [pos_categ_data]
-                        for categ_id in pos_categ_data:
-                            pos_category = env['pos.category'].search([('id', '=', categ_id)], limit=1)
-                            if pos_category:
-                                pos_categ_command.append((4, categ_id))
-                            else:
-                                errors.append({'id': None, 'product_code': product_code, 'message': f"POS category with ID {categ_id} not found."})
-
-                        tax_command = []
-                        tax_ids = [] 
-                        tax_names = data.get('taxes_names', [])
-                        for tax_name in tax_names:
-                            tax = env['account.tax'].search([('name', '=', tax_name)], limit=1)
-                            if tax:
-                                tax_command.append((4, tax.id))
-                                tax_ids.append(tax.id)
-                            else:
-                                errors.append({'id': None, 'product_code': product_code, 'message': f"Tax with name '{tax_name}' not found."})
-
-                        cost = data.get('standard_price', data.get('cost', 0.0))
-                        item_data = {
-                            'name': data.get('product_name'),
-                            'active': data.get('active'),
-                            'default_code': product_code,
-                            'detailed_type': data.get('product_type'),
-                            'invoice_policy': data.get('invoice_policy'),
-                            'create_date': data.get('create_date'),
-                            'list_price': data.get('sales_price'),
-                            'standard_price': cost,
-                            'uom_id': data.get('uom_id'),
-                            'uom_po_id': data.get('uom_po_id'),
-                            'pos_categ_ids': pos_categ_command,
-                            'categ_id': category_id,
-                            'taxes_id': tax_command,
-                            'available_in_pos': data.get('available_in_pos'),
-                            'image_1920': data.get('image_1920'),
-                            'barcode': data.get('barcode'),
-                            'create_uid': uid
-                        }
-
-                        item = env['product.template'].sudo().create(item_data)
-                        return {
-                            'id': item.id,
+                    # Cek duplikat
+                    existing_product = request.env['product.template'].sudo().search(
+                        [('default_code', '=', product_code)], limit=1
+                    )
+                    if existing_product:
+                        errors.append({
+                            'id': existing_product.id,
                             'product_code': product_code,
-                            'name': item.name,
-                            'list_price': item.list_price
-                        }
+                            'message': f"Duplicate item code: {product_code}"
+                        })
+                        continue
+
+                    # Cek kategori
+                    category_name = data.get('category_name')
+                    category = request.env['product.category'].sudo().search(
+                        [('complete_name', '=', category_name)], limit=1
+                    )
+                    category_id = category.id if category else False
+                    if not category_id:
+                        _logger.warning(f"Category not found in database: {category_name}")
+
+                    # POS Category
+                    pos_categ_command = []
+                    pos_categ_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
+                    if not isinstance(pos_categ_data, list):
+                        pos_categ_data = [pos_categ_data]
+                    for categ_id in pos_categ_data:
+                        pos_category = request.env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1)
+                        if pos_category:
+                            pos_categ_command.append((4, categ_id))
+                        else:
+                            errors.append({
+                                'id': None,
+                                'product_code': product_code,
+                                'message': f"POS category with ID {categ_id} not found."
+                            })
+
+                    # Pajak
+                    tax_command = []
+                    tax_names = data.get('taxes_names', [])
+                    if not isinstance(tax_names, list):
+                        tax_names = [tax_names]
+                    for tax_name in tax_names:
+                        tax = request.env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
+                        if tax:
+                            tax_command.append((4, tax.id))
+                        else:
+                            errors.append({
+                                'id': None,
+                                'product_code': product_code,
+                                'message': f"Tax with name '{tax_name}' not found."
+                            })
+
+                    # Data produk
+                    cost = data.get('standard_price', data.get('cost', 0.0))
+                    vals_list.append({
+                        'name': data.get('product_name'),
+                        'active': data.get('active'),
+                        'default_code': product_code,
+                        'detailed_type': data.get('product_type'),
+                        'invoice_policy': data.get('invoice_policy'),
+                        'create_date': data.get('create_date'),
+                        'list_price': data.get('sales_price'),
+                        'standard_price': cost,
+                        'uom_id': data.get('uom_id'),
+                        'uom_po_id': data.get('uom_po_id'),
+                        'pos_categ_ids': pos_categ_command,
+                        'categ_id': category_id,
+                        'taxes_id': tax_command,
+                        'available_in_pos': data.get('available_in_pos'),
+                        'image_1920': data.get('image_1920'),
+                        'barcode': data.get('barcode'),
+                        'create_uid': uid,
+                    })
+
                 except Exception as e:
-                    errors.append({'id': None, 'product_code': product_code, 'message': f"Exception: {str(e)}"})
+                    errors.append({
+                        'id': None,
+                        'product_code': data.get('product_code'),
+                        'message': f"Exception: {str(e)}"
+                    })
 
-            # Process items in bulk
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = [executor.submit(process_item, data) for data in items]
-                for future in as_completed(futures):
-                    result = future.result()
-                    if result:
-                        created.append(result)
+            # 🔹 Bulk create kalau ada data valid
+            if vals_list:
+                products = request.env['product.template'].sudo().create(vals_list)
+                for rec in products:
+                    created.append({
+                        'id': rec.id,
+                        'product_code': rec.default_code,
+                        'name': rec.name,
+                        'list_price': rec.list_price,
+                        'status': 'success'
+                    })
 
-            # Returning results - DIPERBAIKI: Hanya return data tanpa wrapper JSON-RPC
-            if errors:
-                return {
-                    'code': 400,
-                    'status': 'failed',
-                    'created_items': created,
-                    'errors': errors
-                }
-            else:
-                return {
-                    'code': 200,
-                    'status': 'success',
-                    'created_items': created,
-                    'errors': errors
-                }
+            return {
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'created_items': created,
+                'errors': errors
+            }
 
         except Exception as e:
+            request.env.cr.rollback()
             _logger.error(f"Failed to create items: {str(e)}")
             return {
                 'status': 'Failed',
                 'code': 500,
                 'message': f"Failed to create items: {str(e)}"
             }
-
 
 
 class POSTMasterPricelist(http.Controller):
@@ -514,11 +538,16 @@ class POSTMasterCustomer(http.Controller):
     @http.route('/api/master_customer', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_customer(self, **kw):
         try:
+            # Autentikasi
             config = request.env['setting.config'].sudo().search(
                 [('vit_config_server', '=', 'mc')], limit=1
             )
             if not config:
-                return {'status': 'Failed', 'code': 500, 'message': 'Configuration not found.'}
+                return {
+                    'status': 'Failed',
+                    'code': 500,
+                    'message': 'Configuration not found.'
+                }
 
             uid = request.session.authenticate(
                 request.session.db,
@@ -526,24 +555,40 @@ class POSTMasterCustomer(http.Controller):
                 config.vit_config_password_api
             )
             if not uid:
-                return {'status': 'Failed', 'code': 401, 'message': 'Authentication failed.'}
+                return {
+                    'status': 'Failed',
+                    'code': 401,
+                    'message': 'Authentication failed.'
+                }
 
             json_data = request.get_json_data()
             items = json_data.get('items')
 
-            # ✅ Fleksibel: bisa single dict atau list
+            # ✅ Bisa single dict atau list
             if isinstance(items, dict):
                 items = [items]
             elif items is None and isinstance(json_data, dict):
                 items = [json_data]
             elif not isinstance(items, list):
-                return {'status': 'Failed', 'code': 400, 'message': "'items' must be a list or object."}
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
 
-            created, errors = [], []
+            vals_list, created, errors = [], [], []
 
+            # 🔹 Validasi & kumpulkan data
             for data in items:
                 try:
                     customer_code = data.get('customer_code')
+                    if not customer_code:
+                        errors.append({
+                            'id': None,
+                            'customer_code': None,
+                            'message': "Missing customer_code"
+                        })
+                        continue
 
                     # Cek duplikat
                     existing = request.env['res.partner'].sudo().search(
@@ -557,7 +602,8 @@ class POSTMasterCustomer(http.Controller):
                         })
                         continue
 
-                    customer_data = {
+                    # Data customer
+                    vals_list.append({
                         'name': data.get('name'),
                         'customer_code': customer_code,
                         'street': data.get('street'),
@@ -566,16 +612,7 @@ class POSTMasterCustomer(http.Controller):
                         'mobile': data.get('mobile'),
                         'website': data.get('website'),
                         'create_uid': uid,
-                    }
-
-                    customer = request.env['res.partner'].sudo().create(customer_data)
-
-                    created.append({
-                        'id': customer.id,
-                        'customer_code': customer.customer_code,
-                        'name': customer.name,
-                        'email': customer.email,
-                        'status': 'success'
+                        'customer_rank': 1,  # supaya otomatis dianggap customer
                     })
 
                 except Exception as e:
@@ -583,6 +620,18 @@ class POSTMasterCustomer(http.Controller):
                         'id': data.get('id'),
                         'customer_code': data.get('customer_code'),
                         'message': f"Exception: {str(e)}"
+                    })
+
+            # 🔹 Bulk create kalau ada data valid
+            if vals_list:
+                customers = request.env['res.partner'].sudo().create(vals_list)
+                for rec in customers:
+                    created.append({
+                        'id': rec.id,
+                        'customer_code': rec.customer_code,
+                        'name': rec.name,
+                        'email': rec.email,
+                        'status': 'success'
                     })
 
             return {
@@ -600,8 +649,6 @@ class POSTMasterCustomer(http.Controller):
                 'code': 500,
                 'message': f"Failed to create customers: {str(e)}"
             }
-
-
     
 class POSTMasterWarehouse(http.Controller):
     @http.route('/api/master_warehouse', type='json', auth='none', methods=['POST'], csrf=False)
@@ -1125,6 +1172,7 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                 product_uom_qty = line.get('product_uom_qty')
                 price_unit = line.get('price_unit')
                 taxes_name = line.get('taxes_ids')
+                vit_line_number_sap = line.get('line_number_sap')
 
                 # Validate tax
                 tax = env['account.tax'].sudo().search([('name', '=', taxes_name)], limit=1)
@@ -1145,6 +1193,7 @@ class POSTPurchaseOrderFromSAP(http.Controller):
                     'product_qty': product_uom_qty,
                     'price_unit': price_unit,
                     'taxes_id': [(6, 0, [tax.id])],
+                    'vit_line_number_sap': vit_line_number_sap,
                     'product_uom': product_id.uom_id.id,
                 }
                 purchase_order_lines.append((0, 0, purchase_order_line))

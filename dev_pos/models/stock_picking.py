@@ -71,3 +71,8 @@ class StockPicking(models.Model):
 
         for res in ts_out:
             res.write({'is_integrated': True})
+
+class StockMove(models.Model):
+    _inherit = 'stock.move'
+
+    vit_line_number_sap = fields.Integer(string='Line Number SAP')

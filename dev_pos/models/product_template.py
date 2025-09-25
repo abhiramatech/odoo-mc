@@ -11,3 +11,8 @@ class ProductTemplate(models.Model):
     vit_item_kel = fields.Char(string="Kelompok")
     vit_item_type = fields.Char(string="Type")
     vit_is_discount = fields.Boolean(string="Discount")
+
+class ProductProductInherit(models.Model):
+    _inherit = 'product.product'
+
+    vit_is_discount = fields.Boolean(string="Is Discount", default=False)

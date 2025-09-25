@@ -21,6 +21,8 @@ class PurchaseOrderIntegration(models.Model):
             # Set scheduled_date pada semua receipts agar ikut backdate
             for picking in order.picking_ids:
                 picking.write({'vit_trxid': order.vit_trxid})
+                for move in picking.move_ids_without_package:
+                    move.write({'vit_line_number_sap': move.vit_line_number_sap})
 
     def create_purchase_orders(self):
         partner_id = 7
@@ -60,3 +62,14 @@ class PurchaseOrderIntegration(models.Model):
             print(f"Created and confirmed Purchase Order {purchase_order.name}")
 
         print("Finished creating 100 purchase orders")
+
+class PurchaseOrderLineIntegration(models.Model):
+    _inherit = 'purchase.order.line'
+
+    vit_line_number_sap = fields.Integer(string='Line Number SAP')
+
+    def _prepare_stock_moves(self, picking):
+        moves = super()._prepare_stock_moves(picking)
+        for move_vals in moves:
+            move_vals['vit_line_number_sap'] = self.vit_line_number_sap
+        return moves

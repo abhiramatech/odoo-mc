@@ -28,11 +28,8 @@ class MasterCustomerPATCH(http.Controller):
             json_data = request.get_json_data()
             items = json_data.get('items')
 
-            # ✅ Fleksibel: bisa single dict atau list
             if isinstance(items, dict):
                 items = [items]
-            elif items is None and isinstance(json_data, dict):
-                items = [json_data]
             elif not isinstance(items, list):
                 return {'status': 'Failed', 'code': 400, 'message': "'items' must be a list or object."}
 
@@ -40,19 +37,16 @@ class MasterCustomerPATCH(http.Controller):
 
             for data in items:
                 try:
-                    customer_id = data.get('id')
                     customer_code = data.get('customer_code')
+                    if not customer_code:
+                        errors.append({'customer_code': None, 'message': "Missing customer_code"})
+                        continue
 
-                    domain = []
-                    if customer_id:
-                        domain = [('id', '=', int(customer_id))]
-                    elif customer_code:
-                        domain = [('customer_code', '=', customer_code)]
-
-                    master_customer = request.env['res.partner'].sudo().search(domain, limit=1)
+                    master_customer = request.env['res.partner'].sudo().search(
+                        [('customer_code', '=', customer_code)], limit=1
+                    )
                     if not master_customer:
                         errors.append({
-                            'id': customer_id,
                             'customer_code': customer_code,
                             'message': "Customer not found."
                         })
@@ -79,7 +73,6 @@ class MasterCustomerPATCH(http.Controller):
 
                 except Exception as e:
                     errors.append({
-                        'id': data.get('id'),
                         'customer_code': data.get('customer_code'),
                         'message': f"Exception: {str(e)}"
                     })
@@ -97,6 +90,7 @@ class MasterCustomerPATCH(http.Controller):
 
 
 
+
 class MasterItemPATCH(http.Controller):
     @http.route(['/api/master_item'], type='json', auth='none', methods=['PATCH'], csrf=False)
     def update_master_item(self, **kwargs):
@@ -107,7 +101,6 @@ class MasterItemPATCH(http.Controller):
             if not config:
                 return {'code': 500, 'status': 'Failed', 'message': 'Configuration not found.'}
 
-            # Manual authentication
             uid = request.session.authenticate(
                 request.session.db,
                 config.vit_config_username,
@@ -116,107 +109,107 @@ class MasterItemPATCH(http.Controller):
             if not uid:
                 return {'code': 401, 'status': 'Failed', 'message': 'Authentication failed.'}
 
-            env = request.env(user=request.env.ref('base.user_admin').id)
-            data = request.get_json_data()
-            items = data.get('items', [])
-            if not isinstance(items, list):
-                return {'code': 400, 'status': 'Failed', 'message': "'items' must be a list."}
+            json_data = request.get_json_data()
+            items = json_data.get('items', [])
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
+                return {'code': 400, 'status': 'Failed', 'message': "'items' must be a list or object."}
 
             updated, errors = [], []
 
-            def process_item(data, env):
-                product_id = data.get('id')
-                if not product_id:
-                    return {'message': "Missing 'id' in item."}
-
-                product_code = data.get('product_code')
-                product_name = data.get('product_name')
-
-                master_item = env['product.template'].sudo().search(
-                    [('id', '=', int(product_id))], limit=1
-                )
-                if not master_item:
-                    return {'id': product_id, 'message': f"Master Item with ID {product_id} not found."}
-
-                # category
-                category_name = data.get('category_name')
-                name_categ = env['product.category'].sudo().search(
-                    [('complete_name', '=', category_name)], limit=1
-                )
-                if not name_categ:
-                    return {'id': product_id, 'message': f"Category not found: {category_name}"}
-
-                # taxes (customer side)
-                tax_command = []
-                for tax_name in data.get('taxes_names', []):
-                    tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
-                    if tax:
-                        tax_command.append((4, tax.id))
-                    else:
-                        return {'id': product_id, 'message': f"Tax not found: {tax_name}"}
-
-                # supplier taxes
-                supplier_tax_ids = []
-                for tax_name in data.get('supplier_taxes_id', []):
-                    tax = env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
-                    if tax:
-                        supplier_tax_ids.append(tax.id)
-                    else:
-                        return {'id': product_id, 'message': f"Supplier Tax not found: {tax_name}"}
-
-                # pos category
-                pos_categ_ids = data.get('pos_categ_ids', [])
-                for categ_id in pos_categ_ids:
-                    if not env['pos.category'].search([('id', '=', categ_id)], limit=1):
-                        return {'id': product_id, 'message': f"POS Category not found: {categ_id}"}
-
-                update_data = {
-                    'name': product_name,
-                    'default_code': product_code,
-                    'list_price': data.get('sales_price'),
-                    'is_integrated': data.get('is_integrated'),
-                    'detailed_type': data.get('product_type'),
-                    'invoice_policy': data.get('invoice_policy'),
-                    'standard_price': data.get('cost'),
-                    'uom_id': data.get('uom_id'),
-                    'uom_po_id': data.get('uom_po_id'),
-                    'categ_id': name_categ.id,
-                    'pos_categ_ids': [(6, 0, pos_categ_ids)],
-                    'taxes_id': tax_command,
-                    'supplier_taxes_id': [(6, 0, supplier_tax_ids)],
-                    'available_in_pos': data.get('available_in_pos'),
-                    'barcode': data.get('barcode'),
-                    'image_1920': data.get('image_1920'),
-                    'vit_sub_div': data.get('vit_sub_div'),
-                    'vit_item_kel': data.get('vit_item_kel'),
-                    'vit_item_type': data.get('vit_item_type'),
-                }
-                if data.get('active') is not None:
-                    update_data['active'] = data.get('active')
-
-                _logger.info("Updating product %s with data: %s", product_id, update_data)
-
-                master_item.sudo().write(update_data)
-
-                return {
-                    'id': master_item.id,
-                    'product_code': product_code,
-                    'name': product_name,
-                    'status': 'success'
-                }
-
-            # ✅ Bulk sequential with savepoint per item
-            for item in items:
+            for data in items:
                 try:
-                    with env.cr.savepoint():  # isolate per-item
-                        res = process_item(item, env)
-                        if 'message' in res:
-                            errors.append(res)
+                    product_code = data.get('product_code')
+                    if not product_code:
+                        errors.append({'product_code': None, 'message': "Missing product_code"})
+                        continue
+
+                    master_item = request.env['product.template'].sudo().search(
+                        [('default_code', '=', product_code)], limit=1
+                    )
+                    if not master_item:
+                        errors.append({
+                            'product_code': product_code,
+                            'message': f"Product not found with code: {product_code}"
+                        })
+                        continue
+
+                    # category
+                    category_name = data.get('category_name')
+                    name_categ = False
+                    if category_name:
+                        name_categ = request.env['product.category'].sudo().search(
+                            [('complete_name', '=', category_name)], limit=1
+                        )
+                        if not name_categ:
+                            errors.append({
+                                'product_code': product_code,
+                                'message': f"Category not found: {category_name}"
+                            })
+                            continue
+
+                    # taxes
+                    tax_command = []
+                    for tax_name in data.get('taxes_names', []):
+                        tax = request.env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
+                        if tax:
+                            tax_command.append((4, tax.id))
                         else:
-                            updated.append(res)
+                            errors.append({'product_code': product_code, 'message': f"Tax not found: {tax_name}"})
+
+                    # supplier taxes
+                    supplier_tax_ids = []
+                    for tax_name in data.get('supplier_taxes_id', []):
+                        tax = request.env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
+                        if tax:
+                            supplier_tax_ids.append(tax.id)
+                        else:
+                            errors.append({'product_code': product_code, 'message': f"Supplier Tax not found: {tax_name}"})
+
+                    # pos category
+                    pos_categ_ids = data.get('pos_categ_ids', [])
+                    for categ_id in pos_categ_ids:
+                        if not request.env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1):
+                            errors.append({'product_code': product_code, 'message': f"POS Category not found: {categ_id}"})
+
+                    update_data = {
+                        'name': data.get('product_name'),
+                        'list_price': data.get('sales_price'),
+                        'is_integrated': data.get('is_integrated'),
+                        'detailed_type': data.get('product_type'),
+                        'invoice_policy': data.get('invoice_policy'),
+                        'standard_price': data.get('cost'),
+                        'uom_id': data.get('uom_id'),
+                        'uom_po_id': data.get('uom_po_id'),
+                        'categ_id': name_categ.id if name_categ else False,
+                        'pos_categ_ids': [(6, 0, pos_categ_ids)],
+                        'taxes_id': tax_command,
+                        'supplier_taxes_id': [(6, 0, supplier_tax_ids)],
+                        'available_in_pos': data.get('available_in_pos'),
+                        'barcode': data.get('barcode'),
+                        'image_1920': data.get('image_1920'),
+                        'vit_sub_div': data.get('vit_sub_div'),
+                        'vit_item_kel': data.get('vit_item_kel'),
+                        'vit_item_type': data.get('vit_item_type'),
+                    }
+                    if data.get('active') is not None:
+                        update_data['active'] = data.get('active')
+
+                    master_item.sudo().write(update_data)
+
+                    updated.append({
+                        'id': master_item.id,
+                        'product_code': product_code,
+                        'name': master_item.name,
+                        'status': 'success'
+                    })
+
                 except Exception as e:
-                    _logger.exception("Error processing item %s", item.get('id'))
-                    errors.append({'id': item.get('id'), 'message': str(e)})
+                    errors.append({
+                        'product_code': data.get('product_code'),
+                        'message': f"Exception: {str(e)}"
+                    })
 
             return {
                 'code': 200 if not errors else 207,
@@ -228,6 +221,7 @@ class MasterItemPATCH(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in PATCH /api/master_item")
             return {'code': 500, 'status': 'error', 'message': str(e)}
+
 
 class MasterPricelistPATCH(http.Controller):
     @http.route(['/api/master_pricelist/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)

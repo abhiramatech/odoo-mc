@@ -2347,7 +2347,7 @@ class PurchaseOrder(http.Controller):
                 raise werkzeug.exceptions.NotFound(_("Purchase Order not found"))
 
             # Get the first picking related to the invoice
-            purchase_lines = purchase_order.invoice_line_ids
+            purchase_lines = purchase_order.order_line
             doc_num = purchase_order.name
             
             jakarta_tz = pytz.timezone('Asia/Jakarta')
@@ -2362,6 +2362,7 @@ class PurchaseOrder(http.Controller):
                 location = pickings.location_id.complete_name if pickings else None
                 location_dest_id = pickings.location_dest_id.id if pickings else None
                 location_dest = pickings.location_dest_id.complete_name if pickings else None
+                vit_line_number_sap = line.vit_line_number_sap
 
                 tax_data = []
                 for tax in line.taxes_id:
@@ -2372,6 +2373,7 @@ class PurchaseOrder(http.Controller):
                 
                 line_data = {
                     'line_number': line_number,
+                    'line_number_sap': vit_line_number_sap,
                     'id': line.id,
                     'doc_no': doc_num,
                     'product_id': line.product_id.id,
@@ -2853,6 +2855,7 @@ class GRPO(http.Controller):
             for line_number, line in enumerate(goods_receipt_lines, start=1):
                 line_data = {
                     'line_number': line_number,
+                    'line_number_sap': line.vit_line_number_sap,
                     'id': line.id,
                     'doc_num': doc_num,
                     'source_document': source_document,

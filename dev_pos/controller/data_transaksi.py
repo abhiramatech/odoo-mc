@@ -774,11 +774,12 @@ class DataTransaksi:
 
             # Pre-fetch all pos.order.line and pos.payment data
             order_ids = [record['id'] for record in transaksi_posorder_invoice]
+            # ✅ TAMBAHKAN 'user_id' di fields pos.order.line
             pos_order_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         'pos.order.line', 'search_read',
                                                         [[['order_id', 'in', order_ids]]],
-                                                        {'fields': ['order_id', 'product_id', 'full_product_name', 'qty', 'price_unit', 'tax_ids_after_fiscal_position', 'tax_ids', 'discount', 'price_subtotal', 'price_subtotal_incl']})
+                                                        {'fields': ['order_id', 'product_id', 'full_product_name', 'qty', 'price_unit', 'tax_ids_after_fiscal_position', 'tax_ids', 'discount', 'price_subtotal', 'price_subtotal_incl', 'user_id']})
             pos_payments = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         'pos.payment', 'search_read',
@@ -810,6 +811,21 @@ class DataTransaksi:
                                                                         {'fields': ['id'], 'limit': 1})
                 if existing_pos_order_invoice:
                     existing_pos_order_invoice_dict[record['id']] = existing_pos_order_invoice[0]['id']
+
+            # ✅ TAMBAHKAN: Fetch user_id dari pos.order.line
+            user_ids_from_lines = [line['user_id'][0] if isinstance(line.get('user_id'), list) and line.get('user_id') else line.get('user_id') 
+                                   for line in pos_order_lines if line.get('user_id')]
+            user_ids_from_lines = [uid for uid in user_ids_from_lines if uid]  # Filter out None/False values
+
+            # ✅ TAMBAHKAN: Fetch mapping user_id dari source ke target
+            users_source_dict = {}
+            if user_ids_from_lines:
+                users_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                            self.source_client.uid, self.source_client.password,
+                                                            'hr.employee', 'search_read',
+                                                            [[['id', 'in', user_ids_from_lines]]],
+                                                            {'fields': ['id', 'id_mc']})
+                users_source_dict = {user['id']: user['id_mc'] for user in users_source if user.get('id_mc')}
 
             # Enhanced product fetching logic to handle service products
             product_ids = [line['product_id'][0] for line in pos_order_lines if line.get('product_id')]
@@ -917,6 +933,12 @@ class DataTransaksi:
                             missing_products.append(f"Product: {identifier or product_name}")
                         continue
 
+                    # ✅ TAMBAHKAN: Map user_id dari source ke target
+                    source_user_id = line.get('user_id')[0] if isinstance(line.get('user_id'), list) and line.get('user_id') else line.get('user_id')
+                    target_user_id = None
+                    if source_user_id:
+                        target_user_id = users_source_dict.get(source_user_id)
+
                     tax_ids_mc = [source_taxes_dict.get(tax_id) for tax_id in line.get('tax_ids', []) if tax_id in source_taxes_dict]
                     pos_order_line_data = {
                         'product_id': int(target_product_id),
@@ -929,6 +951,11 @@ class DataTransaksi:
                         'price_subtotal_incl': line.get('price_subtotal_incl'),
                         'tax_ids': [(6, 0, tax_ids_mc)],
                     }
+                    
+                    # ✅ TAMBAHKAN: Set user_id jika ada
+                    if target_user_id:
+                        pos_order_line_data['user_id'] = int(target_user_id)
+                    
                     pos_order_invoice_line_ids.append((0, 0, pos_order_line_data))
 
                 if missing_products:
