@@ -358,7 +358,7 @@ class DataIntegrator:
                     fields_line = ['name', 'default_code', 'description']
                     type_fields_line, relation_fields_line = self.get_type_data_source(model_line, fields_line)
                 
-                if model == 'account.tax' or model == 'product.pricelist':
+                if model == 'account.tax' or model == 'product.pricelist' or model == 'purchase.order':
                     if model == 'product.pricelist':
                         model_line = 'product.pricelist.item'
                         fields_line = ['product_tmpl_id', 'min_quantity', 'fixed_price', 'date_start', 'date_end', 'compute_price', 'percent_price', 'base', 'price_discount', 'price_surcharge', 'price_round', 'price_min_margin', 'applied_on', 'categ_id', 'product_id']
