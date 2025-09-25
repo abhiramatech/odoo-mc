@@ -127,7 +127,7 @@ class DataIntegrator:
                                                     {'fields': fields})
             elif model == 'product.template':
                 ids = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-                                                    self.source_client.password, model, 'search', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]]) 
+                                                    self.source_client.password, model, 'search', [[[field_uniq, '!=', False], ['is_integrated', '=', False], ['vit_is_discount', '=', False], ['write_date', '>=', date_from], ['write_date', '<=', date_to]]]) 
                 data_list = []
                 batch_size=2000
                 for i in range(0, len(ids), batch_size):
@@ -433,6 +433,10 @@ class DataIntegrator:
                         id_mc_for_update_isintegrated.append(id_mc)
 
                     if model == 'purchase.order':
+                        self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                self.target_client.uid, self.target_client.password,
+                                                'purchase.order', 'button_confirm',
+                                                [create])
                         self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
                                             self.source_client.password, model, 'write', [id_mc_for_update_isintegrated, {'is_integrated': True}])
                         self.set_log_mc.create_log_note_success(log_data_created)
