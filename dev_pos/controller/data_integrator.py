@@ -541,6 +541,8 @@ class DataIntegrator:
             if valid_record:
                 if model != 'purchase.order':
                     record['id_mc'] = id_mc
+                if model == 'purchase.order' and record['order_line'] == None:
+                        return None
                 return record
         except Exception as e:
             self.set_log_mc.create_log_note_failed(f"Exception - {model}", f"{model} from {self.source_client.server_name} to {self.target_client.server_name}", f"Error occurred while processing record: {e}", None)
@@ -1958,6 +1960,8 @@ class SetLogMC:
                 key = record.get('code')
             elif record.get('complete_name'):
                 key = record.get('complete_name')
+            elif record.get('vit_trxid'):
+                key = record.get('vit_trxid')
             else:
                 key = record.get('name')
 
@@ -2099,6 +2103,8 @@ class SetLogSS:
                 key = record.get('code')
             elif record.get('complete_name'):
                 key = record.get('complete_name')
+            elif record.get('vit_trxid'):
+                key = record.get('vit_trxid')
             else:
                 key = record.get('name')
 

@@ -20,7 +20,8 @@ class PurchaseOrderIntegration(models.Model):
         for order in self:
             # Set scheduled_date pada semua receipts agar ikut backdate
             for picking in order.picking_ids:
-                picking.write({'vit_trxid': order.vit_trxid})
+                picking.write({'vit_trxid': order.vit_trxid,
+                               'is_integrated': True})
 
     def create_purchase_orders(self):
         partner_id = 7
