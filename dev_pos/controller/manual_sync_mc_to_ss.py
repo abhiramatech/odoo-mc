@@ -104,6 +104,16 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
         mc_client, ss_clients = self.get_config(store_ids)
         datefrom, dateto = self.get_date(date_from, date_to)
 
+        message = _("{mc_client}, {mc_client} {datefrom}, {dateto}, {master_item_utils}")
+        return {'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Success'),
+                    'message': message,
+                    'type': 'info',  # types: success, warning, info, danger
+                    'sticky': True,  # True/False will display for few seconds if false
+                }}
+
         # ---- Proses Per Store ----
         for store_id in store_ids:
             if master_employee:
