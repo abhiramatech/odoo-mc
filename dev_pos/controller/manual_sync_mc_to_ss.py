@@ -216,29 +216,73 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
     #         vit_val_ts_out = configs.vit_val_ts_out
     #     return store, date_from, date_to, master_employee, master_item_utils, master_item, master_tag, master_barcode, master_bom_to_ss, master_customer, master_location, master_pricelist, master_operation_type, master_discount, update_discount, master_voucher, update_voucher_mc, update_voucher_store, master_pos_utility, list_warehouse, config_print_timbangan, vit_internal_transfers, vit_goods_issue, vit_goods_receipts, vit_receipts_to_ss, vit_ts_in, vit_po, vit_val_inv, vit_val_goods_receipts, vit_val_goods_issue, vit_val_ts_out
     
-    def create(self, vals):
-        if vals.get('store_sync'):
-            store_ids = vals['store_sync'][0][2] if isinstance(vals['store_sync'][0], (list, tuple)) else vals['store_sync']
-            store_sync = self.env['setting.config'].browse(store_ids)
-            vals['vit_config_server'] = store_sync.vit_config_server
-            vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            vals['vit_config_db'] = store_sync.vit_config_db
-            vals['vit_config_username'] = store_sync.vit_config_username
-            vals['vit_config_password'] = store_sync.vit_config_password
-            vals['vit_linked_server'] = store_sync.vit_linked_server
-        else:
-            # jika store_sync kosong karena untuk semua store
-            store_sync = self.env['setting.config'].search([('vit_config_server', '=', 'mc')])
-            if store_sync:
-                vals['vit_config_server'] = store_sync.vit_config_server
-                vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                vals['vit_config_db'] = store_sync.vit_config_db
-                vals['vit_config_username'] = store_sync.vit_config_username
-                vals['vit_config_password'] = store_sync.vit_config_password
-                vals['vit_linked_server'] = store_sync.vit_linked_server
-            else:
-                raise ValidationError(_(f"The master configuration has not been set. Please set the master configuration first."))
+    # def create(self, vals):
+    #     if vals.get('store_sync'):
+    #         store_ids = vals['store_sync'][0][2] if isinstance(vals['store_sync'][0], (list, tuple)) else vals['store_sync']
+    #         store_sync = self.env['setting.config'].browse(store_ids)
+    #         vals['vit_config_server'] = store_sync.vit_config_server
+    #         vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         vals['vit_config_db'] = store_sync.vit_config_db
+    #         vals['vit_config_username'] = store_sync.vit_config_username
+    #         vals['vit_config_password'] = store_sync.vit_config_password
+    #         vals['vit_linked_server'] = store_sync.vit_linked_server
+    #     else:
+    #         # jika store_sync kosong karena untuk semua store
+    #         store_sync = self.env['setting.config'].search([('vit_config_server', '=', 'mc')])
+    #         if store_sync:
+    #             vals['vit_config_server'] = store_sync.vit_config_server
+    #             vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #             vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #             vals['vit_config_db'] = store_sync.vit_config_db
+    #             vals['vit_config_username'] = store_sync.vit_config_username
+    #             vals['vit_config_password'] = store_sync.vit_config_password
+    #             vals['vit_linked_server'] = store_sync.vit_linked_server
+    #         else:
+    #             raise ValidationError(_(f"The master configuration has not been set. Please set the master configuration first."))
             
+    #     return super(ManualSyncMCToSSIntegration, self).create(vals)
+    
+    def create(self, vals):
+        store_ids = []
+
+        if vals.get('store_sync'):
+            # cek apakah list kosong
+            commands = vals['store_sync']
+            if commands and isinstance(commands[0], (list, tuple)) and len(commands[0]) >= 3:
+                # contoh: [(6, 0, [1,2,3])]
+                store_ids = commands[0][2]
+            else:
+                # fallback: mungkin langsung list of ids
+                store_ids = commands
+        else:
+            # jika store_sync kosong → ambil default MC
+            mc_store = self.env['setting.config'].search([('vit_config_server', '=', 'mc')], limit=1)
+            if mc_store:
+                vals.update({
+                    'vit_config_server': mc_store.vit_config_server,
+                    'vit_config_server_name': f"{mc_store.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    'vit_config_url': f"{mc_store.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    'vit_config_db': mc_store.vit_config_db,
+                    'vit_config_username': mc_store.vit_config_username,
+                    'vit_config_password': mc_store.vit_config_password,
+                    'vit_linked_server': mc_store.vit_linked_server,
+                })
+                return super(ManualSyncMCToSSIntegration, self).create(vals)
+            else:
+                raise ValidationError(_("The master configuration has not been set. Please set the master configuration first."))
+
+        # jika ada store_ids, ambil store pertama sebagai acuan
+        if store_ids:
+            store_sync = self.env['setting.config'].browse(store_ids[0])
+            vals.update({
+                'vit_config_server': store_sync.vit_config_server,
+                'vit_config_server_name': f"{store_sync.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                'vit_config_url': f"{store_sync.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                'vit_config_db': store_sync.vit_config_db,
+                'vit_config_username': store_sync.vit_config_username,
+                'vit_config_password': store_sync.vit_config_password,
+                'vit_linked_server': store_sync.vit_linked_server,
+            })
+
         return super(ManualSyncMCToSSIntegration, self).create(vals)

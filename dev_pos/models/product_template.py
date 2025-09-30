@@ -12,7 +12,17 @@ class ProductTemplate(models.Model):
     vit_item_type = fields.Char(string="Type")
     vit_is_discount = fields.Boolean(string="Discount")
 
+    def _check_barcode_uniqueness(self):
+        # Override untuk mematikan validasi barcode unik
+        # Tidak akan pernah raise ValidationError lagi walaupun ada duplikat
+        return True
+
 class ProductProductInherit(models.Model):
     _inherit = 'product.product'
 
     vit_is_discount = fields.Boolean(string="Is Discount", default=False)
+
+    def _check_barcode_uniqueness(self):
+        # Override untuk mematikan validasi barcode unik
+        # Tidak akan pernah raise ValidationError lagi walaupun ada duplikat
+        return True
