@@ -106,67 +106,68 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
 
         mc_name = mc_client.server_name
         ss_names = ", ".join([s.server_name for s in ss_clients])
-        raise UserError(_(f"{mc_name}, {ss_names} {datefrom}, {dateto}, {master_item_utils}"))
+        ss_names = ", ".join([s.server_name for s in store_ids])
+        raise UserError(_(f"{mc_name}, ss {ss_names}, store_ids {store_ids}, {datefrom}, {dateto}, {master_item_utils}"))
                 
 
         # ---- Proses Per Store ----
-        for store_id in store_ids:
+        for store_id in ss_clients:
             if master_employee:
-                self.create_master_employee(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_employee(mc_client, store_id, datefrom, dateto)
             if master_item_utils:
-                self.create_master_item_utility(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_item_utility(mc_client, store_id, datefrom, dateto)
             if master_item:
-                self.create_master_items(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_items(mc_client, store_id, datefrom, dateto)
             if master_tag:
-                self.create_master_tags(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_tags(mc_client, store_id, datefrom, dateto)
             if master_barcode:
-                self.create_master_barcode(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_barcode(mc_client, store_id, datefrom, dateto)
             if master_bom_to_ss:
-                self.create_master_bom(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_bom(mc_client, store_id, datefrom, dateto)
             if master_customer:
-                self.create_master_customers_from_mc_to_store(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_customers_from_mc_to_store(mc_client, store_id, datefrom, dateto)
             if master_location:
-                self.create_location(mc_client, ss_clients, datefrom, dateto)
+                self.create_location(mc_client, store_id, datefrom, dateto)
             if master_pricelist:
-                self.create_master_pricelist(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_pricelist(mc_client, store_id, datefrom, dateto)
             if master_operation_type:
-                self.create_master_operation_type(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_operation_type(mc_client, store_id, datefrom, dateto)
             if master_discount:
-                self.create_master_discount(mc_client, ss_clients, datefrom, dateto)
+                self.create_master_discount(mc_client, store_id, datefrom, dateto)
             if update_discount:
-                self.update_master_discount(mc_client, ss_clients, datefrom, dateto)
+                self.update_master_discount(mc_client, store_id, datefrom, dateto)
             if master_voucher:
-                self.create_voucher_loyalty(mc_client, ss_clients, datefrom, dateto)
+                self.create_voucher_loyalty(mc_client, store_id, datefrom, dateto)
             if update_voucher_mc:
-                self.update_voucher_loyalty_store_to_mc(mc_client, ss_clients, datefrom, dateto)
+                self.update_voucher_loyalty_store_to_mc(mc_client, store_id, datefrom, dateto)
             if update_voucher_store:
-                self.update_voucher_loyalty_mc_to_store(mc_client, ss_clients, datefrom, dateto)
+                self.update_voucher_loyalty_mc_to_store(mc_client, store_id, datefrom, dateto)
             if master_pos_utility:
-                self.create_payment_method_pos_config_journal_invoicing(mc_client, ss_clients, datefrom, dateto)
+                self.create_payment_method_pos_config_journal_invoicing(mc_client, store_id, datefrom, dateto)
             if list_warehouse:
-                self.create_list_warehouse(mc_client, ss_clients, datefrom, dateto)
+                self.create_list_warehouse(mc_client, store_id, datefrom, dateto)
             if config_print_timbangan:
-                self.transfer_config_timbangan(mc_client, ss_clients, datefrom, dateto)
+                self.transfer_config_timbangan(mc_client, store_id, datefrom, dateto)
             if vit_internal_transfers:
-                self.transfer_internal_transfers_from_mc_to_store(mc_client, ss_clients, datefrom, dateto)
+                self.transfer_internal_transfers_from_mc_to_store(mc_client, store_id, datefrom, dateto)
             if vit_goods_issue:
-                self.transfer_goods_issue_from_mc_to_store(mc_client, ss_clients, datefrom, dateto)
+                self.transfer_goods_issue_from_mc_to_store(mc_client, store_id, datefrom, dateto)
             if vit_goods_receipts:
-                self.transfer_goods_receipt_from_mc_to_store(mc_client, ss_clients, datefrom, dateto)
+                self.transfer_goods_receipt_from_mc_to_store(mc_client, store_id, datefrom, dateto)
             if vit_receipts_to_ss:
-                self.transfer_receipt_from_mc_to_store(mc_client, ss_clients, datefrom, dateto)
+                self.transfer_receipt_from_mc_to_store(mc_client, store_id, datefrom, dateto)
             if vit_ts_in:
-                self.transfer_ts_in(mc_client, ss_clients, datefrom, dateto)
+                self.transfer_ts_in(mc_client, store_id, datefrom, dateto)
             if vit_po:
-                self.create_purchase_order_from_mc_to_ss(mc_client, ss_clients, datefrom, dateto)
+                self.create_purchase_order_from_mc_to_ss(mc_client, store_id, datefrom, dateto)
             if vit_val_inv:
-                self.validate_invoice(mc_client, ss_clients, datefrom, dateto)
+                self.validate_invoice(mc_client, store_id, datefrom, dateto)
             if vit_val_goods_receipts:
-                self.validate_goods_receipts_mc(mc_client, ss_clients, datefrom, dateto)
+                self.validate_goods_receipts_mc(mc_client, store_id, datefrom, dateto)
             if vit_val_goods_issue:
-                self.validate_goods_issue_mc(mc_client, ss_clients, datefrom, dateto)
+                self.validate_goods_issue_mc(mc_client, store_id, datefrom, dateto)
             if vit_val_ts_out:
-                self.validate_ts_out_mc(mc_client, ss_clients, datefrom, dateto)
+                self.validate_ts_out_mc(mc_client, store_id, datefrom, dateto)
 
         message = _("Sync Finished")
         return {'type': 'ir.actions.client',
