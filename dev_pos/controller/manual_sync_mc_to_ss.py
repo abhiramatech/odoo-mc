@@ -246,17 +246,18 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
     def create(self, vals):
         store_ids = []
 
+        # --- 1. Cek apakah user memilih store ---
         if vals.get('store_sync'):
-            # cek apakah list kosong
             commands = vals['store_sync']
+            # contoh format commands = [(6, 0, [1,2,3])]
             if commands and isinstance(commands[0], (list, tuple)) and len(commands[0]) >= 3:
-                # contoh: [(6, 0, [1,2,3])]
-                store_ids = commands[0][2]
+                store_ids = commands[0][2]  # ambil list id dari command
             else:
-                # fallback: mungkin langsung list of ids
+                # fallback kalau langsung list of ids
                 store_ids = commands
-        else:
-            # jika store_sync kosong → ambil default MC
+
+        # --- 2. Jika user TIDAK memilih store ---
+        if not store_ids:
             mc_store = self.env['setting.config'].search([('vit_config_server', '=', 'mc')], limit=1)
             if mc_store:
                 vals.update({
@@ -272,17 +273,18 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
             else:
                 raise ValidationError(_("The master configuration has not been set. Please set the master configuration first."))
 
-        # jika ada store_ids, ambil store pertama sebagai acuan
-        if store_ids:
-            store_sync = self.env['setting.config'].browse(store_ids[0])
-            vals.update({
-                'vit_config_server': store_sync.vit_config_server,
-                'vit_config_server_name': f"{store_sync.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                'vit_config_url': f"{store_sync.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                'vit_config_db': store_sync.vit_config_db,
-                'vit_config_username': store_sync.vit_config_username,
-                'vit_config_password': store_sync.vit_config_password,
-                'vit_linked_server': store_sync.vit_linked_server,
-            })
+        # --- 3. Jika user memilih store ---
+        # browse akan mengembalikan recordset -> ambil hanya 1 untuk menghindari singleton error
+        store_sync = self.env['setting.config'].browse(store_ids)[:1]
+
+        vals.update({
+            'vit_config_server': store_sync.vit_config_server,
+            'vit_config_server_name': f"{store_sync.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            'vit_config_url': f"{store_sync.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            'vit_config_db': store_sync.vit_config_db,
+            'vit_config_username': store_sync.vit_config_username,
+            'vit_config_password': store_sync.vit_config_password,
+            'vit_linked_server': store_sync.vit_linked_server,
+        })
 
         return super(ManualSyncMCToSSIntegration, self).create(vals)
