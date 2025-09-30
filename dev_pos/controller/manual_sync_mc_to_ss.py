@@ -104,9 +104,9 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
         mc_client, ss_clients = self.get_config(store_ids)
         datefrom, dateto = self.get_date(date_from, date_to)
 
-        mc_name = mc_client.server_name
-        ss_names = ", ".join([s.server_name for s in ss_clients])
-        raise UserError(_(f"{mc_client}, {ss_clients} {datefrom}, {dateto}, {master_item_utils}"))
+        # mc_name = mc_client.server_name
+        # ss_names = ", ".join([s.server_name for s in ss_clients])
+        # raise UserError(_(f"{mc_client}, {ss_clients} {datefrom}, {dateto}, {master_item_utils}"))
                 
 
         # ---- Proses Per Store ----
