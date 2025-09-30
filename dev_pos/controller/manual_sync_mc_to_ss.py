@@ -243,48 +243,48 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
             
     #     return super(ManualSyncMCToSSIntegration, self).create(vals)
     
-    def create(self, vals):
-        store_ids = []
+    # def create(self, vals):
+    #     store_ids = []
 
-        # --- 1. Cek apakah user memilih store ---
-        if vals.get('store_sync'):
-            commands = vals['store_sync']
-            # contoh format commands = [(6, 0, [1,2,3])]
-            if commands and isinstance(commands[0], (list, tuple)) and len(commands[0]) >= 3:
-                store_ids = commands[0][2]  # ambil list id dari command
-            else:
-                # fallback kalau langsung list of ids
-                store_ids = commands
+    #     # --- 1. Cek apakah user memilih store ---
+    #     # if vals.get('store_sync'):
+    #     #     commands = vals['store_sync']
+    #     #     # contoh format commands = [(6, 0, [1,2,3])]
+    #     #     if commands and isinstance(commands[0], (list, tuple)) and len(commands[0]) >= 3:
+    #     #         store_ids = commands[0][2]  # ambil list id dari command
+    #     #     else:
+    #     #         # fallback kalau langsung list of ids
+    #     #         store_ids = commands
 
-        # --- 2. Jika user TIDAK memilih store ---
-        if not store_ids:
-            mc_store = self.env['setting.config'].search([('vit_config_server', '=', 'mc')], limit=1)
-            if mc_store:
-                vals.update({
-                    'vit_config_server': mc_store.vit_config_server,
-                    'vit_config_server_name': f"{mc_store.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    'vit_config_url': f"{mc_store.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    'vit_config_db': mc_store.vit_config_db,
-                    'vit_config_username': mc_store.vit_config_username,
-                    'vit_config_password': mc_store.vit_config_password,
-                    'vit_linked_server': mc_store.vit_linked_server,
-                })
-                return super(ManualSyncMCToSSIntegration, self).create(vals)
-            else:
-                raise ValidationError(_("The master configuration has not been set. Please set the master configuration first."))
+    #     # --- 2. Jika user TIDAK memilih store ---
+    #     if not store_ids:
+    #         mc_store = self.env['setting.config'].search([('vit_config_server', '=', 'mc')], limit=1)
+    #         if mc_store:
+    #             vals.update({
+    #                 'vit_config_server': mc_store.vit_config_server,
+    #                 'vit_config_server_name': f"{mc_store.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    #                 'vit_config_url': f"{mc_store.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    #                 'vit_config_db': mc_store.vit_config_db,
+    #                 'vit_config_username': mc_store.vit_config_username,
+    #                 'vit_config_password': mc_store.vit_config_password,
+    #                 'vit_linked_server': mc_store.vit_linked_server,
+    #             })
+    #             return super(ManualSyncMCToSSIntegration, self).create(vals)
+    #         else:
+    #             raise ValidationError(_("The master configuration has not been set. Please set the master configuration first."))
 
-        # --- 3. Jika user memilih store ---
-        # browse akan mengembalikan recordset -> ambil hanya 1 untuk menghindari singleton error
-        store_sync = self.env['setting.config'].browse(store_ids)[:1]
+    #     # --- 3. Jika user memilih store ---
+    #     # browse akan mengembalikan recordset -> ambil hanya 1 untuk menghindari singleton error
+    #     # store_sync = self.env['setting.config'].browse(store_ids)[:1]
 
-        vals.update({
-            'vit_config_server': store_sync.vit_config_server,
-            'vit_config_server_name': f"{store_sync.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            'vit_config_url': f"{store_sync.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            'vit_config_db': store_sync.vit_config_db,
-            'vit_config_username': store_sync.vit_config_username,
-            'vit_config_password': store_sync.vit_config_password,
-            'vit_linked_server': store_sync.vit_linked_server,
-        })
+    #     # vals.update({
+    #     #     'vit_config_server': store_sync.vit_config_server,
+    #     #     'vit_config_server_name': f"{store_sync.vit_config_server_name} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    #     #     'vit_config_url': f"{store_sync.vit_config_url} - {fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    #     #     'vit_config_db': store_sync.vit_config_db,
+    #     #     'vit_config_username': store_sync.vit_config_username,
+    #     #     'vit_config_password': store_sync.vit_config_password,
+    #     #     'vit_linked_server': store_sync.vit_linked_server,
+    #     # })
 
-        return super(ManualSyncMCToSSIntegration, self).create(vals)
+    #     # return super(ManualSyncMCToSSIntegration, self).create(vals)
