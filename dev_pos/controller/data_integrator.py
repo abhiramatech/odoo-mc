@@ -412,49 +412,55 @@ class DataIntegrator:
                         self.set_log_ss.create_log_note_failed(f"Exception - {model}", model, f"Error occurred while processing record data: {e}", None)
 
             if data_for_create:
-                start_time = time.time()
-                create = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
-                                self.target_client.password, model, 'create', [data_for_create])
-                end_time = time.time()
-                duration = end_time - start_time
+                batch_size = 2000
+                total_records = len(data_for_create)
 
-                print(create)
+                for i in range(0, total_records, batch_size):
+                    batch_data = data_for_create[i:i+batch_size]  # ambil 2000 record per loop
 
-                if create:
-                    for index, data_create in enumerate(data_for_create):
-                        if model == 'product.pricelist':
-                            item_line = data_for_create[index]['item_ids']
-                            id_line = [item[2]['id'] for item in item_line]
-                            id_line_for_update_isintegrated.extend(id_line)  
-                        id_mc = data_create['id']
-                        write_date = data_create['write_date']
-                        log_record = self.set_log_mc.log_record_success(data_create, start_time, end_time, duration, modul, write_date, self.source_client.server_name, self.target_client.server_name)
-                        log_data_created.append(log_record)
-                        id_mc_for_update_isintegrated.append(id_mc)
+                    start_time = time.time()
+                    create = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
+                                    self.target_client.password, model, 'create', [batch_data])
+                    end_time = time.time()
+                    duration = end_time - start_time
 
-                    if model == 'purchase.order':
-                        self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                self.target_client.uid, self.target_client.password,
-                                                'purchase.order', 'button_confirm',
-                                                [create])
-                        self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-                                            self.source_client.password, model, 'write', [id_mc_for_update_isintegrated, {'is_integrated': True}])
-                        self.set_log_mc.create_log_note_success(log_data_created)
-                        self.set_log_ss.create_log_note_success(log_data_created)
-                    else:
-                        self.update_indexstore_source(model, id_mc_for_update_isintegrated, index_store_field)
-                        if model == 'product.pricelist':
-                            self.update_indexstore_source('product.pricelist.item', id_line_for_update_isintegrated, index_store_field)
-                        
-                        if self.target_client.server_name == last_master_url:
-                            index_store_data = self.get_index_store_data(model, id_mc_for_update_isintegrated, len_master)
-                            self.update_isintegrated_source(model, index_store_data)
+                    # print(create)
+
+                    if create:
+                        for index, data_create in enumerate(data_for_create):
                             if model == 'product.pricelist':
-                                index_store_data = self.get_index_store_data('product.pricelist.item', id_line_for_update_isintegrated, len_master)
-                                self.update_isintegrated_source('product.pricelist.item', index_store_data)
+                                item_line = data_for_create[index]['item_ids']
+                                id_line = [item[2]['id'] for item in item_line]
+                                id_line_for_update_isintegrated.extend(id_line)  
+                            id_mc = data_create['id']
+                            write_date = data_create['write_date']
+                            log_record = self.set_log_mc.log_record_success(data_create, start_time, end_time, duration, modul, write_date, self.source_client.server_name, self.target_client.server_name)
+                            log_data_created.append(log_record)
+                            id_mc_for_update_isintegrated.append(id_mc)
+
+                        if model == 'purchase.order':
+                            self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                    self.target_client.uid, self.target_client.password,
+                                                    'purchase.order', 'button_confirm',
+                                                    [create])
+                            self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
+                                                self.source_client.password, model, 'write', [id_mc_for_update_isintegrated, {'is_integrated': True}])
+                            self.set_log_mc.create_log_note_success(log_data_created)
+                            self.set_log_ss.create_log_note_success(log_data_created)
+                        else:
+                            self.update_indexstore_source(model, id_mc_for_update_isintegrated, index_store_field)
+                            if model == 'product.pricelist':
+                                self.update_indexstore_source('product.pricelist.item', id_line_for_update_isintegrated, index_store_field)
                             
-                        self.set_log_mc.create_log_note_success(log_data_created)
-                        self.set_log_ss.create_log_note_success(log_data_created)
+                            if self.target_client.server_name == last_master_url:
+                                index_store_data = self.get_index_store_data(model, id_mc_for_update_isintegrated, len_master)
+                                self.update_isintegrated_source(model, index_store_data)
+                                if model == 'product.pricelist':
+                                    index_store_data = self.get_index_store_data('product.pricelist.item', id_line_for_update_isintegrated, len_master)
+                                    self.update_isintegrated_source('product.pricelist.item', index_store_data)
+                                
+                            self.set_log_mc.create_log_note_success(log_data_created)
+                            self.set_log_ss.create_log_note_success(log_data_created)
             # #     # self.set_log_mc.delete_data_log_failed(record['name'])
             # #     # self.set_log_ss.delete_data_log_failed(record['name'])
         except Exception as e:
