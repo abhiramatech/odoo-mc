@@ -1227,48 +1227,86 @@ class SettingConfig(models.Model):
 
         return super(SettingConfig, self).create(vals)
 
-    def write(self, vals):
+    # def write(self, vals):
         # if 'vit_config_url' in vals:
         #      existing_record = self.env['setting.config'].search([('vit_config_url', '=', vals['vit_config_url'])])
         #      if existing_record:
         #          raise UserError(_("URL already exists"))
         
-        if vals.get('vit_config_server_name'):
-             existing_record = self.env['setting.config'].search([('vit_config_server_name', '=', vals['vit_config_server_name'])])
-             if existing_record:
-                 raise UserError(_("Server Name already exists"))
+        # if vals.get('vit_config_server_name'):
+        #      existing_record = self.env['setting.config'].search([('vit_config_server_name', '=', vals['vit_config_server_name'])])
+        #      if existing_record:
+        #          raise UserError(_("Server Name already exists"))
              
+        # if vals:
+        #     try:
+        #         for record in self:
+        #         # URL dan parameter koneksi API Odoo
+        #             url = record.vit_config_url
+        #             db = record.vit_config_db
+        #             username = record.vit_config_username
+        #             password = record.vit_config_password
+                    
+        #             url = vals.get('vit_config_url') if vals.get('vit_config_url') is not None else record.vit_config_url
+        #             db = vals.get('vit_config_db') if vals.get('vit_config_db') is not None else record.vit_config_db
+        #             username = vals.get('vit_config_username') if vals.get('vit_config_username') is not None else record.vit_config_username
+        #             password = vals.get('vit_config_password') if vals.get('vit_config_password') is not None else record.vit_config_password
+
+        #             # raise ValidationError(_(f"{url}, {db}, {username}, {password}")) # buat check debug ya
+        #             common = xmlrpc.client.ServerProxy(f'{url}/xmlrpc/2/common')
+        #             uid = common.authenticate(db, username, password, {})
+
+        #             if uid:
+        #                 vals['vit_linked_server'] = True
+        #                 vals['vit_state'] = 'success'
+        #             if not uid: 
+        #                 vals['vit_linked_server'] = False
+        #                 vals['vit_state'] = 'failed'
+        #     except Exception as e:
+        #         raise UserError(_(f"{url} {db} {username} {password} {e}"))
+        #         vals['vit_linked_server'] = False
+        #         vals['vit_state'] = 'failed'
+            
+        # super(SettingConfig, self).write(vals)
+    
+    def write(self, vals):
+        if vals.get('vit_config_server_name'):
+            existing_record = self.env['setting.config'].search([
+                ('vit_config_server_name', '=', vals['vit_config_server_name'])
+            ])
+            if existing_record:
+                raise UserError(_("Server Name already exists"))
+
         if vals:
             try:
-                for record in self:
-                # URL dan parameter koneksi API Odoo
-                    url = record.vit_config_url
-                    db = record.vit_config_db
-                    username = record.vit_config_username
-                    password = record.vit_config_password
-                    
-                    url = vals.get('vit_config_url') if vals.get('vit_config_url') is not None else record.vit_config_url
-                    db = vals.get('vit_config_db') if vals.get('vit_config_db') is not None else record.vit_config_db
-                    username = vals.get('vit_config_username') if vals.get('vit_config_username') is not None else record.vit_config_username
-                    password = vals.get('vit_config_password') if vals.get('vit_config_password') is not None else record.vit_config_password
+                # Ambil nilai dari vals atau fallback ke record pertama
+                record = self[0]  
+                url = vals.get('vit_config_url') or record.vit_config_url
+                db = vals.get('vit_config_db') or record.vit_config_db
+                username = vals.get('vit_config_username') or record.vit_config_username
+                password = vals.get('vit_config_password') or record.vit_config_password
 
-                    # raise ValidationError(_(f"{url}, {db}, {username}, {password}")) # buat check debug ya
-                    common = xmlrpc.client.ServerProxy(f'{url}/xmlrpc/2/common')
-                    uid = common.authenticate(db, username, password, {})
+                # Tambahkan protokol otomatis kalau tidak ada
+                if url and not url.startswith(('http://', 'https://')):
+                    url = 'http://' + url
 
-                    if uid:
-                        vals['vit_linked_server'] = True
-                        vals['vit_state'] = 'success'
-                    if not uid: 
-                        vals['vit_linked_server'] = False
-                        vals['vit_state'] = 'failed'
+                common = xmlrpc.client.ServerProxy(f'{url}/xmlrpc/2/common')
+                uid = common.authenticate(db, username, password, {})
+
+                if uid:
+                    vals['vit_linked_server'] = True
+                    vals['vit_state'] = 'success'
+                else:
+                    vals['vit_linked_server'] = False
+                    vals['vit_state'] = 'failed'
+
             except Exception as e:
-                raise UserError(_(f"{url} {db} {username} {password} {e}"))
-                vals['vit_linked_server'] = False
-                vals['vit_state'] = 'failed'
-            
-        super(SettingConfig, self).write(vals)
-    
+                # vals['vit_linked_server'] = False
+                # vals['vit_state'] = 'failed'
+                raise UserError(_(f"URL: {url}, DB: {db}, Username: {username}, Error: {e}"))
+
+        return super(SettingConfig, self).write(vals)
+
     def action_test_connect_button(self):
         for record in self:
             try:
