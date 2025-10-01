@@ -47,6 +47,7 @@
                 <field name="session_id" readonly="state in ('finished')"/>    
                 <field name="start_date" readonly="state in ('finished')"/>    
                 <field name="end_date" readonly="state in ('finished')"/> 
+                <field name="modal"/> 
                 <field name="is_integrated" string="Integrated"/>                  
               </group>
             </group>

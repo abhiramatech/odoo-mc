@@ -3791,6 +3791,7 @@ class DataTransaksi:
                     'session_id': int(session_id),
                     'start_date': record.get('start_date'),
                     'end_date': record.get('end_date'),
+                    'modal': record.get('modal'),
                     'line_ids': end_shift_line_ids,
                 }
 

@@ -15,6 +15,7 @@ class EndShiftSession(models.Model):
     session_id = fields.Many2one('pos.session', string='Session', tracking=True, required=True)
     start_date = fields.Datetime(string='Start Date', tracking=True)
     end_date = fields.Datetime(string='End Date', tracking=True)
+    modal = fields.Float(string="Modal", tracking=True, default=0.0, help="Modal awal untuk shift ini")
     is_integrated = fields.Boolean(string='Integrated', default=False, readonly=True, tracking=True)
     state = fields.Selection([
         ('opened', 'Opened'),

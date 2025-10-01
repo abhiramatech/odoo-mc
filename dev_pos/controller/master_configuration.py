@@ -676,7 +676,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksi.transfer_end_shift_from_store('end.shift', ['doc_num', 'cashier_id', 'session_id', 'start_date', 'end_date', 'is_integrated', 'line_ids'], 'Transfer End Shift')
+            integrator_transaksi.transfer_end_shift_from_store('end.shift', ['doc_num', 'cashier_id', 'session_id', 'start_date', 'end_date', 'is_integrated', 'line_ids', 'modal'], 'Transfer End Shift')
 
     def create_update_session_pos(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -1278,15 +1278,18 @@ class SettingConfig(models.Model):
                 raise UserError(_("Server Name already exists"))
 
         if vals:
-            record = self[0]
-            if not record:
-                return super(SettingConfig, self).write(vals)
             try:
+                record = self[0]
                 # Ambil nilai dari vals atau fallback ke record pertama
                 url = vals.get('vit_config_url') or record.vit_config_url
                 db = vals.get('vit_config_db') or record.vit_config_db
                 username = vals.get('vit_config_username') or record.vit_config_username
                 password = vals.get('vit_config_password') or record.vit_config_password
+
+                if not url or not db or not username or not password:
+                    vals['vit_linked_server'] = False
+                    vals['vit_state'] = 'failed'
+                    return super(SettingConfig, self).write(vals)
 
                 # Tambahkan protokol otomatis kalau tidak ada
                 if url and not url.startswith(('http://', 'https://')):
