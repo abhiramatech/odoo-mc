@@ -1278,9 +1278,11 @@ class SettingConfig(models.Model):
                 raise UserError(_("Server Name already exists"))
 
         if vals:
+            record = self[0]
+            if not record:
+                return super(SettingConfig, self).write(vals)
             try:
                 # Ambil nilai dari vals atau fallback ke record pertama
-                record = self[0]  
                 url = vals.get('vit_config_url') or record.vit_config_url
                 db = vals.get('vit_config_db') or record.vit_config_db
                 username = vals.get('vit_config_username') or record.vit_config_username
