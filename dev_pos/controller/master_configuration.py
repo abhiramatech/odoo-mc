@@ -17,14 +17,14 @@ class SettingConfig(models.Model):
         ('ss', 'Store Server'),
     ]
 
-    vit_config_server = fields.Selection(selection=SERVER_SELECTION, string='Server Selection', required=True)
-    vit_config_server_name = fields.Char(string='Server Name', required=True)
-    vit_config_url = fields.Char(string='url', required=True)
-    vit_config_db = fields.Char(string='Database Name', required=True)
-    vit_config_username = fields.Char(string='Username', required=True)
-    vit_config_password = fields.Char(string='Password', required=True)
+    vit_config_server = fields.Selection(selection=SERVER_SELECTION, string='Server Selection')
+    vit_config_server_name = fields.Char(string='Server Name')
+    vit_config_url = fields.Char(string='url')
+    vit_config_db = fields.Char(string='Database Name')
+    vit_config_username = fields.Char(string='Username')
+    vit_config_password = fields.Char(string='Password')
     vit_config_password_api = fields.Char(string='Password API')
-    vit_linked_server = fields.Boolean(string="Linked Server", default=False, required=True)
+    vit_linked_server = fields.Boolean(string="Linked Server", default=False)
     vit_state = fields.Selection([
         ('failed', 'Failed'),
         ('success', 'Success')], default='failed', string="Status")

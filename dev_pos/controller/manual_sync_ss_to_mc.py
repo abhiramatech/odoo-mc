@@ -111,25 +111,25 @@ class ManualSyncSSToMCIntegratiion(models.TransientModel):
             vit_manufacture_order = configs.vit_manufacture_order
         return store, date_from, date_to, master_customer_to_mc, master_employee_to_mc, session, end_shift, invoice, invoice_rescue,internal_transfers_to_mc, goods_receipts_to_mc, goods_issue_to_mc, receipts_to_mc, inventory_adjustment_to_mc, inventory_counting, ts_out, ts_in, grpo, vit_val_goods_receipts, vit_val_goods_issue, vit_manufacture_order
 
-    def create(self, vals):
-        if vals.get('store_sync'):
-            store_sync = self.env['setting.config'].browse(vals['store_sync'])
-            vals['vit_config_server'] = store_sync.vit_config_server
-            vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            vals['vit_config_db'] = store_sync.vit_config_db
-            vals['vit_config_username'] = store_sync.vit_config_username
-            vals['vit_config_password'] = store_sync.vit_config_password
-            vals['vit_linked_server'] = store_sync.vit_linked_server
-        else:
-            # jika store_sync kosong karena untuk semua store
-            store_sync = self.env['setting.config'].search([('vit_config_server', '=', 'mc')])
-            vals['vit_config_server'] = store_sync.vit_config_server
-            vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            vals['vit_config_db'] = store_sync.vit_config_db
-            vals['vit_config_username'] = store_sync.vit_config_username
-            vals['vit_config_password'] = store_sync.vit_config_password
-            vals['vit_linked_server'] = store_sync.vit_linked_server
+    # def create(self, vals):
+    #     if vals.get('store_sync'):
+    #         store_sync = self.env['setting.config'].browse(vals['store_sync'])
+    #         vals['vit_config_server'] = store_sync.vit_config_server
+    #         vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         vals['vit_config_db'] = store_sync.vit_config_db
+    #         vals['vit_config_username'] = store_sync.vit_config_username
+    #         vals['vit_config_password'] = store_sync.vit_config_password
+    #         vals['vit_linked_server'] = store_sync.vit_linked_server
+    #     else:
+    #         # jika store_sync kosong karena untuk semua store
+    #         store_sync = self.env['setting.config'].search([('vit_config_server', '=', 'mc')])
+    #         vals['vit_config_server'] = store_sync.vit_config_server
+    #         vals['vit_config_server_name'] = store_sync.vit_config_server_name + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         vals['vit_config_url'] = store_sync.vit_config_url + " - " + fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         vals['vit_config_db'] = store_sync.vit_config_db
+    #         vals['vit_config_username'] = store_sync.vit_config_username
+    #         vals['vit_config_password'] = store_sync.vit_config_password
+    #         vals['vit_linked_server'] = store_sync.vit_linked_server
 
-        return super(ManualSyncSSToMCIntegratiion, self).create(vals)
+    #     return super(ManualSyncSSToMCIntegratiion, self).create(vals)
