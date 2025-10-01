@@ -392,7 +392,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.update_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids', 'schedule_ids', 'member_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
+            integrator_transaksiMCtoSS.update_discount_loyalty('loyalty.program', ['id', 'name', 'program_type', 'currency_id', 'active', 'pricelist_ids', 'portal_point_name', 'portal_visible', 'trigger', 'applies_on', 'date_from', 'date_to', 'limit_usage', 'pos_ok', 'pos_config_ids', 'sale_ok', 'vit_trxid', 'index_store', 'reward_ids', 'rule_ids', 'schedule_ids', 'member_ids'], 'Transfer Discount/Loyalty', datefrom, dateto)
     
     def create_manufacture_unbuild(self, mc, ss, datefrom, dateto):
         if mc and ss:

@@ -44,3 +44,4 @@ from . import product_tag
 from . import mrp_unbuild_line
 from . import res_partner_category
 from . import timbangan_template
+from . import account_move_line

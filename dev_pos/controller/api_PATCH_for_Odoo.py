@@ -192,6 +192,7 @@ class MasterItemPATCH(http.Controller):
                         'vit_sub_div': data.get('vit_sub_div'),
                         'vit_item_kel': data.get('vit_item_kel'),
                         'vit_item_type': data.get('vit_item_type'),
+                        'vit_item_brand': data.get('vit_item_brand'),
                     }
                     if data.get('active') is not None:
                         update_data['active'] = data.get('active')

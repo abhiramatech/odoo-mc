@@ -930,7 +930,8 @@ class MasterProductItemAPI(http.Controller):
                     # 'image_1920': base64.b64encode(product.image_1920).decode('utf-8') if product.image_1920 else None
                     'vit_sub_div': product.vit_sub_div,
                     'vit_item_kel': product.vit_item_kel,
-                    'vit_item_type': product.vit_item_type
+                    'vit_item_type': product.vit_item_type,
+                    'vit_item_brand': product.vit_item_brand,
                 }
                 data_master_product.append(product_data)
 
@@ -1776,6 +1777,8 @@ class InvoiceOrder(http.Controller):
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
+                    'employee_id': order.employee_id.id,
+                    'employee': order.employee_id.name,
                     'location_id': location_id or int(-1),
                     'location': location or int(-1),
                     'location_dest_id': location_dest_id or int(-1),
@@ -1850,6 +1853,9 @@ class InvoiceOrder(http.Controller):
                     'line_number': line_number,
                     'id': line.id,
                     'doc_no': doc_num,
+                    'sales_id': line.user_id or "",
+                    'sales': line.user_id.name,
+                    'sales_code': line.user_id.vit_employee_code,
                     'product_id': line.product_id.id,
                     'product_name': line.name,
                     'product_code': line.product_id.default_code or "",
@@ -2111,7 +2117,7 @@ class CrediNoteAPI(http.Controller):
                     pickings = request.env['stock.picking'].sudo().search([('origin', '=', record.name)], limit=1)
                     if pickings:
                         location_id = pickings.location_dest_id.id
-                        location = pickings.location_id.complete_name
+                        location = pickings.location_dest_id.complete_name
                     else:
                         location_id = None
                         location = None
@@ -2126,7 +2132,7 @@ class CrediNoteAPI(http.Controller):
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
-                    'location_id': location_id,
+                    'location_id': location_id or int(-1),
                     'location': location,
                     'is_integrated': order.is_integrated,
                     'create_date': str(create_date_jakarta),

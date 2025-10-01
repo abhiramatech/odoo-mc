@@ -9,6 +9,8 @@
       <field name="arch" type="xml">
         <xpath expr="//field[@name='discount_max_amount']" position="after">
             <field name="vit_trxid"/>
+            <field name="vit_item_code_sap"/>
+            <field name="vit_reward_trxid"/>
         </xpath>
         <xpath expr="//field[@name='vit_trxid']" position="attributes">
           <attribute name="force_save">1</attribute>

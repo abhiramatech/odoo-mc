@@ -52,13 +52,6 @@ class POSTEmployee(http.Controller):
                     # Validate department
                     department_id = data.get('department_id')
                     department = env['hr.department'].sudo().browse(department_id)
-                    if not department.exists():
-                        failed.append({
-                            'data': data,
-                            'message': f"Department with ID {department_id} not found.",
-                            'id': None  # ID is not created, so set it to None
-                        })
-                        continue
 
                     # Check if employee name already exists
                     existing_employee = env['hr.employee'].sudo().search([('name', '=', data.get('name'))], limit=1)
@@ -72,7 +65,7 @@ class POSTEmployee(http.Controller):
 
                     # Create employee
                     employee_data = {
-                        'employee_code': data.get('employee_code'),
+                        'vit_employee_code': data.get('employee_code'),
                         'name': data.get('name'),
                         'job_title': data.get('job_title'),
                         'department_id': department.id,
@@ -330,6 +323,10 @@ class POSTMasterItem(http.Controller):
                         'image_1920': data.get('image_1920'),
                         'barcode': data.get('barcode'),
                         'create_uid': uid,
+                        'vit_sub_div': data.get('vit_sub_div'),
+                        'vit_item_kel': data.get('vit_item_kel'),
+                        'vit_item_type': data.get('vit_item_type'),
+                        'vit_item_brand': data.get('vit_item_brand'),
                     })
 
                 except Exception as e:

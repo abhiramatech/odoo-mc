@@ -10,3 +10,4 @@ class HREmployeeInherit(models.Model):
     is_sales = fields.Boolean(string="Sales", default=False)
     is_cashier = fields.Boolean(string="Cashier", default=False)
     is_pic = fields.Boolean(string="PIC", default=False)
+    vit_employee_code = fields.Char(string="Employee Code", default=False, tracking=True)

@@ -764,7 +764,7 @@ class DataTransaksi:
                                                             {'fields': ['id', 'id_mc']})
             employees_source_dict = {employee['id']: employee['id_mc'] for employee in employees_source}
 
-                # Fetch pricelist
+            # Fetch pricelist
             pricelist_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                             self.source_client.uid, self.source_client.password,
                                                             'product.pricelist', 'search_read',
@@ -774,12 +774,14 @@ class DataTransaksi:
 
             # Pre-fetch all pos.order.line and pos.payment data
             order_ids = [record['id'] for record in transaksi_posorder_invoice]
-            # ✅ TAMBAHKAN 'user_id' di fields pos.order.line
+            
+            # ✅ SUDAH BENAR: TAMBAHKAN 'user_id' di fields pos.order.line
             pos_order_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         'pos.order.line', 'search_read',
                                                         [[['order_id', 'in', order_ids]]],
                                                         {'fields': ['order_id', 'product_id', 'full_product_name', 'qty', 'price_unit', 'tax_ids_after_fiscal_position', 'tax_ids', 'discount', 'price_subtotal', 'price_subtotal_incl', 'user_id']})
+            
             pos_payments = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         'pos.payment', 'search_read',
@@ -812,20 +814,55 @@ class DataTransaksi:
                 if existing_pos_order_invoice:
                     existing_pos_order_invoice_dict[record['id']] = existing_pos_order_invoice[0]['id']
 
-            # ✅ TAMBAHKAN: Fetch user_id dari pos.order.line
-            user_ids_from_lines = [line['user_id'][0] if isinstance(line.get('user_id'), list) and line.get('user_id') else line.get('user_id') 
-                                   for line in pos_order_lines if line.get('user_id')]
-            user_ids_from_lines = [uid for uid in user_ids_from_lines if uid]  # Filter out None/False values
+            # ✅ PERBAIKAN: Extract user_ids dari pos.order.line dengan lebih aman
+            user_ids_from_lines = []
+            for line in pos_order_lines:
+                user_id_value = line.get('user_id')
+                if user_id_value:
+                    if isinstance(user_id_value, list) and len(user_id_value) > 0:
+                        user_ids_from_lines.append(user_id_value[0])
+                    elif isinstance(user_id_value, int):
+                        user_ids_from_lines.append(user_id_value)
+            
+            # Remove duplicates
+            user_ids_from_lines = list(set(user_ids_from_lines))
+            
+            print(f"✅ Found {len(user_ids_from_lines)} unique user_ids from order lines: {user_ids_from_lines}")
 
-            # ✅ TAMBAHKAN: Fetch mapping user_id dari source ke target
+            # ✅ PERBAIKAN: Fetch mapping user_id dari source ke target melalui hr.employee
             users_source_dict = {}
             if user_ids_from_lines:
+                # Fetch hr.employee records that have user_id
                 users_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                             self.source_client.uid, self.source_client.password,
                                                             'hr.employee', 'search_read',
-                                                            [[['id', 'in', user_ids_from_lines]]],
-                                                            {'fields': ['id', 'id_mc']})
-                users_source_dict = {user['id']: user['id_mc'] for user in users_source if user.get('id_mc')}
+                                                            [[['user_id', 'in', user_ids_from_lines]]],
+                                                            {'fields': ['id', 'user_id', 'id_mc']})
+                
+                # Create mapping: source user_id -> target employee id_mc
+                for emp in users_source:
+                    source_user_id = emp.get('user_id')
+                    if isinstance(source_user_id, list) and len(source_user_id) > 0:
+                        source_user_id = source_user_id[0]
+                    
+                    target_employee_id_mc = emp.get('id_mc')
+                    
+                    if source_user_id and target_employee_id_mc:
+                        # Now get the user_id from target employee
+                        target_employee = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                    self.target_client.uid, self.target_client.password,
+                                                                    'hr.employee', 'search_read',
+                                                                    [[['id', '=', target_employee_id_mc]]],
+                                                                    {'fields': ['user_id'], 'limit': 1})
+                        
+                        if target_employee and target_employee[0].get('user_id'):
+                            target_user_id = target_employee[0]['user_id']
+                            if isinstance(target_user_id, list) and len(target_user_id) > 0:
+                                target_user_id = target_user_id[0]
+                            users_source_dict[source_user_id] = target_user_id
+                            print(f"✅ Mapped user_id: source {source_user_id} -> target {target_user_id}")
+            
+            print(f"✅ Total user_id mappings created: {len(users_source_dict)}")
 
             # Enhanced product fetching logic to handle service products
             product_ids = [line['product_id'][0] for line in pos_order_lines if line.get('product_id')]
@@ -883,6 +920,7 @@ class DataTransaksi:
                 for prod in product_target_service:
                     product_target_dict[prod['name']] = prod['id']
 
+            # Fetch taxes
             tax_ids = [tax_id for product in pos_order_lines for tax_id in product.get('tax_ids', [])]
             source_taxes = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
@@ -899,7 +937,6 @@ class DataTransaksi:
                                                                 [[['id', 'in', payment_method_ids]]],
                                                                 {'fields': ['id', 'id_mc', 'name']})
             payment_method_source_dict = {payment['id']: payment['id_mc'] for payment in payment_method_source}
-            pos_order_ids = []
             
             # Function to process each record
             def process_record(record):
@@ -911,6 +948,7 @@ class DataTransaksi:
                 pos_order_invoice_line_ids = []
                 pos_order_payment_ids = []
                 missing_products = []
+                missing_users = []
 
                 # Check if all products exist in the target database
                 for line in pos_order_invoice_lines:
@@ -933,13 +971,27 @@ class DataTransaksi:
                             missing_products.append(f"Product: {identifier or product_name}")
                         continue
 
-                    # ✅ TAMBAHKAN: Map user_id dari source ke target
-                    source_user_id = line.get('user_id')[0] if isinstance(line.get('user_id'), list) and line.get('user_id') else line.get('user_id')
+                    # ✅ PERBAIKAN: Extract dan map user_id dengan lebih aman
+                    source_user_id = None
+                    user_id_value = line.get('user_id')
+                    
+                    if user_id_value:
+                        if isinstance(user_id_value, list) and len(user_id_value) > 0:
+                            source_user_id = user_id_value[0]
+                        elif isinstance(user_id_value, int):
+                            source_user_id = user_id_value
+                    
                     target_user_id = None
                     if source_user_id:
                         target_user_id = users_source_dict.get(source_user_id)
+                        if not target_user_id:
+                            missing_users.append(f"User ID {source_user_id} tidak ditemukan mapping ke target")
+                            print(f"⚠️ Warning: User ID {source_user_id} tidak ditemukan mapping ke target untuk line product {source_product_info.get('name')}")
 
+                    # Prepare tax_ids
                     tax_ids_mc = [source_taxes_dict.get(tax_id) for tax_id in line.get('tax_ids', []) if tax_id in source_taxes_dict]
+                    
+                    # ✅ PERBAIKAN: Build pos_order_line_data dengan user_id
                     pos_order_line_data = {
                         'product_id': int(target_product_id),
                         'name': line.get('full_product_name'),
@@ -952,9 +1004,12 @@ class DataTransaksi:
                         'tax_ids': [(6, 0, tax_ids_mc)],
                     }
                     
-                    # ✅ TAMBAHKAN: Set user_id jika ada
+                    # ✅ TAMBAHKAN: Set user_id jika ada mapping
                     if target_user_id:
                         pos_order_line_data['user_id'] = int(target_user_id)
+                        print(f"✅ Line with product {source_product_info.get('name')} will have user_id: {target_user_id}")
+                    else:
+                        print(f"⚠️ Line with product {source_product_info.get('name')} will NOT have user_id (source: {source_user_id})")
                     
                     pos_order_invoice_line_ids.append((0, 0, pos_order_line_data))
 
@@ -967,7 +1022,13 @@ class DataTransaksi:
                     self.set_log_ss.create_log_note_failed(record, 'Invoice', message, write_date)
                     return
 
-                # # # Fetch and process payments
+                # ✅ OPTIONAL: Log warning jika ada user yang tidak ditemukan (tidak menghentikan proses)
+                if missing_users:
+                    missing_users_str = ", ".join(map(str, missing_users))
+                    print(f"⚠️ Warning untuk order {record.get('name')}: {missing_users_str}")
+                    # Anda bisa menambahkan log warning di sini jika diperlukan
+
+                # Fetch and process payments
                 pos_order_payments = pos_payments_dict.get(record['id'], [])
                 amount_paid = 0
                 for payment in pos_order_payments:
@@ -993,7 +1054,7 @@ class DataTransaksi:
                 employee_id = employees_source_dict.get(record.get('employee_id')[0] if isinstance(record.get('employee_id'), list) else record.get('employee_id'))
                 pricelist_id = pricelist_source_dict.get(record.get('pricelist_id')[0] if isinstance(record.get('pricelist_id'), list) else None)
 
-                print(partner_id, session_id, employee_id, pricelist_id)
+                print(f"✅ Mapping IDs - partner: {partner_id}, session: {session_id}, employee: {employee_id}, pricelist: {pricelist_id}")
 
                 if not partner_id or not session_id or not employee_id:
                     missing_fields = []
@@ -1016,12 +1077,11 @@ class DataTransaksi:
                     self.set_log_mc.create_log_note_failed(record, 'Invoice', message, write_date)
                     self.set_log_ss.create_log_note_failed(record, 'Invoice', message, write_date)
                     return
-                
 
+                # ✅ Build pos_order_data
                 pos_order_data = {
                     'name': record.get('name'),
                     'pos_reference': record.get('pos_reference'),
-                    # 'pricelist_id': int(pricelist_id) if pricelist_id is not [] else [],  # Set to None if pricelist_id is None
                     'vit_trxid': record.get('name'),
                     'vit_id': record.get('id'),
                     'partner_id': int(partner_id),
@@ -1040,7 +1100,7 @@ class DataTransaksi:
                     'payment_ids': pos_order_payment_ids,
                 }
 
-                print(pos_order_data)
+                print(f"✅ POS Order Data prepared for order {record.get('name')} with {len(pos_order_invoice_line_ids)} lines")
 
                 try:
                     start_time = time.time()
@@ -1049,7 +1109,7 @@ class DataTransaksi:
                                                                     'pos.order', 'create',
                                                                     [pos_order_data])
 
-                    print(f"Pos Order baru telah dibuat dengan ID: {new_pos_order_id}")
+                    print(f"✅ Pos Order baru telah dibuat dengan ID: {new_pos_order_id}")
 
                     self.source_client.call_odoo(
                         'object', 'execute_kw', self.source_client.db,
@@ -1064,19 +1124,28 @@ class DataTransaksi:
                     write_date = self.get_write_date(model_name, record['id'])
                     self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Invoice', write_date)
                     self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Invoice', write_date)
+                    
+                    print(f"✅ Successfully created and logged POS Order {record.get('name')} (ID: {new_pos_order_id})")
+                    
                 except Exception as e:
                     message_exception = f"Terjadi kesalahan saat membuat invoice: {e}"
+                    print(f"❌ Error creating POS Order {record.get('name')}: {message_exception}")
                     write_date = self.get_write_date(model_name, record['id'])
                     self.set_log_mc.create_log_note_failed(record, 'Invoice', message_exception, write_date)
                     self.set_log_ss.create_log_note_failed(record, 'Invoice', message_exception, write_date)
 
             # Use ThreadPoolExecutor to process records in parallel
+            print(f"✅ Starting parallel processing of {len(transaksi_posorder_invoice)} orders with 20 workers...")
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(process_record, record) for record in transaksi_posorder_invoice]
                 concurrent.futures.wait(futures)
+            
+            print(f"✅ Finished processing all {len(transaksi_posorder_invoice)} orders")
 
         except Exception as e:
-            print(f"Error during processing: {e}")
+            print(f"❌ Error during processing: {e}")
+            import traceback
+            print(traceback.format_exc())
 
     def transfer_pos_order_invoice_ss_to_mc_session_closed_before_inv(self, model_name, fields, description, date_from, date_to):
         try:

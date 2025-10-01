@@ -484,7 +484,7 @@ class PrintBarcode(models.Model):
         return self._generate_strip_pdf(product_data)
     
     def _generate_strip_pdf(self, product_data):
-        """Generate PDF with label strips - optimized layout for mixed copy counts"""
+        """Generate PDF with label strips - consistent page size, max labels per row enforced"""
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         file_path = temp_file.name
         temp_file.close()
@@ -497,116 +497,111 @@ class PrintBarcode(models.Model):
         if not products:
             raise ValidationError("No valid products found.")
         
+        # Calculate FIXED page dimensions based on max_labels_per_row
+        max_labels_per_row = self.max_labels_per_row or 4
+        
+        # FIXED page width - always accommodates max_labels_per_row
+        fixed_page_width = (self.single_label_width * max_labels_per_row) + \
+                        (self.label_spacing * (max_labels_per_row - 1)) + \
+                        (self.margin_kiri + self.margin_kanan)
+        
+        # FIXED page height
+        fixed_page_height = self.single_label_height + (self.margin_atas + self.margin_bawah)
+        
+        # Create canvas with FIXED page size
+        c = canvas.Canvas(file_path, pagesize=(fixed_page_width * mm, fixed_page_height * mm))
+        
         # Separate products by copy count
         multi_copy_products = [p for p in products if product_data.get(p.id, 1) > 1]
         single_copy_products = [p for p in products if product_data.get(p.id, 1) == 1]
         
-        # Calculate maximum possible labels per row (user configurable)
-        max_labels_per_row = self.max_labels_per_row or 4  # Use user setting or default to 4
-        max_copies = max(product_data.values()) if product_data else 1
-        strip_height = self.single_label_height + (self.margin_atas + self.margin_bawah)
-        
-        # Create canvas
-        c = canvas.Canvas(file_path, pagesize=(210 * mm, strip_height * mm))  # Start with A4 width
-        
         # Track remaining single copy products
         remaining_single_products = single_copy_products.copy()
         
-        # Process multi-copy products and try to fit single products in same row
-        for idx, product in enumerate(multi_copy_products):
+        first_page = True
+        
+        # Process multi-copy products
+        for product in multi_copy_products:
             if not product.barcode:
                 continue
                 
-            copies = product_data.get(product.id, 1)
+            total_copies = product_data.get(product.id, 1)
+            remaining_copies = total_copies
             
-            # Calculate how many single products can fit in this row with the multi-copy product
-            total_labels_this_row = copies
-            single_products_this_row = []
-            
-            # Try to fit single products until we reach max_labels_per_row
-            while total_labels_this_row < max_labels_per_row and remaining_single_products:
-                single_products_this_row.append(remaining_single_products.pop(0))
-                total_labels_this_row += 1
-            
-            # Calculate actual page width needed for this row
-            actual_page_width = (self.single_label_width * total_labels_this_row) + \
-                               (self.label_spacing * (total_labels_this_row - 1)) + \
-                               (self.margin_kiri + self.margin_kanan)
-            
-            c.setPageSize((actual_page_width * mm, strip_height * mm))
-            
-            current_position = 0
-            
-            # Draw multi-copy product labels first
-            for copy_num in range(copies):
-                x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
-                y_pos = self.margin_bawah
-                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
-                current_position += 1
-            
-            # Draw single products that fit in this row
-            for single_product in single_products_this_row:
-                if single_product.barcode:
+            # Handle product yang copy-nya lebih dari max_labels_per_row
+            while remaining_copies > 0:
+                if not first_page:
+                    c.showPage()
+                first_page = False
+                
+                # Tentukan berapa labels yang akan di-print di halaman ini
+                labels_this_page = min(remaining_copies, max_labels_per_row)
+                
+                # Coba isi sisa slot dengan single products
+                single_products_this_row = []
+                slots_available = max_labels_per_row - labels_this_page
+                
+                while slots_available > 0 and remaining_single_products:
+                    single_products_this_row.append(remaining_single_products.pop(0))
+                    slots_available -= 1
+                
+                # Draw labels
+                current_position = 0
+                
+                # Draw multi-copy labels
+                for _ in range(labels_this_page):
                     x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
                     y_pos = self.margin_bawah
-                    self._draw_single_label(c, single_product, x_pos * mm, y_pos * mm, font_name)
+                    self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
                     current_position += 1
-            
-            # New page for next product (if not the last one or if there are remaining single products)
-            if idx < len(multi_copy_products) - 1 or remaining_single_products:
-                c.showPage()
+                
+                # Draw single products in remaining slots
+                for single_product in single_products_this_row:
+                    if single_product.barcode:
+                        x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
+                        y_pos = self.margin_bawah
+                        self._draw_single_label(c, single_product, x_pos * mm, y_pos * mm, font_name)
+                        current_position += 1
+                
+                remaining_copies -= labels_this_page
         
-        # Handle remaining single products (if any) - each gets its own small page
+        # Handle remaining single products - group by max_labels_per_row
         if remaining_single_products:
-            # Give each remaining single product its own small page
-            for idx, product in enumerate(remaining_single_products):
-                if not product.barcode:
-                    continue
-                
-                # Each single product gets its own compact page
-                # Use user-configured dimensions for single labels
-                single_page_width = self.single_label_width
-                single_page_height = self.single_label_height
-                
-                page_width = single_page_width + (self.margin_kiri + self.margin_kanan)
-                page_height = single_page_height + (self.margin_atas + self.margin_bawah)
-                
-                c.setPageSize((page_width * mm, page_height * mm))
-                
-                x_pos = self.margin_kiri
-                y_pos = self.margin_bawah
-                
-                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
-                
-                # New page for next product (if not the last one)
-                if idx < len(remaining_single_products) - 1:
+            for batch_idx in range(0, len(remaining_single_products), max_labels_per_row):
+                if not first_page:
                     c.showPage()
+                first_page = False
+                
+                batch = remaining_single_products[batch_idx:batch_idx + max_labels_per_row]
+                current_position = 0
+                
+                for product in batch:
+                    if not product.barcode:
+                        continue
+                    
+                    x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
+                    y_pos = self.margin_bawah
+                    self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
+                    current_position += 1
         
-        # Handle case where we only have single copy products - each gets its own small page
+        # Handle case: only single copy products
         elif not multi_copy_products and single_copy_products:
-            # All products are single copy - give each product its own small page
-            for idx, product in enumerate(single_copy_products):
-                if not product.barcode:
-                    continue
-                
-                # Each single product gets its own compact page  
-                # Use user-configured dimensions for single labels
-                single_page_width = self.single_label_width
-                single_page_height = self.single_label_height
-                
-                page_width = single_page_width + (self.margin_kiri + self.margin_kanan)
-                page_height = single_page_height + (self.margin_atas + self.margin_bawah)
-                
-                c.setPageSize((page_width * mm, page_height * mm))
-                
-                x_pos = self.margin_kiri
-                y_pos = self.margin_bawah
-                
-                self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
-                
-                # New page for next product (if not the last one)
-                if idx < len(single_copy_products) - 1:
+            for batch_idx in range(0, len(single_copy_products), max_labels_per_row):
+                if not first_page:
                     c.showPage()
+                first_page = False
+                
+                batch = single_copy_products[batch_idx:batch_idx + max_labels_per_row]
+                current_position = 0
+                
+                for product in batch:
+                    if not product.barcode:
+                        continue
+                    
+                    x_pos = self.margin_kiri + (current_position * (self.single_label_width + self.label_spacing))
+                    y_pos = self.margin_bawah
+                    self._draw_single_label(c, product, x_pos * mm, y_pos * mm, font_name)
+                    current_position += 1
         
         c.save()
 
