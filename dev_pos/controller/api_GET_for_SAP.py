@@ -9,6 +9,65 @@ import decimal
 from .api_utils import check_authorization, paginate_records, serialize_response, serialize_error_response
 import base64
 
+class GETEmployee(http.Controller):
+    @http.route(['/api/hr_employee/'], type='http', auth='public', methods=['GET'], csrf=False)
+    def get_employees(self, employee_code=None, name=None, pageSize=200, page=1, is_sales=None, **params):
+        try:
+            check_authorization()
+
+            if int(page) == 0:
+                return serialize_response([], 0, 0)
+
+            domain = []
+
+            # Filtering
+            if employee_code:
+                domain.append(('vit_employee_code', '=', employee_code))
+            if name:
+                domain.append(('name', 'ilike', name))
+            if is_sales is not None:
+                is_sales_bool = str(is_sales).lower() == 'true'
+                domain.append(('is_sales', '=', is_sales_bool))
+
+            pageSize = int(pageSize) if pageSize else 200
+
+            if not employee_code and not name and is_sales is None:
+                employees = request.env['hr.employee'].sudo().search([])
+                total_records = len(employees)
+            else:
+                employees = request.env['hr.employee'].sudo().search(domain)
+                total_records = len(employees)
+
+            # Apply pagination if not filtering by name
+            if not name:
+                employees, total_records = paginate_records('hr.employee', domain, pageSize, page)
+
+            data = []
+            for emp in employees:
+                data.append({
+                    'id': emp.id,
+                    'employee_code': emp.vit_employee_code,
+                    'name': emp.name,
+                    'job_title': emp.job_title,
+                    'department_id': emp.department_id.id,
+                    'department': emp.department_id.name,
+                    'work_email': emp.work_email,
+                    'work_phone': emp.work_phone,
+                    'mobile_phone': emp.mobile_phone,
+                    'gender': emp.gender,
+                    'birthdate': str(emp.birthdate) if emp.birthdate else None,
+                    'is_sales': emp.is_sales,
+                    'address_home_id': emp.address_home_id.id if emp.address_home_id else None,
+                })
+
+            total_pages = (total_records + pageSize - 1) // pageSize
+
+            return serialize_response(data, total_records, total_pages)
+
+        except Exception as e:
+            return serialize_error_response(str(e))
+
+
 class PaymentAPI(http.Controller):
     @http.route(['/api/payment_invoice/'], type='http', auth='public', methods=['GET'], csrf=False)
     def get_payment_invoices(self, createdDateFrom=None, createdDateTo=None, pageSize=200, page=1, q=None, is_integrated=None, **params):
@@ -932,6 +991,7 @@ class MasterProductItemAPI(http.Controller):
                     'vit_item_kel': product.vit_item_kel,
                     'vit_item_type': product.vit_item_type,
                     'vit_item_brand': product.vit_item_brand,
+                    'brand': product.brand
                 }
                 data_master_product.append(product_data)
 
@@ -1809,7 +1869,14 @@ class InvoiceOrder(http.Controller):
         try:
             check_authorization()
 
-            invoicing = request.env['account.move'].sudo().search([('id', '=', order_id), ('state', '=', 'posted'), ('payment_state', '=', 'paid'), ('move_type', '=', 'out_invoice'), ('partner_id.customer_code', '!=', False)], limit=1)
+            invoicing = request.env['account.move'].sudo().search([
+                ('id', '=', order_id),
+                ('state', '=', 'posted'),
+                ('payment_state', '=', 'paid'),
+                ('move_type', '=', 'out_invoice'),
+                ('partner_id.customer_code', '!=', False)
+            ], limit=1)
+
             if not invoicing:
                 raise werkzeug.exceptions.NotFound(_("Invoice Order not found"))
 
@@ -1838,31 +1905,48 @@ class InvoiceOrder(http.Controller):
                 if line.quantity == 0:
                     continue
 
-                pickings = request.env['stock.picking'].sudo().search([('pos_order_id', '=', invoicing.pos_order_ids[0].id), ('origin', '=', invoicing.ref), ('move_ids_without_package.product_id', '=', line.product_id.id)], limit=1)
-                location_id = location = location_dest_id = location_dest = None
+                pickings = request.env['stock.picking'].sudo().search([
+                    ('pos_order_id', '=', invoicing.pos_order_ids[0].id if invoicing.pos_order_ids else False),
+                    ('origin', '=', invoicing.ref),
+                    ('move_ids_without_package.product_id', '=', line.product_id.id)
+                ], limit=1)
 
+                location_id = location = location_dest_id = location_dest = None
                 if pickings:
                     location_id = pickings.location_id.id
                     location = pickings.location_id.complete_name
                     location_dest_id = pickings.location_dest_id.id
                     location_dest = pickings.location_dest_id.complete_name
+                else:
+                    # fallback ke vit_pos_store
+                    if invoicing.pos_order_ids:
+                        pos_order = invoicing.pos_order_ids[0]
+                        if pos_order.vit_pos_store:
+                            location_id = pos_order.vit_pos_store.id
+                            location = pos_order.vit_pos_store.name
+                            location_dest_id = pos_order.vit_pos_store.id
+                            location_dest = pos_order.vit_pos_store.name
 
-                tax_data = [{'id': tax.id, 'tax_code': tax.name} for tax in line.tax_ids]
+                # Tambahkan tax_ids
+                tax_data = [
+                    {'id': tax.id, 'tax_name': tax.name, 'amount': tax.amount}
+                    for tax in line.tax_ids
+                ]
 
                 line_data = {
                     'line_number': line_number,
                     'id': line.id,
                     'doc_no': doc_num,
-                    'sales_id': line.user_id or "",
-                    'sales': line.user_id.name,
-                    'sales_code': line.user_id.vit_employee_code,
+                    'sales_id': line.user_id.id if line.user_id else "",
+                    'sales': line.user_id.name if line.user_id else "",
+                    'sales_code': line.user_id.vit_employee_code if line.user_id else "",
                     'product_id': line.product_id.id,
                     'product_name': line.name,
                     'product_code': line.product_id.default_code or "",
-                    'location_id': location_id or int(-1),
-                    'location': location or int(-1),
-                    'location_dest_id': location_dest_id or int(-1),
-                    'location_dest': location_dest or int(-1),
+                    'location_id': location_id,
+                    'location': location,
+                    'location_dest_id': location_dest_id,
+                    'location_dest': location_dest,
                     'quantity': line.quantity,
                     'uom_id': line.product_uom_id.id,
                     'uom': line.product_uom_id.name,
@@ -2164,14 +2248,18 @@ class CrediNoteAPI(http.Controller):
     @http.route(['/api/credit_memo_line/<int:order_id>'], type='http', auth='public', methods=['GET'], csrf=False)
     def get_credit_memo_lines(self, order_id, **params):
         try:
-            check_authorization()  # Uncomment and implement this if necessary
+            check_authorization()
 
-            invoicing = request.env['account.move'].sudo().search([('id', '=', order_id), ('state', '=', 'posted'), ('payment_state', 'in', ['paid', 'in_payment', 'reversed', 'partial']), ('move_type', '=', 'out_refund'), ('partner_id.customer_code', '!=', False)], limit=1)
+            invoicing = request.env['account.move'].sudo().search([
+                ('id', '=', order_id),
+                ('state', '=', 'posted'),
+                ('payment_state', 'in', ['paid', 'in_payment', 'reversed', 'partial']),
+                ('move_type', '=', 'out_refund'),
+                ('partner_id.customer_code', '!=', False)
+            ], limit=1)
+
             if not invoicing:
                 raise werkzeug.exceptions.NotFound(_("Credit Note is not found"))
-
-            location_id = None
-            location = None
 
             invoice_lines = invoicing.invoice_line_ids
             customer_name = invoicing.partner_id.name
@@ -2195,14 +2283,32 @@ class CrediNoteAPI(http.Controller):
 
             data_invoice_lines = []
             for line_number, line in enumerate(invoice_lines, start=1):
-                pickings = request.env['stock.picking'].sudo().search([('pos_order_id', '=', invoicing.pos_order_ids[0].id), ('origin', '=', invoicing.ref), ('move_ids_without_package.product_id', '=', line.product_id.id)], limit=1)
-                location_id = location = location_dest_id = location_dest = None
+                pickings = request.env['stock.picking'].sudo().search([
+                    ('pos_order_id', '=', invoicing.pos_order_ids[0].id if invoicing.pos_order_ids else False),
+                    ('origin', '=', invoicing.ref),
+                    ('move_ids_without_package.product_id', '=', line.product_id.id)
+                ], limit=1)
 
+                location_id = location = location_dest_id = location_dest = None
                 if pickings:
                     location_id = pickings.location_id.id
                     location = pickings.location_id.complete_name
                     location_dest_id = pickings.location_dest_id.id
                     location_dest = pickings.location_dest_id.complete_name
+                else:
+                    if invoicing.pos_order_ids:
+                        pos_order = invoicing.pos_order_ids[0]
+                        if pos_order.vit_pos_store:
+                            location_id = pos_order.vit_pos_store.id
+                            location = pos_order.vit_pos_store.name
+                            location_dest_id = pos_order.vit_pos_store.id
+                            location_dest = pos_order.vit_pos_store.name
+
+                # Tambahkan tax_ids
+                tax_data = [
+                    {'id': tax.id, 'tax_name': tax.name, 'amount': tax.amount}
+                    for tax in line.tax_ids
+                ]
 
                 line_data = {
                     'line_number': line_number,
@@ -2211,13 +2317,14 @@ class CrediNoteAPI(http.Controller):
                     'product_id': line.product_id.id,
                     'product_name': line.name,
                     'product_code': line.product_id.default_code or "",
-                    'location_id': location_id or int(-1),
-                    'location': location or int(-1),
-                    'location_dest_id': location_dest_id or int(-1),
-                    'location_dest': location_dest or int(-1),
+                    'location_id': location_id,
+                    'location': location,
+                    'location_dest_id': location_dest_id,
+                    'location_dest': location_dest,
                     'quantity': line.quantity,
                     'uom_id': line.product_uom_id.id,
                     'uom': line.product_uom_id.name,
+                    'tax_ids': tax_data,
                     'price_unit': line.price_unit,
                 }
                 data_invoice_lines.append(line_data)
@@ -2247,7 +2354,7 @@ class CrediNoteAPI(http.Controller):
             )
 
         except Exception as e:
-            return serialize_error_response(str(e))
+            return self.serialize_error_response(str(e))
 
 class PurchaseOrder(http.Controller):
     @http.route(['/api/purchase_order/'], type='http', auth='public', methods=['GET'], csrf=False)

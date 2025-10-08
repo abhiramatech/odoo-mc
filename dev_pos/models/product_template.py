@@ -11,7 +11,7 @@ class ProductTemplate(models.Model):
     vit_item_kel = fields.Char(string="Kelompok")
     vit_item_type = fields.Char(string="Type")
     vit_is_discount = fields.Boolean(string="Discount")
-    vit_item_brand = fields.Char(string="Brand")
+    brand = fields.Char(string="Brand", tracking=True)
 
     def _check_barcode_uniqueness(self):
         # Override untuk mematikan validasi barcode unik

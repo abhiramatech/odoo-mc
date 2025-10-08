@@ -161,9 +161,12 @@ class DataTransaksi:
                         [[['vit_trxid', '=', record.get('name')]]],
                         {'fields': ['id'], 'limit': 1})
                     if existing_unbuild:
-                        print(f"🚫 Unbuild Order {record.get('name')} already exists in target — skipped.")
+                        error_message = f"Unbuild Order {record.get('name')} already exists in target — skipped."
+                        print(error_message)
+                        write_date = self.get_write_date(model_name, record['id'])
+                        self.set_log_mc.create_log_note_failed(record, 'Unbuild Order', error_message, write_date)
+                        self.set_log_ss.create_log_note_failed(record, 'Unbuild Order', error_message, write_date)
                         return
-
                     
                     unbuild_order_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                                             self.source_client.uid, self.source_client.password,
@@ -178,14 +181,16 @@ class DataTransaksi:
                     mo_name = mo_source_dict.get(str(src_mo_id))
                     mo_id = mo_target_dict.get(mo_name)
 
-
                     src_variant_id = record['product_id'][0] if isinstance(record['product_id'], list) else record['product_id']
                     src_variant_code = product_id_to_default_code.get(src_variant_id)
                     product_variant_id = default_code_to_target_product_id.get(src_variant_code) if src_variant_code else False
 
                     if not all([location_id, location_dest_id, mo_id, product_variant_id, bom_id]):
-                        print("❌ Missing mapping details:")
-                        print(f"location_id={location_id}, location_dest_id={location_dest_id}, mo_id={mo_id}, product_id={product_variant_id}, bom_id={bom_id}")
+                        error_message = f"Missing mapping details: location_id={location_id}, location_dest_id={location_dest_id}, mo_id={mo_id}, product_id={product_variant_id}, bom_id={bom_id}"
+                        print(error_message)
+                        write_date = self.get_write_date(model_name, record['id'])
+                        self.set_log_mc.create_log_note_failed(record, 'Unbuild Order', error_message, write_date)
+                        self.set_log_ss.create_log_note_failed(record, 'Unbuild Order', error_message, write_date)
                         return
 
                     missing_products = []
@@ -224,6 +229,9 @@ class DataTransaksi:
                         self.set_log_ss.create_log_note_failed(record, 'Unbuild Order', message, write_date)
                         return
 
+                    if len(unbuild_order_lines) != len(unbuild_order_line_ids):
+                        return
+                    
                     unbuild_data = {
                         'product_qty': record.get('product_qty'),
                         'vit_trxid': record.get('name'),
@@ -414,8 +422,11 @@ class DataTransaksi:
                     product_variant_id = default_code_to_target_product_id.get(src_variant_code) if src_variant_code else False
 
                     if not all([location_id, location_dest_id, picking_type_id, product_variant_id, bom_id, user_id]):
-                        print(f"⏭️ Data tidak lengkap untuk MO {record.get('id')} → dilewati")
-                        print(f"location_id: {location_id}, location_dest_id: {location_dest_id}, picking_type_id: {picking_type_id}, product_id: {product_variant_id}, bom_id: {bom_id}, user_id: {user_id}")
+                        error_message = f"Data tidak lengkap untuk MO {record.get('id')} → location_id: {location_id}, location_dest_id: {location_dest_id}, picking_type_id: {picking_type_id}, product_id: {product_variant_id}, bom_id: {bom_id}, user_id: {user_id}"
+                        print(error_message)
+                        write_date = self.get_write_date(model_name, record.get('id'))
+                        self.set_log_mc.create_log_note_failed(record, 'Manufacture Order', error_message, write_date)
+                        self.set_log_ss.create_log_note_failed(record, 'Manufacture Order', error_message, write_date)
                         return
 
                     missing_products = []
@@ -448,6 +459,9 @@ class DataTransaksi:
                         self.set_log_ss.create_log_note_failed(record, 'Manufacture Order', message, write_date)
                         return
 
+                    if len(manufacture_order_lines) != len(manufacture_order_line_ids):
+                        return
+                    
                     mrp_data = {
                         'date_start': record.get('date_start'),
                         'date_finished': record.get('date_finished'),
@@ -487,7 +501,7 @@ class DataTransaksi:
 
         except Exception as e:
             print(f"💣 ERROR di transfer_manufacture_order: {e}")
-            
+             
     def transfer_inventory_stock(self, model_name, fields, description, date_from, date_to):
         try:
             print(f"Memulai transfer {description}...")
@@ -1084,6 +1098,7 @@ class DataTransaksi:
                     'pos_reference': record.get('pos_reference'),
                     'vit_trxid': record.get('name'),
                     'vit_id': record.get('id'),
+                    'vit_pos_store': record.get('vit_pos_store'),
                     'partner_id': int(partner_id),
                     'session_id': int(session_id),
                     'employee_id': int(employee_id),

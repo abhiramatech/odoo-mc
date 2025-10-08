@@ -7,6 +7,111 @@ from .api_utils import check_authorization, paginate_records, serialize_response
 import logging
 _logger = logging.getLogger(__name__)
 
+class MasterEmployeePATCH(http.Controller):
+    @http.route(['/api/hr_employee'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_master_employee(self, **kwargs):
+        try:
+            # 🔐 Authentication
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            # 🔄 Load JSON input
+            json_data = request.get_json_data()
+            items = json_data.get('items')
+
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
+
+            updated, errors = [], []
+
+            for data in items:
+                try:
+                    employee_code = data.get('employee_code')
+                    if not employee_code:
+                        errors.append({
+                            'employee_code': None,
+                            'message': "Missing employee_code"
+                        })
+                        continue
+
+                    # 🔍 Find employee by employee_code
+                    employee = request.env['hr.employee'].sudo().search(
+                        [('vit_employee_code', '=', employee_code)], limit=1
+                    )
+
+                    if not employee:
+                        errors.append({
+                            'employee_code': employee_code,
+                            'message': "Employee not found."
+                        })
+                        continue
+
+                    # 🧩 Prepare update data
+                    update_data = {
+                        'name': data.get('name'),
+                        'job_title': data.get('job_title'),
+                        'department_id': data.get('department_id'),
+                        'work_email': data.get('work_email'),
+                        'work_phone': data.get('work_phone'),
+                        'mobile_phone': data.get('mobile_phone'),
+                        'gender': data.get('gender'),
+                        'birthdate': data.get('birthdate'),
+                        'is_sales': data.get('is_sales'),
+                        'address_home_id': data.get('address_home_id'),
+                        'write_uid': uid,
+                    }
+
+                    # Hapus field yang None agar tidak overwrite kosong
+                    update_data = {
+                        key: val for key, val in update_data.items() if val is not None
+                    }
+
+                    # ✏️ Update record
+                    employee.sudo().write(update_data)
+
+                    updated.append({
+                        'id': employee.id,
+                        'employee_code': employee.vit_employee_code,
+                        'name': employee.name,
+                        'status': 'success'
+                    })
+
+                except Exception as e:
+                    errors.append({
+                        'employee_code': data.get('employee_code'),
+                        'message': f"Exception: {str(e)}"
+                    })
+
+            # ✅ Return structured response
+            return {
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'updated_employees': updated,
+                'errors': errors
+            }
+
+        except Exception as e:
+            _logger.error(f"Error updating employee: {str(e)}")
+            return {'code': 500, 'status': 'failed', 'message': str(e)}
+
+
 class MasterCustomerPATCH(http.Controller):
     @http.route(['/api/master_customer'], type='json', auth='none', methods=['PATCH'], csrf=False)
     def update_master_customer(self, **kwargs):
@@ -193,6 +298,7 @@ class MasterItemPATCH(http.Controller):
                         'vit_item_kel': data.get('vit_item_kel'),
                         'vit_item_type': data.get('vit_item_type'),
                         'vit_item_brand': data.get('vit_item_brand'),
+                        'brand': data.get('brand')
                     }
                     if data.get('active') is not None:
                         update_data['active'] = data.get('active')

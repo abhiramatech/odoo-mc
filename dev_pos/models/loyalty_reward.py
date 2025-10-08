@@ -6,7 +6,7 @@ class LoyaltyRewardInherit(models.Model):
 
     vit_trxid = fields.Char(string="Transaction ID", default=False)
     vit_item_code_sap = fields.Char(string="Item Code SAP", required=True) 
-    vit_reward_trxid = fields.Char(string="Reward Item", index=True)
+    vit_reward_trxid = fields.Char(string="Reward Item Transaction ID", index=True)
 
 
     def _get_discount_product_values(self):

@@ -209,7 +209,7 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
             # raise ValidationError(_(f"{mc_client}, {ss_client}, {ss_clients}, {mc}, {ss}, {datefrom}, {dateto}, {date_from}, {date_to}")) # buat check debug ya
-            integrator_master.transfer_data('product.template', ['name', 'sale_ok', 'purchase_ok', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id', 'list_price', 'standard_price', 'categ_id', 'default_code', 'pos_categ_ids', 'available_in_pos', 'taxes_id', 'active', 'create_date', 'write_date', 'image_1920', 'barcode', 'vit_sub_div', 'vit_item_kel', 'vit_item_type'], 'Master Item', date_from, date_to) # , 'multi_barcode_ids' 
+            integrator_master.transfer_data('product.template', ['name', 'sale_ok', 'purchase_ok', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id', 'list_price', 'standard_price', 'categ_id', 'default_code', 'pos_categ_ids', 'available_in_pos', 'taxes_id', 'active', 'create_date', 'write_date', 'image_1920', 'barcode', 'vit_sub_div', 'vit_item_kel', 'vit_item_type', 'brand'], 'Master Item', date_from, date_to) # , 'multi_barcode_ids' 
 
     def create_master_tags(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -438,7 +438,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
-            integrator_transaksiMCtoSS.transfer_bom_master('mrp.bom', ['id', 'product_tmpl_id', 'product_id', 'code', 'type', 'product_qty', 'consumption', 'produce_delay', 'days_to_prepare_mo', 'create_date', 'is_integrated', 'bom_line_ids'], 'Transaksi Manufacture Order Inventory', datefrom, dateto)
+            integrator_transaksiMCtoSS.transfer_bom_master('mrp.bom', ['id', 'product_tmpl_id', 'product_id', 'code', 'type', 'product_qty', 'consumption', 'produce_delay', 'days_to_prepare_mo', 'create_date', 'is_integrated', 'bom_line_ids'], 'Master BOM', datefrom, dateto)
             
     def create_voucher_loyalty(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -632,7 +632,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksi.transfer_pos_order_invoice_ss_to_mc('pos.order', ['id', 'name', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
+            integrator_transaksi.transfer_pos_order_invoice_ss_to_mc('pos.order', ['id', 'name', 'vit_pos_store', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
 
     def transfer_pos_order_invoice_rescue(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -654,7 +654,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksi.transfer_pos_order_invoice_session_closed('pos.order', ['id', 'name', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
+            integrator_transaksi.transfer_pos_order_invoice_session_closed('pos.order', ['id', 'name', 'vit_pos_store', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
 
     def create_end_of_shift(self, mc, ss, datefrom, dateto):
         if mc and ss:
