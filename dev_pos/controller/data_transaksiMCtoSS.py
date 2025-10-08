@@ -97,7 +97,11 @@ class DataTransaksiMCtoSS:
                 src_tmpl_id = record['product_tmpl_id'][0] if isinstance(record['product_tmpl_id'], list) else record['product_tmpl_id']
                 src_template_code = template_id_to_default_code.get(src_tmpl_id)
                 if not src_template_code:
-                    print(f"❌ BoM:{record['id']} tidak punya default_code template di source untuk tmpl_id: {src_tmpl_id}")
+                    error_message = f"BoM:{record['id']} tidak punya default_code template di source untuk tmpl_id: {src_tmpl_id}"
+                    print(error_message)
+                    write_date = self.get_write_date(model_name, record['id'])
+                    self.set_log_mc.create_log_note_failed(record, 'Master BOM', error_message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Master BOM', error_message, write_date)
                     return
 
                 product_id = default_code_to_target_template_id.get(src_template_code)

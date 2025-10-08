@@ -932,6 +932,7 @@ class MasterProductItemAPI(http.Controller):
                     'vit_item_kel': product.vit_item_kel,
                     'vit_item_type': product.vit_item_type,
                     'vit_item_brand': product.vit_item_brand,
+                    'brand': product.brand
                 }
                 data_master_product.append(product_data)
 
