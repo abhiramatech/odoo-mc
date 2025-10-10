@@ -12,6 +12,11 @@ class POSIntegration(models.Model):
     vit_trxid = fields.Char(string='Transaction ID', tracking=True)
     vit_id = fields.Char(string='Document ID', tracking=True)
     is_integrated = fields.Boolean(string="Integrated", default=False, readonly=True, tracking=True)
+    vit_pos_store = fields.Char(
+            string='POS Store Location',
+            readonly=True,
+            help='Location source from delivery picking (complete name)'
+        )
 
     def generate_pos_order_invoice(self):
         return self._generate_pos_order_invoice()

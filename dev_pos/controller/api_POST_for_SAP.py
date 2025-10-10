@@ -38,17 +38,6 @@ class POSTEmployee(http.Controller):
             # Process each item
             for data in items:
                 try:
-                    # Validate required fields
-                    required_fields = ['employee_code', 'name', 'job_title', 'department_id']
-                    missing_fields = [field for field in required_fields if not data.get(field)]
-                    if missing_fields:
-                        failed.append({
-                            'data': data,
-                            'message': f"Missing required fields: {', '.join(missing_fields)}",
-                            'id': None  # ID is not created, so set it to None
-                        })
-                        continue
-
                     # Validate department
                     department_id = data.get('department_id')
                     department = env['hr.department'].sudo().browse(department_id)
@@ -67,15 +56,13 @@ class POSTEmployee(http.Controller):
                     employee_data = {
                         'vit_employee_code': data.get('employee_code'),
                         'name': data.get('name'),
-                        'job_title': data.get('job_title'),
-                        'department_id': department.id,
                         'work_email': data.get('work_email'),
                         'work_phone': data.get('work_phone'),
                         'mobile_phone': data.get('mobile_phone'),
                         'create_uid': uid,
-                        'address_home_id': data.get('address_home_id'),
+                        'private_street': data.get('address_home_id'),
                         'gender': data.get('gender'),
-                        'birthdate': data.get('birthdate'),
+                        'birthday': data.get('birthdate'),
                         'is_sales': data.get('is_sales', False)
                     }
 

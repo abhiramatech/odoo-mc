@@ -1098,6 +1098,7 @@ class DataTransaksi:
                     'pos_reference': record.get('pos_reference'),
                     'vit_trxid': record.get('name'),
                     'vit_id': record.get('id'),
+                    'vit_pos_store': record.get('vit_pos_store'),
                     'partner_id': int(partner_id),
                     'session_id': int(session_id),
                     'employee_id': int(employee_id),

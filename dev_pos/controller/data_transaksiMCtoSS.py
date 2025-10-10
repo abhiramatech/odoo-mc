@@ -1239,7 +1239,7 @@ class DataTransaksiMCtoSS:
             discount_loyalty = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                             self.source_client.uid, self.source_client.password,
                                                             model_name, 'search_read',
-                                                            [[['is_integrated', '=', False], ['is_updated', '=', True]]],
+                                                            [[['is_integrated', '=', False], ['is_updated', '=', True], ['active', 'in', [True, False]]]],
                                                             {'fields': fields})
             if not discount_loyalty:
                 print("Tidak ada discount/loyalty yang ditemukan untuk ditransfer.")
@@ -1251,7 +1251,7 @@ class DataTransaksiMCtoSS:
                 'object', 'execute_kw', self.target_client.db,
                 self.target_client.uid, self.target_client.password,
                 'loyalty.program', 'search_read',
-                [[['vit_trxid', 'in', discount_names]]],
+                [[['vit_trxid', 'in', discount_names], ['active', 'in', [True, False]]]],
                 {'fields': ['id', 'vit_trxid']}
             )
             existing_discount_dict = {record['vit_trxid']: record['id'] for record in existing_discount_loyalty}
@@ -1495,6 +1495,68 @@ class DataTransaksiMCtoSS:
                     print(f"Program {record.get('name')} not found in target, skipping...")
                     return
 
+                # === SINKRONISASI STATUS ACTIVE ===
+                source_active_status = record.get('active')
+                
+                try:
+                    # Update status active di target sesuai dengan source
+                    self.target_client.call_odoo(
+                        'object', 'execute_kw', self.target_client.db,
+                        self.target_client.uid, self.target_client.password,
+                        model_name, 'write',
+                        [[program_id], {'active': source_active_status}]
+                    )
+                    
+                    if not source_active_status:
+                        print(f"✓ Program {record.get('name')} archived in target (following source)")
+                        
+                        # Update status di source
+                        index_store_ids = record.get('index_store', [])
+                        setting_config_ids = self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'setting.config', 'search_read',
+                            [[['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                            {'fields': ['id']}
+                        )
+                        setting_config_ids = [config['id'] for config in setting_config_ids]
+                        
+                        # Check integration status
+                        if len(index_store_ids) == len(setting_config_ids):
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'loyalty.program', 'write',
+                                [[record['id']], {'is_integrated': True, 'is_updated': False, 'index_store': [(5, 0, 0)]}]
+                            )
+                        else:
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'loyalty.program', 'write',
+                                [[record['id']], {'is_updated': False}]
+                            )
+                        
+                        # Log success untuk archive
+                        start_time = time.time()
+                        end_time = time.time()
+                        duration = end_time - start_time
+                        write_date = self.get_write_date(model_name, record['id'])
+                        
+                        self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Discount/Loyalty (Archived)', write_date)
+                        self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Discount/Loyalty (Archived)', write_date)
+                        
+                        return  # Skip update detail jika sudah archived
+                        
+                except Exception as e:
+                    print(f"✗ Failed to sync active status for {record.get('name')}: {e}")
+                    write_date = self.get_write_date(model_name, record['id'])
+                    message_exception = f"Terjadi kesalahan saat archive discount: {e}"
+                    self.set_log_ss.create_log_note_failed(record, 'Discount/Loyalty', message_exception, write_date)
+                    self.set_log_mc.create_log_note_failed(record, 'Discount/Loyalty', message_exception, write_date)
+                    return
+                # === AKHIR SINKRONISASI ACTIVE ===
+
                 # Fetch existing data from target
                 existing_reward_lines = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
@@ -1503,7 +1565,8 @@ class DataTransaksiMCtoSS:
                                                                     {'fields': ['id', 'reward_type', 'discount', 'discount_applicability',
                                                                                 'discount_line_product_id', 'discount_max_amount', 'required_points',
                                                                                 'description', 'discount_product_ids', 'discount_product_category_id',
-                                                                                'vit_reward_trxid', 'reward_product_id', 'discount_product_tag_id', 'discount_product_domain']})
+                                                                                'vit_reward_trxid', 'reward_product_id', 'discount_product_tag_id', 
+                                                                                'discount_product_domain', 'discount_mode']})
 
                 existing_rule_lines = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
@@ -1601,28 +1664,75 @@ class DataTransaksiMCtoSS:
 
                         reward_target_product_tag_id = product_tag_dict_reward.get(reward_source_product_tag_name) if reward_source_product_tag_name else None
 
+                        # === PERBAIKAN LOGIKA PENCOCOKAN REWARD ===
+                        # Ambil identifier dari source
+                        source_vit_reward_trxid = line.get('vit_reward_trxid')
                         source_description = line.get('description')
-                        source_reward_trxid = source_description or line.get('vit_reward_trxid')
-
-                        existing_line = next(
-                            (x for x in existing_reward_lines if x.get('vit_reward_trxid') == source_reward_trxid),
-                            None
-                        )
-                        if not existing_line and source_description:
+                        source_reward_id = line.get('id')
+                        
+                        # Debug logging
+                        print(f"\n=== Processing Reward Line ===")
+                        print(f"Source ID: {source_reward_id}")
+                        print(f"Source vit_reward_trxid: {source_vit_reward_trxid}")
+                        print(f"Source description: {source_description}")
+                        
+                        existing_line = None
+                        
+                        # Prioritas 1: Cocokkan dengan vit_reward_trxid (paling reliable)
+                        if source_vit_reward_trxid:
                             existing_line = next(
-                                (x for x in existing_reward_lines if x.get('description') == source_description),
+                                (x for x in existing_reward_lines 
+                                if x.get('vit_reward_trxid') == source_vit_reward_trxid),
                                 None
                             )
+                            if existing_line:
+                                print(f"✓ Match found by vit_reward_trxid: {existing_line['id']}")
+                        
+                        # Prioritas 2: Cocokkan dengan description
+                        if not existing_line and source_description:
+                            existing_line = next(
+                                (x for x in existing_reward_lines 
+                                if x.get('description') == source_description),
+                                None
+                            )
+                            if existing_line:
+                                print(f"✓ Match found by description: {existing_line['id']}")
+                        
+                        # Prioritas 3: Fallback - cocokkan dengan karakteristik reward
+                        # (untuk data lama yang belum punya identifier)
+                        if not existing_line:
+                            existing_line = next(
+                                (x for x in existing_reward_lines 
+                                if x.get('reward_type') == line.get('reward_type') 
+                                and x.get('discount') == line.get('discount')
+                                and x.get('discount_applicability') == line.get('discount_applicability')
+                                and x.get('discount_mode') == line.get('discount_mode')),
+                                None
+                            )
+                            if existing_line:
+                                print(f"✓ Match found by characteristics: {existing_line['id']}")
+                        
+                        # Tentukan identifier yang akan digunakan
+                        # Prioritas: vit_reward_trxid > description > generated ID
+                        if source_vit_reward_trxid:
+                            final_identifier = source_vit_reward_trxid
+                        elif source_description:
+                            final_identifier = source_description
+                        else:
+                            # Generate identifier unik jika tidak ada
+                            final_identifier = f"{record.get('name')}_reward_{source_reward_id}"
+                        
+                        print(f"Final identifier: {final_identifier}")
+                        # === AKHIR LOGIKA PENCOCOKAN ===
 
-                        # ✅ langsung isi description = vit_reward_trxid agar sinkron
                         discount_line_data = {
                             'reward_type': line.get('reward_type'),
                             'discount': line.get('discount'),
                             'discount_applicability': line.get('discount_applicability'),
                             'discount_max_amount': line.get('discount_max_amount'),
                             'required_points': line.get('required_points'),
-                            'description': source_reward_trxid,      # ✅ isi langsung
-                            'vit_reward_trxid': source_reward_trxid,  # ✅ isi langsung
+                            'description': final_identifier,
+                            'vit_reward_trxid': final_identifier,
                             'discount_mode': line.get('discount_mode'),
                             'discount_product_domain': line.get('discount_product_domain'),
                         }
@@ -1638,10 +1748,10 @@ class DataTransaksiMCtoSS:
 
                         if existing_line:
                             discount_loyalty_line_ids.append((1, existing_line['id'], discount_line_data))
-                            print(f"✓ Updating reward ID {existing_line['id']} in target with vit_reward_trxid='{source_reward_trxid}'")
+                            print(f"✓ Updating reward ID {existing_line['id']} in target with identifier='{final_identifier}'")
                         else:
                             discount_loyalty_line_ids.append((0, 0, discount_line_data))
-                            print(f"✓ Creating new reward with description='{source_reward_trxid}'")
+                            print(f"✓ Creating new reward with identifier='{final_identifier}'")
 
                 rule_ids = []
                 for rule in current_rule_lines:
@@ -1673,7 +1783,7 @@ class DataTransaksiMCtoSS:
                                 rule_source_product_tag_name = next((tag['name'] for tag in product_tag_source_rule if tag['id'] == rule_source_product_tag_id), None)
 
                         rule_target_product_tag_id = product_tag_dict_rule.get(rule_source_product_tag_name) if rule_source_product_tag_name else None
-            
+                
                         existing_rule_line = next((x for x in existing_rule_lines if x['vit_trxid'] == rule['vit_trxid']), None)
                         
                         rule_data = {
@@ -1832,7 +1942,7 @@ class DataTransaksiMCtoSS:
                                     'object', 'execute_kw', self.target_client.db,
                                     self.target_client.uid, self.target_client.password,
                                     'loyalty.reward', 'write',
-                                    [[reward['id']], {'vit_reward_trxid': vit_reward_trxid}]
+                                    [[reward['id']], {'description': vit_reward_trxid}]
                                 )
                                 print(f"✓ Sinkronisasi description reward ID {reward['id']} -> {vit_reward_trxid}")
                     except Exception as e:
@@ -1891,9 +2001,22 @@ class DataTransaksiMCtoSS:
                     # Update vit_reward_trxid di source rewards dengan description terbaru
                     reward_updates = []
                     for line in current_reward_lines:
-                        reward_description = line.get('description')
-                        if reward_description:
-                            reward_updates.append((1, line['id'], {'vit_reward_trxid': reward_description}))
+                        source_vit_reward_trxid = line.get('vit_reward_trxid')
+                        source_description = line.get('description')
+                        source_reward_id = line.get('id')
+                        
+                        # Tentukan identifier yang sama seperti yang digunakan di target
+                        if source_vit_reward_trxid:
+                            final_identifier = source_vit_reward_trxid
+                        elif source_description:
+                            final_identifier = source_description
+                        else:
+                            final_identifier = f"{record.get('name')}_reward_{source_reward_id}"
+                        
+                        reward_updates.append((1, line['id'], {
+                            'vit_reward_trxid': final_identifier,
+                            'description': final_identifier
+                        }))
                     
                     self.source_client.call_odoo(
                         'object', 'execute_kw', self.source_client.db,
