@@ -64,6 +64,9 @@
                   </tree>
                 </field>
               </page>
+              <page string="Notes">
+                  <field name="vit_notes" nolabel="1" placeholder="Add your notes here..." required="1" options="{'resizable': true}" readonly="state == 'finished'"/>
+              </page>
             </notebook>
           </sheet>
           <div class="oe_chatter">

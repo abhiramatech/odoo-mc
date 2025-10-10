@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 import pytz
 import re
 import concurrent.futures
+from threading import Lock
+import datetime
 
 # kalau ada case store nya beda zona waktu gimana
 class DataTransaksi:
@@ -88,13 +90,30 @@ class DataTransaksi:
             location_dest_source_dict = {str(loc['id']): loc['id_mc'] for loc in location_dest_source}
 
             # BoM
+            # 🔹 BoM Mapping menggunakan 'code'
+            # Ambil kode BoM dari source
+            bom_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'mrp.bom', 'search_read',
+                [[['id', 'in', bom_ids]]],
+                {'fields': ['id', 'code']})
+
+            # Buat mapping id_source -> code
+            bom_source_dict = {str(b['id']): b.get('code') for b in bom_source if b.get('code')}
+
+            # Cari BoM di target berdasarkan code
             bom_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                 self.target_client.uid, self.target_client.password,
                 'mrp.bom', 'search_read',
-                [[['id_mc', 'in', [str(bid) for bid in bom_ids]]]],
-                {'fields': ['id', 'id_mc']})
-            
-            bom_dict = {str(rec['id_mc']): rec['id'] for rec in bom_target}
+                [[['code', 'in', list(bom_source_dict.values())]]],
+                {'fields': ['id', 'code']})
+
+            # Buat mapping code -> id_target
+            bom_target_dict = {b['code']: b['id'] for b in bom_target}
+
+            # Mapping akhir: id_source -> id_target berdasarkan code yang sama
+            bom_dict = {src_id: bom_target_dict.get(code) for src_id, code in bom_source_dict.items() if code in bom_target_dict}
+
 
             # Manufacture Order Lines
             picking_ids = [record['id'] for record in transaksi_unbuild_order if record.get('id')]
@@ -176,7 +195,9 @@ class DataTransaksi:
 
                     location_id = location_source_dict.get(str(record['location_id'][0] if isinstance(record['location_id'], list) else record['location_id']))
                     location_dest_id = location_dest_source_dict.get(str(record['location_dest_id'][0] if isinstance(record['location_dest_id'], list) else record['location_dest_id']))
-                    bom_id = bom_dict.get(str(record['bom_id'][0] if isinstance(record['bom_id'], list) else record['bom_id']))
+                    bom_src_id = str(record['bom_id'][0] if isinstance(record['bom_id'], list) else record['bom_id'])
+                    bom_id = bom_dict.get(bom_src_id)
+
                     src_mo_id = record['mo_id'][0] if isinstance(record['mo_id'], list) else record['mo_id']
                     mo_name = mo_source_dict.get(str(src_mo_id))
                     mo_id = mo_target_dict.get(mo_name)
@@ -185,7 +206,7 @@ class DataTransaksi:
                     src_variant_code = product_id_to_default_code.get(src_variant_id)
                     product_variant_id = default_code_to_target_product_id.get(src_variant_code) if src_variant_code else False
 
-                    if not all([location_id, location_dest_id, mo_id, product_variant_id, bom_id]):
+                    if not all([location_id, location_dest_id, product_variant_id, bom_id]):
                         error_message = f"Missing mapping details: location_id={location_id}, location_dest_id={location_dest_id}, mo_id={mo_id}, product_id={product_variant_id}, bom_id={bom_id}"
                         print(error_message)
                         write_date = self.get_write_date(model_name, record['id'])
@@ -237,9 +258,9 @@ class DataTransaksi:
                         'vit_trxid': record.get('name'),
                         'location_id': int(location_id),
                         'location_dest_id': int(location_dest_id),
-                        'bom_id': bom_id,
+                        'bom_id': int(bom_id),
                         'product_id': product_variant_id,
-                        'mo_id': int(mo_id),
+                        'mo_id': int(mo_id) if mo_id else False,
                         'unbuild_line_ids': unbuild_order_line_ids
                     }
 
@@ -335,12 +356,30 @@ class DataTransaksi:
             picking_type_mapping = {str(pt['id']): pt['id_mc'] for pt in picking_type_source if pt.get('id_mc')}
 
             # BoM
+            # 🔹 BoM Mapping menggunakan 'code'
+            # Ambil kode BoM dari source
+            bom_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                self.source_client.uid, self.source_client.password,
+                'mrp.bom', 'search_read',
+                [[['id', 'in', bom_ids]]],
+                {'fields': ['id', 'code']})
+
+            # Buat mapping id_source -> code
+            bom_source_dict = {str(b['id']): b.get('code') for b in bom_source if b.get('code')}
+
+            # Cari BoM di target berdasarkan code
             bom_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                 self.target_client.uid, self.target_client.password,
                 'mrp.bom', 'search_read',
-                [[['id_mc', 'in', [str(bid) for bid in bom_ids]]]],
-                {'fields': ['id', 'id_mc']})
-            bom_dict = {str(rec['id_mc']): rec['id'] for rec in bom_target}
+                [[['code', 'in', list(bom_source_dict.values())]]],
+                {'fields': ['id', 'code']})
+
+            # Buat mapping code -> id_target
+            bom_target_dict = {b['code']: b['id'] for b in bom_target}
+
+            # Mapping akhir: id_source -> id_target berdasarkan code yang sama
+            bom_dict = {src_id: bom_target_dict.get(code) for src_id, code in bom_source_dict.items() if code in bom_target_dict}
+
 
             # User Mapping
             user_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
@@ -414,7 +453,9 @@ class DataTransaksi:
                     location_id = location_source_dict.get(str(record['location_src_id'][0] if isinstance(record['location_src_id'], list) else record['location_src_id']))
                     location_dest_id = location_dest_source_dict.get(str(record['location_dest_id'][0] if isinstance(record['location_dest_id'], list) else record['location_dest_id']))
                     picking_type_id = picking_type_mapping.get(str(record['picking_type_id'][0] if isinstance(record['picking_type_id'], list) else record['picking_type_id']))
-                    bom_id = bom_dict.get(str(record['bom_id'][0] if isinstance(record['bom_id'], list) else record['bom_id']))
+                    bom_src_id = str(record['bom_id'][0] if isinstance(record['bom_id'], list) else record['bom_id'])
+                    bom_id = bom_dict.get(bom_src_id)
+
                     user_id = user_id_mapping.get(str(record['user_id'][0] if isinstance(record['user_id'], list) else record['user_id']))
 
                     src_variant_id = record['product_id'][0] if isinstance(record['product_id'], list) else record['product_id']
@@ -471,7 +512,7 @@ class DataTransaksi:
                         'location_src_id': int(location_id),
                         'location_dest_id': int(location_dest_id),
                         'picking_type_id': int(picking_type_id),
-                        'bom_id': bom_id,
+                        'bom_id': int(bom_id),
                         'product_id': product_variant_id,
                         'move_raw_ids': manufacture_order_line_ids
                     }
@@ -687,6 +728,7 @@ class DataTransaksi:
                     'location_id': int(location_id),
                     'company_id': int(company_id),
                     'create_date': record.get('create_date'),
+                    'vit_notes': record.get('vit_notes'),
                     'from_date': record.get('from_date'),
                     'to_date': record.get('to_date'),
                     'inventory_date': record.get('inventory_date'),
@@ -2054,6 +2096,7 @@ class DataTransaksi:
                         'location_dest_id': int(transit_location_id),
                         'target_location': target_location_name,
                         'picking_type_id': int(picking_type_id),
+                        'origin': record.get('origin', False),
                         # 'is_integrated': True,
                         'vit_trxid': record.get('name', False),
                         'move_ids_without_package': tsout_transfer_inventory_line_ids,
@@ -3219,9 +3262,12 @@ class DataTransaksi:
         except Exception as e:
             print(f"Gagal membuat atau memposting Goods Issue di Source baru: {e}")
 
+
     def transfer_stock_adjustment(self, model_name, fields, description, date_from, date_to):
+        start_time = datetime.datetime.now()
+        write_date = start_time.strftime('%Y-%m-%d %H:%M:%S')
+
         try:
-            # Step 1: Fetch all needed data sequentially
             transaksi_stock_adjustment = self.source_client.call_odoo(
                 'object', 'execute_kw', self.source_client.db,
                 self.source_client.uid, self.source_client.password,
@@ -3234,50 +3280,48 @@ class DataTransaksi:
                 print("Tidak ada transaksi yang ditemukan untuk ditransfer.")
                 return
 
-            # Step 2: Build dictionaries from required metadata
-            product_ids = list({record.get('product_id')[0] if isinstance(record.get('product_id'), list) else record.get('product_id') for record in transaksi_stock_adjustment})
-            location_ids = list({record.get('location_id')[0] if isinstance(record.get('location_id'), list) else record.get('location_id') for record in transaksi_stock_adjustment})
-            location_dest_ids = list({record.get('location_dest_id')[0] if isinstance(record.get('location_dest_id'), list) else record.get('location_dest_id') for record in transaksi_stock_adjustment})
-            company_ids = list({record.get('company_id')[0] if isinstance(record.get('company_id'), list) else record.get('company_id') for record in transaksi_stock_adjustment if record.get('company_id')})
+            product_ids = {record.get('product_id')[0] if isinstance(record.get('product_id'), list) else record.get('product_id') for record in transaksi_stock_adjustment}
+            location_ids = {record.get('location_id')[0] if isinstance(record.get('location_id'), list) else record.get('location_id') for record in transaksi_stock_adjustment}
+            location_dest_ids = {record.get('location_dest_id')[0] if isinstance(record.get('location_dest_id'), list) else record.get('location_dest_id') for record in transaksi_stock_adjustment}
+            company_ids = {record.get('company_id')[0] if isinstance(record.get('company_id'), list) else record.get('company_id') for record in transaksi_stock_adjustment if record.get('company_id')}
 
-            location_source_dict = {loc['id']: loc['id_mc'] for loc in self.source_client.call_odoo(
-                'object', 'execute_kw', self.source_client.db, self.source_client.uid, self.source_client.password,
-                'stock.location', 'search_read', [[['id', 'in', location_ids]]], {'fields': ['id', 'id_mc']}
-            )}
+            location_source_dict = {loc['id']: loc['id_mc'] for loc in self.source_client.call_odoo('object', 'execute_kw',
+                self.source_client.db, self.source_client.uid, self.source_client.password,
+                'stock.location', 'search_read', [[['id', 'in', list(location_ids)]]], {'fields': ['id', 'id_mc']})}
 
-            location_dest_source_dict = {loc['id']: loc['id_mc'] for loc in self.source_client.call_odoo(
-                'object', 'execute_kw', self.source_client.db, self.source_client.uid, self.source_client.password,
-                'stock.location', 'search_read', [[['id', 'in', location_dest_ids]]], {'fields': ['id', 'id_mc']}
-            )}
+            location_dest_source_dict = {loc['id']: loc['id_mc'] for loc in self.source_client.call_odoo('object', 'execute_kw',
+                self.source_client.db, self.source_client.uid, self.source_client.password,
+                'stock.location', 'search_read', [[['id', 'in', list(location_dest_ids)]]], {'fields': ['id', 'id_mc']})}
 
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db, self.source_client.uid,
-                                                        self.source_client.password, 'product.product', 'search_read',
-                                                        [[['id', 'in', product_ids]]], {'fields': ['id', 'default_code']})
-            product_source_dict = {product['id']: product['default_code'] for product in product_source}
+                self.source_client.password, 'product.product', 'search_read', [[['id', 'in', list(product_ids)]]], {'fields': ['id', 'default_code']})
+            product_source_dict = {p['id']: p['default_code'] for p in product_source}
 
             product_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db, self.target_client.uid,
-                                                        self.target_client.password, 'product.product', 'search_read',
-                                                        [[['default_code', 'in', list(product_source_dict.values())]]],
-                                                        {'fields': ['id', 'default_code']})
-            product_target_dict = {product['default_code']: product['id'] for product in product_target}
+                self.target_client.password, 'product.product', 'search_read', [[['default_code', 'in', list(product_source_dict.values())]]], {'fields': ['id', 'default_code']})
+            product_target_dict = {p['default_code']: p['id'] for p in product_target}
 
             companies_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                            self.source_client.uid, self.source_client.password,
-                                                            'res.company', 'search_read', [[['id', 'in', company_ids]]],
-                                                            {'fields': ['id', 'name']})
-            company_source_dict = {c['id']: c['name'] for c in companies_source if 'name' in c}
+                self.source_client.uid, self.source_client.password, 'res.company', 'search_read',
+                [[['id', 'in', list(company_ids)]]], {'fields': ['id', 'name']})
+            company_source_dict = {c['id']: c['name'] for c in companies_source}
 
             companies_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                            self.target_client.uid, self.target_client.password,
-                                                            'res.company', 'search_read',
-                                                            [[['name', 'in', list(company_source_dict.values())]]],
-                                                            {'fields': ['id', 'name']})
+                self.target_client.uid, self.target_client.password, 'res.company', 'search_read',
+                [[['name', 'in', list(company_source_dict.values())]]], {'fields': ['id', 'name']})
             company_target_dict = {c['name']: c['id'] for c in companies_target}
 
-            # Step 3: Parallel processing of each record
+            # Shared collections with lock
+            batched_data = []
+            data_lock = Lock()
+
+            success_count = 0
+            error_count = 0
+            skipped_count = 0
+
             def _process_single_adjustment_record(record):
+                nonlocal success_count, error_count, skipped_count
                 try:
-                    # Unwrap values
                     company_name = company_source_dict.get(record.get('company_id')[0] if isinstance(record.get('company_id'), list) else record.get('company_id'))
                     company_id = company_target_dict.get(company_name)
                     if not company_id:
@@ -3286,7 +3330,6 @@ class DataTransaksi:
                     product_id = record.get('product_id')[0] if isinstance(record.get('product_id'), list) else record.get('product_id')
                     product_code = product_source_dict.get(product_id)
                     target_product_id = product_target_dict.get(product_code)
-
                     if not target_product_id:
                         raise Exception(f"Product {product_code} tidak ditemukan di target system")
 
@@ -3294,57 +3337,96 @@ class DataTransaksi:
                     dest_loc_id = location_dest_source_dict.get(record.get('location_dest_id')[0] if isinstance(record.get('location_dest_id'), list) else record.get('location_dest_id'))
 
                     existing_quant = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'stock.quant', 'search_read',
-                                                                [[['product_id', '=', target_product_id], ['location_id', '=', int(source_loc_id)]]],
-                                                                {'fields': ['quantity']})
+                        self.target_client.uid, self.target_client.password, 'stock.quant', 'search_read',
+                        [[['product_id', '=', target_product_id], ['location_id', '=', int(source_loc_id)]]], {'fields': ['quantity']})
+
                     existing_quantity = existing_quant[0]['quantity'] if existing_quant else 0
                     adjusted_quantity = record.get('quantity') - existing_quantity
 
                     if adjusted_quantity <= 0:
+                        with data_lock:
+                            skipped_count += 1
                         print(f"[SKIP] Product {product_code} sudah cukup stoknya.")
                         return
 
-                    stock_move_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                                self.target_client.uid, self.target_client.password,
-                                                                'stock.move', 'create',
-                                                                [{
-                                                                    'product_id': target_product_id,
-                                                                    'location_id': int(source_loc_id),
-                                                                    'location_dest_id': int(dest_loc_id),
-                                                                    'name': "Product Quantity Updated",
-                                                                    'state': 'done',
-                                                                    'company_id': int(company_id),
-                                                                }])
-                    self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                                                self.target_client.uid, self.target_client.password,
-                                                'stock.move.line', 'create',
-                                                [{
-                                                    'product_id': target_product_id,
-                                                    'location_id': int(source_loc_id),
-                                                    'location_dest_id': int(dest_loc_id),
-                                                    'quantity': adjusted_quantity,
-                                                    'move_id': stock_move_id,
-                                                    'state': 'done',
-                                                    'company_id': int(company_id),
-                                                }])
-                    self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
-                                                self.source_client.uid, self.source_client.password,
-                                                model_name, 'write',
-                                                [[record['id']], {'is_integrated': True}])
-                    print(f"[OK] {product_code} qty {adjusted_quantity} berhasil diproses.")
+                    move = {
+                        'product_id': target_product_id,
+                        'location_id': int(source_loc_id),
+                        'location_dest_id': int(dest_loc_id),
+                        'name': "Product Quantity Updated",
+                        'state': 'done',
+                        'company_id': int(company_id),
+                    }
+
+                    move_line = {
+                        'product_id': target_product_id,
+                        'location_id': int(source_loc_id),
+                        'location_dest_id': int(dest_loc_id),
+                        'quantity': adjusted_quantity,
+                        'state': 'done',
+                        'company_id': int(company_id),
+                    }
+
+                    with data_lock:
+                        batched_data.append((move, move_line, record['id']))
+                        success_count += 1
+
+                    end_time = datetime.datetime.now()
+                    duration = str(end_time - start_time)
+                    self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Physical Inventory', write_date)
+                    self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Physical Inventory', write_date)
 
                 except Exception as e:
-                    print(f"[ERROR] Record ID {record['id']} gagal: {str(e)}")
+                    with data_lock:
+                        error_count += 1
 
+                    error_message = str(e)
+                    self.set_log_mc.create_log_note_failed(record, 'Physical Inventory', error_message, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Physical Inventory', error_message, write_date)
+
+                    print(f"[ERROR] Record ID {record.get('id')} gagal: {error_message}")
+
+            # Parallel processing
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                futures = [executor.submit(_process_single_adjustment_record, rec) for rec in transaksi_stock_adjustment]
-                concurrent.futures.wait(futures)
+                executor.map(_process_single_adjustment_record, transaksi_stock_adjustment)
 
+            # Grouping into chunks
+            def chunked(data, size):
+                for i in range(0, len(data), size):
+                    yield data[i:i + size]
+
+            for chunk in chunked(batched_data, 100):
+                move_batch = [item[0] for item in chunk]
+                line_batch = [item[1] for item in chunk]
+                id_batch = [item[2] for item in chunk]
+
+                move_ids = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                    self.target_client.uid, self.target_client.password, 'stock.move', 'create', [move_batch])
+
+                for i, move_id in enumerate(move_ids):
+                    line_batch[i]['move_id'] = move_id
+
+                self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                    self.target_client.uid, self.target_client.password, 'stock.move.line', 'create', [line_batch])
+
+                self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                    self.source_client.uid, self.source_client.password, model_name, 'write',
+                    [[rec_id] for rec_id in id_batch], {'is_integrated': True})
+
+            # Final summary
+            print(f"[SUMMARY] Total: {len(transaksi_stock_adjustment)}, Sukses: {success_count}, Dilewati: {skipped_count}, Gagal: {error_count}")
             return True
 
         except Exception as e:
-            print(f"[FATAL ERROR] {str(e)}")
+            end_time = datetime.datetime.now()
+            duration = str(end_time - start_time)
+            message_exception = str(e)
+
+            # Jika error besar di level atas (global failure), log 1x saja (tanpa record)
+            self.set_log_mc.create_log_note_failed("GLOBAL", 'Physical Inventory', message_exception, write_date)
+            self.set_log_ss.create_log_note_failed("GLOBAL", 'Physical Inventory', message_exception, write_date)
+
+            print(f"[FATAL ERROR] {message_exception}")
             return False
 
     def update_session_status(self, model_name, fields, description, date_from, date_to):
@@ -3876,6 +3958,7 @@ class DataTransaksi:
                     'start_date': record.get('start_date'),
                     'end_date': record.get('end_date'),
                     'modal': record.get('modal'),
+                    'notes': record.get('vit_notes'),
                     'line_ids': end_shift_line_ids,
                 }
 

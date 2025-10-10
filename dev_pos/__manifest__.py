@@ -12,6 +12,7 @@
     'data': [
         # 'security/hr_security.xml',
         'security/ir.model.access.csv',
+        'data/mrp_bom_schedule.xml',
         'views/views_pos_order.xml',
         'views/views_stock_picking.xml',
         'views/views_res_partner.xml',
@@ -62,6 +63,7 @@
         'views/product_product_view.xml',
         'views/mrp_unbuild_line_view.xml',
         'views/pos_timbangan_views.xml',
+        'views/report_stock_view.xml',
         # 'reports/sales_report_view.xml',
         # 'reports/sales_report_menu_view.xml',
         # 'reports/report_layout_templates.xml',
@@ -70,6 +72,8 @@
     ],
     'assets': {
         'web.assets_backend': [
+            'dev_pos/static/src/xml/button_generate_report.xml',
+            'dev_pos/static/src/js/button_generate_report.js',
             'dev_pos/static/src/js/web_title.js',
             'dev_pos/static/src/css/theme_custom.css',
         ],
