@@ -175,7 +175,7 @@ class ManualSyncMCToSSIntegration(models.TransientModel):
                     'title': _('Success'),
                     'message': message,
                     'type': 'info',  # types: success, warning, info, danger
-                    'sticky': True,  # True/False will display for few seconds if false
+                    'sticky': False,  # True/False will display for few seconds if false
                 }}
 
         

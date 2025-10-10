@@ -676,7 +676,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksi.transfer_end_shift_from_store('end.shift', ['doc_num', 'cashier_id', 'session_id', 'start_date', 'end_date', 'is_integrated', 'line_ids', 'modal'], 'Transfer End Shift')
+            integrator_transaksi.transfer_end_shift_from_store('end.shift', ['doc_num', 'vit_notes', 'cashier_id', 'session_id', 'start_date', 'end_date', 'is_integrated', 'line_ids', 'modal'], 'Transfer End Shift')
 
     def create_update_session_pos(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -922,7 +922,7 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
-            integrator_transaksi.transfer_inventory_stock('inventory.stock', ['id', 'doc_num', 'warehouse_id', 'location_id', 'company_id', 'create_date', 'from_date', 'to_date', 'inventory_date', 'state'], 'Transaksi Inventory Counting', date_from, date_to)
+            integrator_transaksi.transfer_inventory_stock('inventory.stock', ['id', 'doc_num', 'vit_notes', 'warehouse_id', 'location_id', 'company_id', 'create_date', 'from_date', 'to_date', 'inventory_date', 'state'], 'Transaksi Inventory Counting', date_from, date_to)
 
     def transfer_ts_out(self, mc, ss, datefrom, dateto):
         if mc and ss:

@@ -1,20 +1,33 @@
 <odoo>
   <data>
 
-    <record model="ir.ui.view" id="view_res_partner_form">
-      <field name="name">res.partner.form</field>
+    <record model="ir.ui.view" id="view_res_partner_form_inherit">
+      <field name="name">res.partner.form.inherit</field>
       <field name="model">res.partner</field>
       <field name="inherit_id" ref="base.view_partner_form"/>
       <field name="arch" type="xml">
         <xpath expr="//field[@name='category_id']" position="after">
-            <field name="customer_code"/>
-            <field name="is_integrated"/>
-            <field name="index_store" widget="many2many_tags"/>
+            <field name="customer_code" readonly="1"/>
+            <field name="is_integrated" readonly="1"/>
+            <field name="index_store" widget="many2many_tags" readonly="1"/>
         </xpath>
-        <!-- <xpath expr="//field[@name='customer_code']" position="attributes">
+        
+        <!-- Field yang bisa diubah dan log ke chatter -->
+        <xpath expr="//field[@name='phone']" position="attributes">
           <attribute name="force_save">1</attribute>
-          <attribute name="readonly">True</attribute>
-        </xpath> -->
+        </xpath>
+        
+        <xpath expr="//field[@name='category_id']" position="attributes">
+          <attribute name="force_save">1</attribute>
+        </xpath>
+        
+        <xpath expr="//field[@name='customer_code']" position="attributes">
+          <attribute name="force_save">1</attribute>
+        </xpath>
+        
+        <xpath expr="//field[@name='index_store']" position="attributes">
+          <attribute name="force_save">1</attribute>
+        </xpath>
       </field>
     </record>
 
