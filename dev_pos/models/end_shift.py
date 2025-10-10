@@ -27,6 +27,7 @@ class EndShiftSession(models.Model):
     line_ids = fields.One2many('end.shift.line', 'end_shift_id', string='Shift Lines', context={'parent_state': 'state'})
 
     pos_order_count = fields.Integer(string='POS Orders', compute='_compute_pos_order_count')
+    vit_notes = fields.Text(string="Notes", tracking=True, required=True)
 
     @api.depends('cashier_id', 'session_id')
     def _compute_pos_order_count(self):

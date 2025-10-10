@@ -13,6 +13,9 @@
             <field name="vit_id"/>
             <field name="is_integrated"/>
         </xpath>
+        <xpath expr="//field[@name='payment_ids']/tree/field[@name='payment_date']" position="before">
+          <field name="is_integrated"/>
+        </xpath>
         <!-- <xpath expr="//header" position="inside">
             <button name="action_generate_invoice" type="object" string="Generate Invoice" class="btn-primary"/>
         </xpath> -->

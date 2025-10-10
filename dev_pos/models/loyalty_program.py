@@ -11,6 +11,7 @@ class LoyaltyProgramInherit(models.Model):
     vit_trxid = fields.Char(string="Transaction ID", default=False)
     schedule_ids = fields.One2many('loyalty.program.schedule','program_id',string='Schedules')
     member_ids = fields.One2many('loyalty.member','member_program_id',string='Members')
+    vit_konversi_poin = fields.Float(string="Konversi untuk Penukaran Point 1 Point =")
 
     def write(self, vals):
         # Only set is_updated to True if it hasn't been explicitly set to False in vals

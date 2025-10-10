@@ -111,6 +111,7 @@
                                     <group string="Font Sizes">
                                         <field name="ukuran_font_nama"/>
                                         <field name="ukuran_font_barcode"/>
+                                        <field name="lebar_barcode"/>
                                         <field name="ukuran_font_kode"/>
                                         <field name="ukuran_font_harga"/>
                                     </group>

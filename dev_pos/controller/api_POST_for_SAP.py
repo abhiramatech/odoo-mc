@@ -70,7 +70,7 @@ class POSTEmployee(http.Controller):
 
                     created.append({
                         'id': employee.id,
-                        'employee_code': employee.employee_code,
+                        'employee_code': employee.vit_employee_code,
                         'name': employee.name,
                     })
 
@@ -313,7 +313,7 @@ class POSTMasterItem(http.Controller):
                         'vit_sub_div': data.get('vit_sub_div'),
                         'vit_item_kel': data.get('vit_item_kel'),
                         'vit_item_type': data.get('vit_item_type'),
-                        'vit_item_brand': data.get('vit_item_brand'),
+                        'brand': data.get('vit_item_brand'),
                     })
 
                 except Exception as e:
@@ -517,6 +517,124 @@ class POSTMasterPricelist(http.Controller):
                 'code': 500, 
                 'message': f"Failed to create Pricelist: {str(e)}"
             }
+        
+class POSTMasterUoM(http.Controller):
+    @http.route('/api/master_uom', type='json', auth='none', methods=['POST'], csrf=False)
+    def post_master_uom(self, **kw):
+        try:
+            # 🔐 Autentikasi
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {
+                    'status': 'Failed',
+                    'code': 500,
+                    'message': 'Configuration not found.'
+                }
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
+            if not uid:
+                return {
+                    'status': 'Failed',
+                    'code': 401,
+                    'message': 'Authentication failed.'
+                }
+
+            json_data = request.get_json_data()
+            items = json_data.get('items')
+
+            # ✅ Bisa single dict atau list
+            if isinstance(items, dict):
+                items = [items]
+            elif items is None and isinstance(json_data, dict):
+                items = [json_data]
+            elif not isinstance(items, list):
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
+
+            vals_list, created, errors = [], [], []
+
+            # 🔍 Validasi & kumpulkan data
+            for data in items:
+                try:
+                    name = data.get('name')
+                    uom_type = data.get('uom_type')
+                    category_id = data.get('category_id')
+
+                    if not name or not uom_type or not category_id:
+                        errors.append({
+                            'name': name,
+                            'message': "Missing required field: name, uom_type, or category_id"
+                        })
+                        continue
+
+                    # Cek duplikat berdasarkan name & category_id
+                    existing = request.env['uom.uom'].sudo().search([
+                        ('name', '=', name),
+                        ('category_id', '=', category_id)
+                    ], limit=1)
+                    if existing:
+                        errors.append({
+                            'id': existing.id,
+                            'name': name,
+                            'message': f"Duplicate UoM with name '{name}' in this category"
+                        })
+                        continue
+
+                    vals_list.append({
+                        'name': name,
+                        'uom_type': uom_type,
+                        'category_id': category_id,
+                        'rounding': data.get('rounding', 1.0),
+                        'ratio': data.get('ratio', 1.0),
+                        'active': data.get('active', True),
+                        'factor': data.get('factor', 1.0),
+                        'factor_inv': data.get('factor_inv', 1.0),
+                    })
+
+                except Exception as e:
+                    errors.append({
+                        'name': data.get('name'),
+                        'message': f"Exception: {str(e)}"
+                    })
+
+            # 🚀 Bulk create
+            if vals_list:
+                uoms = request.env['uom.uom'].sudo().create(vals_list)
+                for rec in uoms:
+                    created.append({
+                        'id': rec.id,
+                        'name': rec.name,
+                        'uom_type': rec.uom_type,
+                        'category_id': rec.category_id.id,
+                        'category': rec.category_id.name,
+                        'status': 'success'
+                    })
+
+            return {
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'created_uoms': created,
+                'errors': errors
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Failed to create UoMs: {str(e)}")
+            return {
+                'status': 'Failed',
+                'code': 500,
+                'message': f"Failed to create UoMs: {str(e)}"
+            }
+
 
 class POSTMasterCustomer(http.Controller):
     @http.route('/api/master_customer', type='json', auth='none', methods=['POST'], csrf=False)
