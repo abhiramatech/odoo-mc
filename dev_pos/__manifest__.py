@@ -12,6 +12,7 @@
     'data': [
         # 'security/hr_security.xml',
         'security/ir.model.access.csv',
+        'data/mrp_bom_schedule.xml',
         'views/views_pos_order.xml',
         'views/views_stock_picking.xml',
         'views/views_res_partner.xml',
