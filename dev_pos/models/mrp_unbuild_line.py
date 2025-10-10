@@ -6,12 +6,24 @@ class MrpProductInherit(models.Model):
 
     vit_trxid = fields.Char(string="Transaction ID", default=False)
     is_integrated = fields.Boolean(string="Integrated", default=False)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
 
 class MrpBoMInherit(models.Model):
     _inherit = 'mrp.bom'
 
     id_mc = fields.Char(string="ID MC", default=False)
     is_integrated = fields.Boolean(string="Integrated", default=False)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
+
+    @api.model
+    def create(self, vals):
+        # Jika field 'code' belum diisi manual
+        if not vals.get('code'):
+            # Buat sequence otomatis, contoh format: BOM/2025/00001
+            sequence = self.env['ir.sequence'].next_by_code('mrp.bom.code') or '/'
+            vals['code'] = sequence
+
+        return super(MrpBoMInherit, self).create(vals)
 
 class MrpUnbuild(models.Model):
     _inherit = 'mrp.unbuild'
@@ -19,6 +31,7 @@ class MrpUnbuild(models.Model):
     unbuild_line_ids = fields.One2many('mrp.unbuild.line', 'unbuild_id', string='Unbuild Lines')
     vit_trxid = fields.Char(string="Transaction ID", default=False)
     is_integrated = fields.Boolean(string="Integrated", default=False)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
 
     def _generate_produce_moves(self):
         StockLocation = self.env['stock.location']
