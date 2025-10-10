@@ -1837,8 +1837,6 @@ class InvoiceOrder(http.Controller):
                     'customer_id': order.partner_id.id,
                     'customer_name': order.partner_id.name,
                     'customer_code': order.partner_id.customer_code,
-                    'employee_id': order.employee_id.id,
-                    'employee': order.employee_id.name,
                     'location_id': location_id or int(-1),
                     'location': location or int(-1),
                     'location_dest_id': location_dest_id or int(-1),
@@ -1881,24 +1879,15 @@ class InvoiceOrder(http.Controller):
                 raise werkzeug.exceptions.NotFound(_("Invoice Order not found"))
 
             invoice_lines = invoicing.invoice_line_ids
-            customer_name = invoicing.partner_id.name
-            customer_id = invoicing.partner_id.id
-            doc_num = invoicing.name
-            company_id = invoicing.company_id.id
-            company = invoicing.company_id.name
-            is_integrated = invoicing.is_integrated
-            invoice_date = str(invoicing.invoice_date)
+            partner = invoicing.partner_id
+            company = invoicing.company_id
 
             jakarta_tz = pytz.timezone('Asia/Jakarta')
             create_date_utc = invoicing.create_date
             create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
-            create_date = str(create_date_jakarta)
 
-            invoice_date_due = str(invoicing.invoice_date_due)
-            payment_reference = invoicing.payment_reference
-            journal_id = invoicing.journal_id.id
-            journal = invoicing.journal_id.name
-            amount = invoicing.amount_total
+            # cari tax PPNK sekali saja
+            tax_ppnk = request.env['account.tax'].sudo().search([('name', 'ilike', 'PPNK')], limit=1)
 
             data_invoice_lines = []
             for line_number, line in enumerate(invoice_lines, start=1):
@@ -1917,26 +1906,22 @@ class InvoiceOrder(http.Controller):
                     location = pickings.location_id.complete_name
                     location_dest_id = pickings.location_dest_id.id
                     location_dest = pickings.location_dest_id.complete_name
-                else:
-                    # fallback ke vit_pos_store
-                    if invoicing.pos_order_ids:
-                        pos_order = invoicing.pos_order_ids[0]
-                        if pos_order.vit_pos_store:
-                            location_id = pos_order.vit_pos_store.id
-                            location = pos_order.vit_pos_store.name
-                            location_dest_id = pos_order.vit_pos_store.id
-                            location_dest = pos_order.vit_pos_store.name
+                elif invoicing.pos_order_ids:
+                    pos_order = invoicing.pos_order_ids[0]
+                    if pos_order.vit_pos_store:
+                        location_id = pos_order.vit_pos_store.id
+                        location = pos_order.vit_pos_store.name
+                        location_dest_id = pos_order.vit_pos_store.id
+                        location_dest = pos_order.vit_pos_store.name
 
-                # Tambahkan tax_ids
-                tax_data = [
-                    {'id': tax.id, 'tax_name': tax.name, 'amount': tax.amount}
-                    for tax in line.tax_ids
-                ]
+                # Cek tax, jika kosong isi dengan PPNK
+                taxes = line.tax_ids or (tax_ppnk and [tax_ppnk] or [])
+                tax_data = [{'id': tax.id, 'tax_name': tax.name, 'amount': tax.amount} for tax in taxes]
 
                 line_data = {
                     'line_number': line_number,
                     'id': line.id,
-                    'doc_no': doc_num,
+                    'doc_no': invoicing.name,
                     'sales_id': line.user_id.id if line.user_id else "",
                     'sales': line.user_id.name if line.user_id else "",
                     'sales_code': line.user_id.vit_employee_code if line.user_id else "",
@@ -1958,20 +1943,20 @@ class InvoiceOrder(http.Controller):
             response_data = {
                 'status': 200,
                 'message': 'success',
-                'doc_num': doc_num,
-                'customer_id': customer_id,
-                'customer_name': customer_name,
-                'create_date': create_date,
-                'invoice_date': invoice_date,
-                'invoice_date_due': invoice_date_due,
-                'is_integrated': is_integrated,
-                'payment_reference': payment_reference,
-                'journal_id': journal_id,
-                'journal': journal,
-                'company_id': company_id,
-                'company': company,
+                'doc_num': invoicing.name,
+                'customer_id': partner.id,
+                'customer_name': partner.name,
+                'create_date': str(create_date_jakarta),
+                'invoice_date': str(invoicing.invoice_date),
+                'invoice_date_due': str(invoicing.invoice_date_due),
+                'is_integrated': invoicing.is_integrated,
+                'payment_reference': invoicing.payment_reference,
+                'journal_id': invoicing.journal_id.id,
+                'journal': invoicing.journal_id.name,
+                'company_id': company.id,
+                'company': company.name,
                 'order_line': data_invoice_lines,
-                'amount': amount
+                'amount': invoicing.amount_total,
             }
             return werkzeug.wrappers.Response(
                 status=200,
@@ -2261,28 +2246,18 @@ class CrediNoteAPI(http.Controller):
             if not invoicing:
                 raise werkzeug.exceptions.NotFound(_("Credit Note is not found"))
 
-            invoice_lines = invoicing.invoice_line_ids
-            customer_name = invoicing.partner_id.name
-            customer_id = invoicing.partner_id.id
-            doc_num = invoicing.name
-            company_id = invoicing.company_id.id
-            company = invoicing.company_id.name
-            is_integrated = invoicing.is_integrated
-            invoice_date = str(invoicing.invoice_date)
+            partner = invoicing.partner_id
+            company = invoicing.company_id
 
             jakarta_tz = pytz.timezone('Asia/Jakarta')
             create_date_utc = invoicing.create_date
             create_date_jakarta = pytz.utc.localize(create_date_utc).astimezone(jakarta_tz)
-            create_date = str(create_date_jakarta)
 
-            invoice_date_due = str(invoicing.invoice_date_due)
-            payment_reference = invoicing.payment_reference
-            journal_id = invoicing.journal_id.id
-            journal = invoicing.journal_id.name
-            amount = invoicing.amount_total
+            # cari tax PPNK
+            tax_ppnk = request.env['account.tax'].sudo().search([('name', 'ilike', 'PPNK')], limit=1)
 
             data_invoice_lines = []
-            for line_number, line in enumerate(invoice_lines, start=1):
+            for line_number, line in enumerate(invoicing.invoice_line_ids, start=1):
                 pickings = request.env['stock.picking'].sudo().search([
                     ('pos_order_id', '=', invoicing.pos_order_ids[0].id if invoicing.pos_order_ids else False),
                     ('origin', '=', invoicing.ref),
@@ -2295,25 +2270,22 @@ class CrediNoteAPI(http.Controller):
                     location = pickings.location_id.complete_name
                     location_dest_id = pickings.location_dest_id.id
                     location_dest = pickings.location_dest_id.complete_name
-                else:
-                    if invoicing.pos_order_ids:
-                        pos_order = invoicing.pos_order_ids[0]
-                        if pos_order.vit_pos_store:
-                            location_id = pos_order.vit_pos_store.id
-                            location = pos_order.vit_pos_store.name
-                            location_dest_id = pos_order.vit_pos_store.id
-                            location_dest = pos_order.vit_pos_store.name
+                elif invoicing.pos_order_ids:
+                    pos_order = invoicing.pos_order_ids[0]
+                    if pos_order.vit_pos_store:
+                        location_id = pos_order.vit_pos_store.id
+                        location = pos_order.vit_pos_store.name
+                        location_dest_id = pos_order.vit_pos_store.id
+                        location_dest = pos_order.vit_pos_store.name
 
-                # Tambahkan tax_ids
-                tax_data = [
-                    {'id': tax.id, 'tax_name': tax.name, 'amount': tax.amount}
-                    for tax in line.tax_ids
-                ]
+                # cek tax, fallback PPNK
+                taxes = line.tax_ids or (tax_ppnk and [tax_ppnk] or [])
+                tax_data = [{'id': tax.id, 'tax_name': tax.name, 'amount': tax.amount} for tax in taxes]
 
                 line_data = {
                     'line_number': line_number,
                     'id': line.id,
-                    'doc_no': doc_num,
+                    'doc_no': invoicing.name,
                     'product_id': line.product_id.id,
                     'product_name': line.name,
                     'product_code': line.product_id.default_code or "",
@@ -2332,20 +2304,20 @@ class CrediNoteAPI(http.Controller):
             response_data = {
                 'status': 200,
                 'message': 'success',
-                'doc_num': doc_num,
-                'customer_id': customer_id,
-                'customer_name': customer_name,
-                'create_date': create_date,
-                'invoice_date': invoice_date,
-                'invoice_date_due': invoice_date_due,
-                'is_integrated': is_integrated,
-                'payment_reference': payment_reference,
-                'journal_id': journal_id,
-                'journal': journal,
-                'company_id': company_id,
-                'company': company,
+                'doc_num': invoicing.name,
+                'customer_id': partner.id,
+                'customer_name': partner.name,
+                'create_date': str(create_date_jakarta),
+                'invoice_date': str(invoicing.invoice_date),
+                'invoice_date_due': str(invoicing.invoice_date_due),
+                'is_integrated': invoicing.is_integrated,
+                'payment_reference': invoicing.payment_reference,
+                'journal_id': invoicing.journal_id.id,
+                'journal': invoicing.journal_id.name,
+                'company_id': company.id,
+                'company': company.name,
                 'order_line': data_invoice_lines,
-                'amount': amount
+                'amount': invoicing.amount_total,
             }
             return werkzeug.wrappers.Response(
                 status=200,

@@ -70,7 +70,7 @@ class POSTEmployee(http.Controller):
 
                     created.append({
                         'id': employee.id,
-                        'employee_code': employee.employee_code,
+                        'employee_code': employee.vit_employee_code,
                         'name': employee.name,
                     })
 
