@@ -46,3 +46,4 @@ from . import res_partner_category
 from . import timbangan_template
 from . import account_move_line
 from . import loyalty_history
+from . import report_stock
