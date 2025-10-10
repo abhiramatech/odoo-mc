@@ -92,7 +92,18 @@ class DataTransaksiMCtoSS:
 
             default_code_to_target_line_product_id = {p['default_code']: p['id'] for p in product_line_target}
 
-            # STEP D - Process each BoM
+            # STEP D - Ambil semua BoM yang sudah ada di target (untuk pengecekan update)
+            all_bom_codes = [record.get('code') for record in transaksi_bom_master if record.get('code')]
+            
+            existing_boms = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                self.target_client.uid, self.target_client.password,
+                'mrp.bom', 'search_read',
+                [[['code', 'in', all_bom_codes]]],
+                {'fields': ['id', 'code']})
+            
+            code_to_existing_bom_id = {bom['code']: bom['id'] for bom in existing_boms if bom.get('code')}
+
+            # STEP E - Process each BoM
             def process_bom(record):
                 src_tmpl_id = record['product_tmpl_id'][0] if isinstance(record['product_tmpl_id'], list) else record['product_tmpl_id']
                 src_template_code = template_id_to_default_code.get(src_tmpl_id)
@@ -144,22 +155,39 @@ class DataTransaksiMCtoSS:
                     'product_qty': record.get('product_qty') or 1.0,
                     'code': record.get('code'),
                     'type': record.get('type'),
-                    # 'id_mc': record.get('id'),
                     'consumption': record.get('consumption'),
                     'produce_delay': record.get('produce_delay'),
                     'days_to_prepare_mo': record.get('days_to_prepare_mo'),
-                    'bom_line_ids': bom_line_vals
                 }
 
-                try:
-                    new_bom_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
-                        self.target_client.uid, self.target_client.password,
-                        'mrp.bom', 'create', [bom_data])
+                # Cek apakah BoM sudah ada berdasarkan code
+                bom_code = record.get('code')
+                existing_bom_id = code_to_existing_bom_id.get(bom_code) if bom_code else None
 
-                    print(f"✅ BoM {record['id']} → created in target with ID {new_bom_id}")
+                try:
+                    if existing_bom_id:
+                        # UPDATE: Hapus line lama dan tambah line baru
+                        bom_data['bom_line_ids'] = [(5, 0, 0)] + bom_line_vals  # (5,0,0) = delete all lines
+                        
+                        self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                            self.target_client.uid, self.target_client.password,
+                            'mrp.bom', 'write',
+                            [[existing_bom_id], bom_data])
+                        
+                        print(f"🔄 BoM {record['id']} → updated in target (ID {existing_bom_id})")
+                    else:
+                        # CREATE: Buat baru
+                        bom_data['bom_line_ids'] = bom_line_vals
+                        
+                        new_bom_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                            self.target_client.uid, self.target_client.password,
+                            'mrp.bom', 'create', [bom_data])
+
+                        print(f"✅ BoM {record['id']} → created in target with ID {new_bom_id}")
 
                 except Exception as e:
-                    print(f"💥 Gagal create BoM ID {record['id']}: {e}")
+                    print(f"💥 Gagal create/update BoM ID {record['id']}: {e}")
+                    return
 
                 try:
                     index_store_ids = record.get('index_store', [])
@@ -186,7 +214,7 @@ class DataTransaksiMCtoSS:
                     print(f"📌 Field index_store diperbarui untuk BoM ID {record['id']}.")
 
                     # Periksa apakah semua setting config sudah tercakup di index_store
-                    if len(index_store_ids) + 1 >= len(setting_config_ids):  # `+1` karena mungkin baru ditambahkan 1 saat ini
+                    if len(index_store_ids) + 1 >= len(setting_config_ids):
                         self.source_client.call_odoo(
                             'object', 'execute_kw', self.source_client.db,
                             self.source_client.uid, self.source_client.password,
@@ -209,7 +237,6 @@ class DataTransaksiMCtoSS:
                         print(f"⌛ BoM ID {record['id']} belum terintegrasi ke semua target.")
                 except Exception as e:
                     print(f"⚠️ Gagal update index_store/is_integrated untuk BoM {record['id']}: {e}")
-
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(process_bom, record) for record in transaksi_bom_master]
@@ -1731,7 +1758,7 @@ class DataTransaksiMCtoSS:
                             'discount_applicability': line.get('discount_applicability'),
                             'discount_max_amount': line.get('discount_max_amount'),
                             'required_points': line.get('required_points'),
-                            'description': final_identifier,
+                            'description': line.get('description'),
                             'vit_reward_trxid': final_identifier,
                             'discount_mode': line.get('discount_mode'),
                             'discount_product_domain': line.get('discount_product_domain'),
@@ -1783,7 +1810,7 @@ class DataTransaksiMCtoSS:
                                 rule_source_product_tag_name = next((tag['name'] for tag in product_tag_source_rule if tag['id'] == rule_source_product_tag_id), None)
 
                         rule_target_product_tag_id = product_tag_dict_rule.get(rule_source_product_tag_name) if rule_source_product_tag_name else None
-                
+                    
                         existing_rule_line = next((x for x in existing_rule_lines if x['vit_trxid'] == rule['vit_trxid']), None)
                         
                         rule_data = {
@@ -1926,8 +1953,9 @@ class DataTransaksiMCtoSS:
                                                 [[program_id], update_values])
                     print(f"Record dengan ID {record['id']} telah diupdate.")
 
+                    # === UPDATE DESCRIPTION di LOYALTY.REWARD TARGET ===
                     try:
-                        rewards_to_sync = self.target_client.call_odoo(
+                        target_rewards = self.target_client.call_odoo(
                             'object', 'execute_kw', self.target_client.db,
                             self.target_client.uid, self.target_client.password,
                             'loyalty.reward', 'search_read',
@@ -1935,18 +1963,33 @@ class DataTransaksiMCtoSS:
                             {'fields': ['id', 'vit_reward_trxid', 'description']}
                         )
 
-                        for reward in rewards_to_sync:
-                            vit_reward_trxid = reward.get('vit_reward_trxid')
-                            if vit_reward_trxid and reward.get('description') != vit_reward_trxid:
-                                self.target_client.call_odoo(
-                                    'object', 'execute_kw', self.target_client.db,
-                                    self.target_client.uid, self.target_client.password,
-                                    'loyalty.reward', 'write',
-                                    [[reward['id']], {'description': vit_reward_trxid}]
-                                )
-                                print(f"✓ Sinkronisasi description reward ID {reward['id']} -> {vit_reward_trxid}")
+                        for target_reward in target_rewards:
+                            vit_reward_trxid = target_reward.get('vit_reward_trxid')
+                            
+                            # Cari source reward yang matching berdasarkan vit_reward_trxid
+                            source_reward = next(
+                                (line for line in current_reward_lines 
+                                if line.get('vit_reward_trxid') == vit_reward_trxid or 
+                                line.get('description') == vit_reward_trxid),
+                                None
+                            )
+                            
+                            if source_reward:
+                                source_description = source_reward.get('description')
+                                target_description = target_reward.get('description')
+                                
+                                # Update hanya jika description berbeda
+                                if source_description and source_description != target_description:
+                                    self.target_client.call_odoo(
+                                        'object', 'execute_kw', self.target_client.db,
+                                        self.target_client.uid, self.target_client.password,
+                                        'loyalty.reward', 'write',
+                                        [[target_reward['id']], {'description': source_description}]
+                                    )
+                                    print(f"✓ Updated description reward ID {target_reward['id']}: '{target_description}' -> '{source_description}'")
                     except Exception as e:
-                        print(f"⚠ Gagal sinkronisasi description di loyalty.reward: {e}")
+                        print(f"⚠ Gagal update description di loyalty.reward: {e}")
+                    # === AKHIR UPDATE DESCRIPTION ===
 
                     # === UPDATE DEFAULT_CODE di discount_line_product_id target ===
                     if source_discount_product_codes:
@@ -2032,6 +2075,7 @@ class DataTransaksiMCtoSS:
                     print(f"✓ Updated vit_reward_trxid in source for program ID {record['id']}")
                     # === AKHIR UPDATE SOURCE ===
 
+                    # Check integration status
                     # Check integration status
                     if len(index_store_ids) == len(setting_config_ids):
                         self.source_client.call_odoo(
