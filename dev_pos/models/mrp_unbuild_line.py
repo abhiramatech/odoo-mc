@@ -6,12 +6,60 @@ class MrpProductInherit(models.Model):
 
     vit_trxid = fields.Char(string="Transaction ID", default=False)
     is_integrated = fields.Boolean(string="Integrated", default=False)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
+
+    def write(self, vals):
+        # Cek jika ada perubahan pada move_raw_ids dan status sudah done
+        if 'move_raw_ids' in vals and any(record.state == 'done' for record in self):
+            # Analisis operasi yang dilakukan pada move_raw_ids
+            move_operations = vals.get('move_raw_ids', [])
+            
+            for operation in move_operations:
+                # (0, 0, values) - CREATE new line
+                # (2, id, 0) - DELETE existing line
+                if operation[0] in (0, 2):
+                    raise UserError(_("Cannot add or delete raw material lines when manufacturing order is in Done state."))
+        
+        # Cek juga untuk move_finished_ids
+        if 'move_finished_ids' in vals and any(record.state == 'done' for record in self):
+            move_operations = vals.get('move_finished_ids', [])
+            
+            for operation in move_operations:
+                if operation[0] in (0, 2):
+                    raise UserError(_("Cannot add or delete finished product lines when manufacturing order is in Done state."))
+        
+        return super(MrpProductInherit, self).write(vals)
 
 class MrpBoMInherit(models.Model):
     _inherit = 'mrp.bom'
 
     id_mc = fields.Char(string="ID MC", default=False)
     is_integrated = fields.Boolean(string="Integrated", default=False)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
+
+    @api.model
+    def create(self, vals):
+        # Jika field 'code' belum diisi manual
+        if not vals.get('code'):
+            # Buat sequence otomatis, contoh format: BOM/2025/00001
+            sequence = self.env['ir.sequence'].next_by_code('mrp.bom.code') or '/'
+            vals['code'] = sequence
+
+        return super(MrpBoMInherit, self).create(vals)
+
+    def write(self, vals):
+        # Cek jika ada perubahan pada bom_line_ids dan BoM aktif
+        if 'bom_line_ids' in vals and any(record.active for record in self):
+            # Analisis operasi yang dilakukan pada bom_line_ids
+            line_operations = vals.get('bom_line_ids', [])
+            
+            for operation in line_operations:
+                # (0, 0, values) - CREATE new line
+                # (2, id, 0) - DELETE existing line
+                if operation[0] in (0, 2):
+                    raise UserError(_("Cannot add or delete BOM lines when Bill of Materials is active."))
+        
+        return super(MrpBoMInherit, self).write(vals)
 
 class MrpUnbuild(models.Model):
     _inherit = 'mrp.unbuild'
@@ -19,6 +67,20 @@ class MrpUnbuild(models.Model):
     unbuild_line_ids = fields.One2many('mrp.unbuild.line', 'unbuild_id', string='Unbuild Lines')
     vit_trxid = fields.Char(string="Transaction ID", default=False)
     is_integrated = fields.Boolean(string="Integrated", default=False)
+    index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
+
+    def write(self, vals):
+        # Cek jika ada perubahan pada unbuild_line_ids dan status sudah done
+        if 'unbuild_line_ids' in vals and any(record.state == 'done' for record in self):
+            line_operations = vals.get('unbuild_line_ids', [])
+            
+            for operation in line_operations:
+                # (0, 0, values) - CREATE new line
+                # (2, id, 0) - DELETE existing line
+                if operation[0] in (0, 2):
+                    raise UserError(_("Cannot add or delete unbuild lines when unbuild order is in Done state."))
+        
+        return super(MrpUnbuild, self).write(vals)
 
     def _generate_produce_moves(self):
         StockLocation = self.env['stock.location']
@@ -81,3 +143,42 @@ class MrpUnbuildLine(models.Model):
     location_id = fields.Many2one('stock.location', string='Location')
     product_uom_qty = fields.Float(string='To Consume')
     product_uom = fields.Many2one('uom.uom', string='Unit of Measure')
+
+    def write(self, vals):
+        # Cek jika unbuild order terkait sudah done
+        for record in self:
+            if record.unbuild_id and record.unbuild_id.state == 'done':
+                raise UserError(_("Cannot modify unbuild lines when unbuild order is in Done state."))
+        
+        return super(MrpUnbuildLine, self).write(vals)
+    
+    def unlink(self):
+        # Cek jika unbuild order terkait sudah done
+        for record in self:
+            if record.unbuild_id and record.unbuild_id.state == 'done':
+                raise UserError(_("Cannot delete unbuild lines when unbuild order is in Done state."))
+        
+        return super(MrpUnbuildLine, self).unlink()
+    
+class StockMove(models.Model):
+    _inherit = 'stock.move'
+
+    def write(self, vals):
+        # Cek jika manufacturing order terkait sudah done
+        for record in self:
+            if (record.raw_material_production_id and record.raw_material_production_id.state == 'done') or \
+               (record.production_id and record.production_id.state == 'done') or \
+               (record.unbuild_id and record.unbuild_id.state == 'done'):
+                raise UserError(_("Cannot modify stock moves linked to a done manufacturing or unbuild order."))
+        
+        return super(StockMove, self).write(vals)
+    
+    def unlink(self):
+        # Cek jika manufacturing order terkait sudah done
+        for record in self:
+            if (record.raw_material_production_id and record.raw_material_production_id.state == 'done') or \
+               (record.production_id and record.production_id.state == 'done') or \
+               (record.unbuild_id and record.unbuild_id.state == 'done'):
+                raise UserError(_("Cannot delete stock moves linked to a done manufacturing or unbuild order."))
+        
+        return super(StockMove, self).unlink()

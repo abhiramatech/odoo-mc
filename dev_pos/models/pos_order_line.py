@@ -10,3 +10,8 @@ class POSLineIntegration(models.Model):
     is_exchange = fields.Boolean(string='Is Exchange')
     user_id = fields.Many2one('hr.employee', string='Salesperson',
                               help="You can see salesperson here")
+
+class PosPaymentLine(models.Model):
+    _inherit = 'pos.payment'
+
+    is_integrated = fields.Boolean(string='Is Integrated')

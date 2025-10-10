@@ -9,6 +9,7 @@ class LoyaltyCardInherit(models.Model):
     is_updated = fields.Boolean(string="Updated", default=False, readonly=True, tracking=True)  
     index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
     vit_trxid = fields.Char(string="Transaction ID", default=False)
+    is_used = fields.Boolean(string="Used", default=False)
 
 
     def delete_card(self):

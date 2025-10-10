@@ -41,11 +41,12 @@ class LoyaltyRewardInherit(models.Model):
 
     @api.constrains('description')
     def _check_unique_description(self):
-        """Pastikan description tidak duplicate"""
+        """Pastikan description tidak duplicate jika diisi"""
         for record in self:
-            duplicate = self.search([
-                ('description', '=', record.description),
-                ('id', '!=', record.id)
-            ], limit=1)
-            if duplicate:
-                raise ValidationError("Description sudah digunakan oleh reward lain. Harap gunakan description yang berbeda.")
+            if record.description:  # hanya cek jika description tidak kosong
+                duplicate = self.search([
+                    ('description', '=', record.description),
+                    ('id', '!=', record.id)
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError("Description sudah digunakan oleh reward lain. Harap gunakan description yang berbeda.")

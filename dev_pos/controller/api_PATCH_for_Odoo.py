@@ -111,7 +111,6 @@ class MasterEmployeePATCH(http.Controller):
             _logger.error(f"Error updating employee: {str(e)}")
             return {'code': 500, 'status': 'failed', 'message': str(e)}
 
-
 class MasterCustomerPATCH(http.Controller):
     @http.route(['/api/master_customer'], type='json', auth='none', methods=['PATCH'], csrf=False)
     def update_master_customer(self, **kwargs):
@@ -261,6 +260,7 @@ class MasterItemPATCH(http.Controller):
                         if tax:
                             tax_command.append((4, tax.id))
                         else:
+                            # tetap lanjut jika tax tidak ada
                             errors.append({'product_code': product_code, 'message': f"Tax not found: {tax_name}"})
 
                     # supplier taxes
@@ -278,6 +278,24 @@ class MasterItemPATCH(http.Controller):
                         if not request.env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1):
                             errors.append({'product_code': product_code, 'message': f"POS Category not found: {categ_id}"})
 
+                    # ✅ UoM Handling — hanya isi jika valid
+                    uom_id = False
+                    if data.get('uom_id'):
+                        uom_record = request.env['uom.uom'].sudo().search([('id', '=', data.get('uom_id'))], limit=1)
+                        if uom_record:
+                            uom_id = uom_record.id
+                        else:
+                            errors.append({'product_code': product_code, 'message': f"UoM not found: {data.get('uom_id')}"})
+
+                    uom_po_id = False
+                    if data.get('uom_po_id'):
+                        uom_po_record = request.env['uom.uom'].sudo().search([('id', '=', data.get('uom_po_id'))], limit=1)
+                        if uom_po_record:
+                            uom_po_id = uom_po_record.id
+                        else:
+                            errors.append({'product_code': product_code, 'message': f"Purchase UoM not found: {data.get('uom_po_id')}"})
+
+                    # 🔹 Update data dict (skip UoM jika tidak valid)
                     update_data = {
                         'name': data.get('product_name'),
                         'list_price': data.get('sales_price'),
@@ -285,8 +303,6 @@ class MasterItemPATCH(http.Controller):
                         'detailed_type': data.get('product_type'),
                         'invoice_policy': data.get('invoice_policy'),
                         'standard_price': data.get('cost'),
-                        'uom_id': data.get('uom_id'),
-                        'uom_po_id': data.get('uom_po_id'),
                         'categ_id': name_categ.id if name_categ else False,
                         'pos_categ_ids': [(6, 0, pos_categ_ids)],
                         'taxes_id': tax_command,
@@ -297,13 +313,29 @@ class MasterItemPATCH(http.Controller):
                         'vit_sub_div': data.get('vit_sub_div'),
                         'vit_item_kel': data.get('vit_item_kel'),
                         'vit_item_type': data.get('vit_item_type'),
-                        'vit_item_brand': data.get('vit_item_brand'),
-                        'brand': data.get('brand')
+                        'brand': data.get('vit_item_brand') or data.get('brand'),
                     }
+
+                    if uom_id:
+                        update_data['uom_id'] = uom_id
+                    if uom_po_id:
+                        update_data['uom_po_id'] = uom_po_id
                     if data.get('active') is not None:
                         update_data['active'] = data.get('active')
 
-                    master_item.sudo().write(update_data)
+                    # ✅ Gunakan try-except agar UoM write error tidak hentikan patch
+                    try:
+                        master_item.sudo().write(update_data)
+                    except Exception as e:
+                        msg = str(e)
+                        if "You cannot change the unit of measure" in msg:
+                            errors.append({'product_code': product_code, 'message': "Skipped UoM update due to existing stock moves"})
+                            # tulis ulang tanpa uom_id & uom_po_id
+                            update_data.pop('uom_id', None)
+                            update_data.pop('uom_po_id', None)
+                            master_item.sudo().write(update_data)
+                        else:
+                            raise
 
                     updated.append({
                         'id': master_item.id,
@@ -328,6 +360,7 @@ class MasterItemPATCH(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in PATCH /api/master_item")
             return {'code': 500, 'status': 'error', 'message': str(e)}
+
 
 
 class MasterPricelistPATCH(http.Controller):
@@ -960,14 +993,16 @@ class PaymentPATCH(http.Controller):
     def _update_payment(return_id, operation_name):
         try:
             # Get configuration
-            config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
             if not config:
                 return {
                     'status': "Failed",
                     'code': 500,
                     'message': "Configuration not found.",
                 }
-            
+
             username = config.vit_config_username
             password = config.vit_config_password_api
 
@@ -994,19 +1029,20 @@ class PaymentPATCH(http.Controller):
                     'id': return_id
                 }
 
-            payment = env['account.move'].sudo().search([
-                ('id', '=', return_id),
-                ('move_type', '=', 'entry')
+            # 🔹 Cari payment di pos.payment, bukan account.move lagi
+            payment = env['pos.payment'].sudo().search([
+                ('id', '=', return_id)
             ], limit=1)
 
             if not payment.exists():
                 return {
                     'code': 404,
                     'status': 'error',
-                    'message': f'{operation_name} not found',
+                    'message': f'{operation_name} not found in pos.payment',
                     'id': return_id
                 }
 
+            # 🔹 Update field is_integrated
             payment.write({
                 'is_integrated': is_integrated,
                 'write_uid': uid
@@ -1027,6 +1063,7 @@ class PaymentPATCH(http.Controller):
                 'message': str(e),
                 'id': return_id
             }
+
 
 class PurchaseOrderPATCH(http.Controller):
     @http.route(['/api/purchase_order/<int:return_id>'], type='json', auth='none', methods=['PATCH'], csrf=False)

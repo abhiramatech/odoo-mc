@@ -84,6 +84,8 @@ class PrintBarcode(models.Model):
     ukuran_font_kode = fields.Float(string="Ukuran Font Kode", default=6.0)
     ukuran_font_nama = fields.Float(string="Ukuran Font Nama", default=6.0)
     ukuran_font_harga = fields.Float(string="Ukuran Font Harga", default=8.0)
+    lebar_barcode_percent = fields.Float(string="Lebar Barcode (%)", default=80.0, help="Persentase lebar barcode dari lebar label (10-100%)")  # TAMBAHKAN INI
+    lebar_barcode = fields.Float(string="Lebar Barcode (mm)", default=24.0, help="Lebar barcode dalam milimeter")  # TAMBAHKAN INI
     posisi_barcode = fields.Float(string="Posisi Barcode", default=12.0)
     posisi_kode = fields.Float(string="Posisi Kode", default=3.0)
     tinggi_kode = fields.Float(string="Tinggi Kode", default=8.0)
@@ -647,17 +649,6 @@ class PrintBarcode(models.Model):
                     continue
         
         return font_name
-    
-    def _draw_single_label(self, canvas_obj, product, x_pos, y_pos, font_name):
-        """Draw a single label at specified position"""
-        # Get product line for pricing info
-        product_line = self.env['print.barcode.product.line'].search([
-            ('barcode_id', '=', self.id),
-            ('product_id', '=', product.id)
-        ], limit=1)
-        
-        label_width = self.single_label_width * mm
-        label_height = self.single_label_height * mm
         
     def _draw_single_label(self, canvas_obj, product, x_pos, y_pos, font_name):
         """Draw a single label at specified position"""
@@ -669,9 +660,6 @@ class PrintBarcode(models.Model):
         
         label_width = self.single_label_width * mm
         label_height = self.single_label_height * mm
-        
-        # Draw border (optional - can be controlled by a field)
-        # canvas_obj.rect(x_pos, y_pos, label_width, label_height)
         
         # Calculate center positions
         center_x = x_pos + (label_width / 2)
@@ -684,9 +672,9 @@ class PrintBarcode(models.Model):
         
         # Draw Barcode (center)
         if product.barcode:
-            # Calculate barcode width based on label dimensions (no hardcode reference to lebar_kolom)
-            barcode_width = label_width * 0.8  # 80% of label width
-            barcode_height = self.ukuran_font_barcode * mm * 0.6  # Smaller barcode for strip labels
+            # Use configured barcode width (in mm)
+            barcode_width = self.lebar_barcode * mm
+            barcode_height = self.ukuran_font_barcode * mm * 0.6
             
             barcode = self._create_barcode_drawing(
                 product.barcode.strip(),
@@ -694,20 +682,21 @@ class PrintBarcode(models.Model):
                 height=barcode_height
             )
             
+            # Barcode position dari bawah
             barcode_x = x_pos + (label_width - barcode_width) / 2
-            barcode_y = y_pos + (label_height / 2) - (barcode_height / 2)
+            barcode_y = y_pos + (self.posisi_barcode * mm)
             barcode.drawOn(canvas_obj, barcode_x, barcode_y)
             
-            # Draw Barcode Number (below barcode)
+            # ✅ PERBAIKAN: Draw Barcode Number - posisi INDEPENDEN dari bawah label
             canvas_obj.setFont(font_name, self.ukuran_font_kode)
-            code_y = barcode_y - (self.posisi_kode * mm)
+            code_y = y_pos + (self.posisi_kode * mm)  # UBAH INI - langsung dari bawah
             canvas_obj.drawCentredString(center_x, code_y, product.barcode)
         
         # Draw Price (bottom)
         if product_line and product_line.harga_jual:
             canvas_obj.setFont(font_name, self.ukuran_font_harga)
             price_text = f"Rp {product_line.harga_jual:,.0f}"
-            price_y = y_pos + (self.posisi_harga * mm * 0.3)  # Adjust position for strip labels
+            price_y = y_pos + (self.posisi_harga * mm * 0.3)
             canvas_obj.drawCentredString(center_x, price_y, price_text)
 
     def action_open_pdf(self):

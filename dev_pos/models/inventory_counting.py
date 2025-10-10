@@ -28,6 +28,18 @@ class InventoryStock(models.Model):
 
     # inventory_count = fields.Integer(string='Count', compute='_compute_stock_count')
 
+    def action_closed(self):
+        """Ubah status menjadi closed, data tidak bisa diubah lagi"""
+        for record in self:
+            if record.state != 'counted':
+                raise ValidationError("Hanya inventory dengan status 'Counted' yang bisa di-closed.")
+            
+            record.state = 'closed'
+            for line in record.inventory_counting_ids:
+                line.state = 'closed'
+        
+        return True
+
     @api.model
     def default_get(self, fields_list):
         """Override default_get to automatically populate certain fields when creating a new record."""
