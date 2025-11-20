@@ -88,3 +88,10 @@ class ResPartner(models.Model):
                 partner.message_post(body=message, subject="Partner Information Updated")
         
         return super(ResPartner, self).write(vals)
+
+class MasterCustomerGroup(models.Model):
+    _inherit = 'customer.group'
+    _description = "Master Customer Group"
+
+    vit_group_name = fields.Char(string="Group", tracking=True)
+    vit_pricelist_id = fields.Many2one('product.pricelist', string="Pricelist", tracking=True)
