@@ -10,6 +10,7 @@ class ResPartner(models.Model):
     customer_code = fields.Char(string='Customer Code', tracking=True)
     is_integrated = fields.Boolean(string="Integrated", default=False, readonly=True, tracking=True)
     index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
+    vit_customer_group = fields.Many2one('customer.group', string="Customer Group", tracking=True)
 
     def write(self, vals):
         # Log perubahan untuk field tertentu ke chatter

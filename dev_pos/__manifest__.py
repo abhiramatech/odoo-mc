@@ -64,6 +64,7 @@
         'views/mrp_unbuild_line_view.xml',
         'views/pos_timbangan_views.xml',
         'views/report_stock_view.xml',
+        'views/customer_group_view.xml',
         # 'reports/sales_report_view.xml',
         # 'reports/sales_report_menu_view.xml',
         # 'reports/report_layout_templates.xml',
