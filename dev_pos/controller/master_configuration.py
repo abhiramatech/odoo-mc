@@ -532,7 +532,7 @@ class SettingConfig(models.Model):
         for ss_client in ss_clients:
             integrator_master = DataIntegrator(mc_client, ss_client)
             integrator_master.transfer_data('res.partner.title', ['name', 'shortcut', 'create_date', 'write_date'], 'Master Customer Title', date_from, date_to)
-            integrator_master.transfer_data('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
+            integrator_master.transfer_data('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'vit_customer_group', 'property_product_pricelist', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
 
     def create_master_customers_from_ss_to_mc(self, mc, ss, datefrom, dateto):
         if mc and ss:
