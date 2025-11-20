@@ -403,5 +403,126 @@
       </t>
   </template>
 
+    <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
+    <t t-set="o_portal_fullwidth_alert">
+      <!-- Uses backend_url provided in rendering values -->
+      <t t-call="report_pos.portal_back_in_edit_mode"/>
+    </t>
+    <t t-call="portal.portal_layout">
+      <t t-set="no_breadcrumbs" t-value="1"/>
+        <div class="o_portal_my_doc_table table-responsive">
+          <!-- <div class="o_download_pdf d-flex flex-lg-column flex-xl-row flex-wrap gap-2">
+            <a t-att-href="'/my/sales/report/detail/pdf?date_from=%s&amp;date_to=%s' % (date_from, date_to)"
+              class="btn btn-primary mb-3">
+              <i class="fa fa-download"/> Download PDF
+            </a>
+          </div> -->
+
+          <div class="o_portal_content table-responsive border-0 d-flex justify-content-center my-3 ">
+            <div class="o_portal_html_view position-relative bg-white shadow overflow-hidden">
+              <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+              <h5 class="text-center">Laporan Penjualan</h5>
+              <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+
+              <table class="table table-bordered table-sm">
+                  <thead class="table-secondary">
+                      <tr>
+                          <th>User</th>
+                          <th>Kasir</th>
+                          <th>Tanggal</th>
+                          <th>Kategori</th>
+                          <th>Kode Store</th>
+                          <th>Nama Store</th>
+                          <th>Payment Method</th>
+                          <th>Amount</th>
+                          <th>Expected Amount</th>
+                          <th>Amount Difference</th>
+                          <th>Shift Number</th>
+                          <th>Session</th>
+                      </tr>
+                  </thead>
+
+                  <tbody>
+                      <t t-foreach="end_shift" t-as="shift">
+                          <t t-if="shift.line_ids">
+                              <t t-foreach="shift.line_ids" t-as="line">
+                                  <tr>
+                                      <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
+                                      <td><t t-esc="shift.cashier_id.name or ''"/></td>
+
+                                      <!-- Tanggal Payment -->
+                                      <td>
+                                          <t t-if="line.payment_date">
+                                              <t t-esc="line.payment_date.strftime('%d/%m/%Y %H:%M:%S')"/>
+                                          </t>
+                                      </td>
+
+                                      <!-- Kategori -->
+                                      <td>
+                                          END OF SHIFT (
+                                          <t t-esc="shift.start_date"/> - <t t-esc="shift.end_date"/>
+                                          ) - <t t-esc="shift.cashier_id.name"/>
+                                          - <t t-esc="shift.session_id.config_id.name"/>
+                                      </td>
+
+                                      <!-- Kode Store -->
+                                      <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+
+                                      <!-- Nama Store -->
+                                      <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+
+                                      <!-- Payment Method -->
+                                      <td><t t-esc="line.payment_method_id.name or ''"/></td>
+
+                                      <!-- Amount -->
+                                      <td><t t-esc="line.amount or ''"/></td>
+
+                                      <!-- Expected Amount -->
+                                      <td><t t-esc="line.expected_amount or ''"/></td>
+
+                                      <!-- Amount Difference -->
+                                      <td><t t-esc="line.amount_difference or ''"/></td>
+
+                                      <!-- Shift Number -->
+                                      <td><t t-esc="shift.doc_num or ''"/></td>
+
+                                      <!-- Session -->
+                                      <td><t t-esc="shift.session_id.name or ''"/></td>
+                                  </tr>
+                              </t>
+                          </t>
+
+                          <!-- Jika tidak ada line_ids -->
+                          <t t-if="not shift.line_ids">
+                              <tr>
+                                  <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
+                                  <td><t t-esc="shift.cashier_id.name or ''"/></td>
+                                  <td></td>
+                                  <td>
+                                      END OF SHIFT (
+                                      <t t-esc="shift.start_date"/> - <t t-esc="shift.end_date"/>
+                                      ) - <t t-esc="shift.cashier_id.name"/>
+                                      - <t t-esc="shift.session_id.config_id.name"/>
+                                  </td>
+                                  <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                                  <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                                  <td></td>
+                                  <td></td>
+                                  <td></td>
+                                  <td></td>
+                                  <td><t t-esc="shift.doc_num or ''"/></td>
+                                  <td><t t-esc="shift.session_id.name or ''"/></td>
+                              </tr>
+                          </t>
+                      </t>
+                  </tbody>
+              </table>
+
+            </div>
+          </div>  
+        </div> 
+    </t>
+  </template>  
+
 
 </odoo>

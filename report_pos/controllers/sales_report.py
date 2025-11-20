@@ -517,3 +517,30 @@ class SalesReportDetailController(http.Controller):
             ('Content-Disposition', 'attachment; filename="contribution_report.pdf"')
         ]
         return request.make_response(pdf, headers=pdfhttpheaders)
+    
+    @http.route('/my/sales/report/settlement_end_of_shift', type='http', auth='user', website=True)
+    def portal_sales_report_settlement_end_of_shift(self, **kw):
+        date_from = kw.get('date_from')
+        date_to = kw.get('date_to')
+
+        # Validasi parameter wajib
+        if not date_from or not date_to:
+            return request.not_found()
+        
+        domain = []
+        if date_from:
+            domain.append(('date_order', '>=', date_from))
+        if date_to:
+            domain.append(('date_order', '<=', date_to))
+            
+        end_shift = request.env['end.shift'].sudo().search(domain, order='id desc')
+
+        values = {
+            'orders': end_shift,
+            'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
+            'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
+            'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
+            'backend_url': self.back_to_pos_view(),
+            'format_number': self.format_number,  # tambahkan ini
+        }
+        return request.render('report_pos.report_sales_settlement_end_of_shift', values)

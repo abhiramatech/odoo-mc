@@ -116,3 +116,15 @@ class SalesReportDetailPreview(models.TransientModel):
             'target': 'self',
             'url': url,
         }
+    
+    def action_preview_report_settlement_end_of_shift(self):
+        self.ensure_one()
+        if not self.vit_date_from or not self.vit_date_to:
+            raise UserError("Tidak dapat menampilkan report. Mohon pilih Date From dan Date To")
+        
+        url = f"/my/sales/report/settlement_end_of_shift?date_from={self.vit_date_from}&date_to={self.vit_date_to}"
+        return {
+            'type': 'ir.actions.act_url',
+            'target': 'self',
+            'url': url,
+        }
