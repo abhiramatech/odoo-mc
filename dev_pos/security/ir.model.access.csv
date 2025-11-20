@@ -25,5 +25,4 @@ access_export_timbangan_line,acces_export.timbangan.line,model_export_timbangan_
 access_export_wizard,export.timbangan.wizard,model_export_timbangan_wizard,,1,1,1,1
 access_loyalty_history,access_loyalty.history,model_loyalty_history,base.group_user,1,1,1,1
 access_balance_stock,access_balance.stock,model_balance_stock,base.group_user,1,1,1,1
-access_customer_group,access_customer.group,model_customer_group,base.group_user,1,1,1,1
 access_wizard_generate_stock_ledger,access_wizard.generate.stock.ledger,model_wizard_generate_stock_ledger,base.group_user,1,1,1,1
