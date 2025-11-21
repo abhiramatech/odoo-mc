@@ -12,6 +12,125 @@ class DataTransaksiMCtoSS:
         self.set_log_mc = SetLogMC(self.source_client)
         self.set_log_ss = SetLogSS(self.target_client)
 
+    def transfer_customer_group(self, model_name, fields, description, date_from, date_to):
+        # Ambil data dari sumber
+        transaksi_customer_group = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                        self.source_client.uid, self.source_client.password,
+                                                        model_name, 'search_read',
+                                                        [[]],
+                                                        {'fields': fields})
+        
+        if not transaksi_customer_group:
+            print("Tidak ada master yang ditemukan untuk ditransfer.")
+            return
+        
+        pricelist_ids = [record.get('vit_pricelist_id')[0] if isinstance(record.get('vit_pricelist_id'), list) else record.get('vit_pricelist_id') for record in transaksi_customer_group]
+
+        pricelist_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                        self.target_client.uid, self.target_client.password,
+                                                        'product.pricelist', 'search_read',
+                                                        [[['id_mc', 'in', str(pricelist_ids)]]],
+                                                        {'fields': ['id', 'name']})
+        
+        pricelist_id_dict = {record['id']: record['id'] for record in pricelist_id}
+
+        # Kirim data ke target
+        for record in transaksi_customer_group:
+            customer_group_name = record.get('vit_group_name', False)
+            
+            existing_customer_group = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                            self.source_client.uid, self.source_client.password,
+                                                                            'customer.group', 'search_read',
+                                                                            [[['vit_group_name', '=', customer_group_name]]],
+                                                                            {'fields': ['id'], 'limit': 1})
+            if not existing_customer_group:
+                existing_groups = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                                self.source_client.uid, self.source_client.password,
+                                                                                'customer.group', 'search_read',
+                                                                                [[['name', '=', customer_group_name]]],
+                                                                                {'fields': ['id'], 'limit': 1})
+                if existing_groups:
+                    print(f"Customer Groups dengan nama {customer_group_name} sudah ada di master customer group.")
+                    continue
+
+                pricelist_id = pricelist_id_dict.get(record.get('vit_pricelist_id')[0] if isinstance(record.get('vit_pricelist_id'), list) else record.get('vit_pricelist_id'), False)
+
+                customer_group_data = {
+                    'vit_group_name': customer_group_name,
+                    'vit_pricelist_id': int(pricelist_id) if pricelist_id else False,
+                }
+                
+                write_date = self.get_write_date(model_name, record['id'])
+                
+                try:
+                    start_time = time.time()
+                    new_customer_group = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                        self.target_client.uid, self.target_client.password,
+                                                                        'customer.group', 'create',
+                                                                        [customer_group_data])
+                    print(f"Customer Group telah dibuat dengan ID: {new_customer_group}")
+
+                    end_time = time.time()
+                    duration = end_time - start_time
+
+                    self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Customer Group', write_date)
+                    self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Customer Group', write_date)
+                    
+                    # Update is_integrated dan index_store di target_client (source)
+                    try:
+                        index_store_ids = record.get('index_store', [])
+                        
+                        # Ambil setting config yang aktif untuk target integrasi
+                        setting_config_ids = self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'setting.config', 'search_read',
+                            [[['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                            {'fields': ['id']}
+                        )
+                        setting_config_ids = [config['id'] for config in setting_config_ids]
+
+                        # Update index_store dengan setting config IDs yang aktif
+                        self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'customer.group', 'write',
+                            [[record['id']], {
+                                'index_store': [(4, setting_config_ids[0])] if setting_config_ids else [(5, 0, 0)]
+                            }]
+                        )
+                        print(f"📌 Field index_store diperbarui untuk Customer Group ID {record['id']}.")
+
+                        # Periksa apakah semua setting config sudah tercakup di index_store
+                        if len(index_store_ids) + 1 >= len(setting_config_ids):
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'customer.group', 'write',
+                                [[record['id']], {
+                                    'is_integrated': True,
+                                    'index_store': [(5, 0, 0)]  # clear
+                                }]
+                            )
+                            print(f"✅ Customer Group ID {record['id']} telah diintegrasi ke semua target.")
+                        else:
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'customer.group', 'write',
+                                [[record['id']], {
+                                    'is_integrated': False
+                                }]
+                            )
+                            print(f"⌛ Customer Group ID {record['id']} belum terintegrasi ke semua target.")
+                    except Exception as e:
+                        print(f"⚠️ Gagal update index_store/is_integrated untuk Customer Group {record['id']}: {e}")
+                        
+                except Exception as e:
+                    message_exception = f"An error occurred while creating customer group: {e}"
+                    self.set_log_mc.create_log_note_failed(record, 'Customer Group', message_exception, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Customer Group', message_exception, write_date)
+
     def transfer_bom_master(self, model_name, fields, description, date_from, date_to):
         try:
             # Step 1: Fetch BoM master from source
@@ -3728,22 +3847,22 @@ class DataTransaksiMCtoSS:
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'res.partner', 'search_read',
                                                                 [[['id_mc', 'in', partner_ids]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
+                                                                {'fields': ['id', 'id_mc']})
             partner_source_dict = {partner['id_mc']: partner['id'] for partner in partner_source}
 
             currency_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'res.currency', 'search_read',
                                                                 [[['id_mc', 'in', currency_ids]]],
-                                                                {'fields': ['id', 'id_mc'] , 'limit': 1})
-            currency_source_dict = {currency['id']: currency['id'] for currency in currency_source}
+                                                                {'fields': ['id', 'id_mc']})
+            currency_source_dict = {currency['id_mc']: currency['id'] for currency in currency_source}
 
             picking_type_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
                                                                     'stock.picking.type', 'search_read',
                                                                     [[['id_mc', 'in', picking_type_ids]]],
-                                                                    {'fields': ['name', 'id_mc', 'default_location_dest_id'] , 'limit': 1})
-            picking_type_source_dict = {type['id_mc']: type['id'] for type in picking_type_source} 
+                                                                    {'fields': ['name', 'id_mc', 'default_location_dest_id']})
+            picking_type_source_dict = {type['id_mc']: type['id'] for type in picking_type_source}
 
             order_ids = [record['id'] for record in purchase_order]
 
@@ -3777,38 +3896,32 @@ class DataTransaksiMCtoSS:
                                                         'uom.uom', 'search_read',
                                                         [[['id_mc', 'in', product_uom_ids]]],
                                                         {'fields': ['id', 'id_mc']})
-            product_uom_source_dict = {uom['id']: uom['id'] for uom in product_uom_source}
+            product_uom_source_dict = {uom['id_mc']: uom['id'] for uom in product_uom_source}
 
-            # Pre-fetch product and tax data
             product_ids = [line['product_id'][0] for line in purchase_order_lines if line.get('product_id')]
-            # Step 1: Fetch product.product data from source_client using product_ids
             product_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                             self.source_client.uid, self.source_client.password,
                                                             'product.product', 'search_read',
                                                             [[['id', 'in', product_ids]]],
                                                             {'fields': ['id', 'product_tmpl_id', 'default_code']})
             print(product_source)
-            # Step 2: Create a dictionary to map product_id to default_code
-            # Hapus pemakaian product_tmpl_id, langsung pakai default_code → product_id
+
             product_source_dict = {
                 product['id']: product['default_code']
                 for product in product_source if 'default_code' in product
             }
             source_default_codes = list(set(product_source_dict.values()))
 
-            # Step 3: Create a mapping from default_code to product_tmpl_id
             default_code_to_product_tmpl_id = {product['default_code']: product['product_tmpl_id'] for product in product_source if 'default_code' in product}
 
             default_codes = list(default_code_to_product_tmpl_id.keys())
-            # Step 4: Fetch product.template data from target_client using default_code
-            # Step 4 (baru): Fetch product.product dari target_client berdasarkan default_code
+
             product_target_source = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                 self.target_client.uid, self.target_client.password,
                                                                 'product.product', 'search_read',
                                                                 [[['default_code', 'in', list(default_code_to_product_tmpl_id.keys())]]],
                                                                 {'fields': ['id', 'default_code']})
 
-            # Step 5 (baru): Mapping dari default_code ke product.product.id
             default_code_to_target_product_id = {
                 product['default_code']: product['id']
                 for product in product_target_source
@@ -3818,19 +3931,15 @@ class DataTransaksiMCtoSS:
             for line in purchase_order_lines:
                 all_tax_ids.update(line.get('taxes_id', []))
 
-            # Create a mapping for tax IDs from source to target
             tax_id_mapping = {}
             for tax_id in all_tax_ids:
-                # Fetch the tax from source_client
                 tax_source = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                         self.source_client.uid, self.source_client.password,
                                                         'account.tax', 'search_read',
                                                         [[['id', '=', tax_id]]],
                                                         {'fields': ['id']})
                 if tax_source:
-                    # Get the id_mc from source_client
                     tax_id_mc = tax_source[0]['id']
-                    # Now fetch the corresponding id from target_client
                     tax_target = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                             self.target_client.uid, self.target_client.password,
                                                             'account.tax', 'search_read',
@@ -3842,6 +3951,7 @@ class DataTransaksiMCtoSS:
             def process_purchase_order_record(record):
                 if record['id'] in existing_purchase_order_dict:
                     return
+                
                 purchase_order_lines = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
                                                                         self.source_client.uid, self.source_client.password,
                                                                         'purchase.order.line', 'search_read',
@@ -3850,23 +3960,20 @@ class DataTransaksiMCtoSS:
                 
                 partner_id = partner_source_dict.get(str(record.get('partner_id')[0]) if isinstance(record.get('partner_id'), list) else str(record.get('partner_id')))
                 picking_type_id = picking_type_source_dict.get(str(record.get('picking_type_id')[0]) if isinstance(record.get('picking_type_id'), list) else str(record.get('picking_type_id')))
-                
+                currency_id = currency_source_dict.get(str(record.get('currency_id')[0]) if isinstance(record.get('currency_id'), list) else str(record.get('currency_id')))
+
                 purchase_order_line_ids = []
                 missing_products = []
                 should_skip_create = False
-                total_tax = 0  # Initialize total tax
 
-                # Check if all products exist in the target database
                 for line in purchase_order_lines:
                     source_product_code = product_source_dict.get(line.get('product_id')[0])
-
-                    # Step 7: Get the target product ID using the default_code mapping
                     target_product_id = default_code_to_target_product_id.get(source_product_code)
 
                     if not target_product_id:
                         missing_products.append(source_product_code)
                         should_skip_create = True
-                        continue  # Append missing product name
+                        continue
 
                     tax_ids = line.get('taxes_id', [])
                     target_tax_ids = [tax_id_mapping.get(tax_id) for tax_id in tax_ids if tax_id in tax_id_mapping]
@@ -3876,13 +3983,11 @@ class DataTransaksiMCtoSS:
                         'product_qty': line.get('product_qty'),
                         'qty_received': line.get('qty_received'),
                         'qty_invoiced': line.get('qty_invoiced'),
-                        # 'product_uom': product_uom,
                         'price_unit': line.get('price_unit'),
                         'taxes_id': [(6, 0, target_tax_ids)]
                     }
                     purchase_order_line_ids.append((0, 0, purchase_order_line_data))
 
-                # Check for missing products after processing all lines
                 if should_skip_create:
                     missing_products_str = ", ".join(missing_products)
                     message = f"Terdapat produk tidak aktif dalam invoice: {missing_products_str}"
@@ -3903,77 +4008,144 @@ class DataTransaksiMCtoSS:
                     'order_line': purchase_order_line_ids
                 }
 
-                # print(f"Purchase Order Data: {purchase_order_data}")
                 try:
                     start_time = time.time()
+
+                    # =============================================
+                    # STEP 1: CREATE & CONFIRM PURCHASE ORDER
+                    # =============================================
                     new_purchase_order_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
                                                                     'purchase.order', 'create',
                                                                     [purchase_order_data])
-
                     print(f"Purchase Order baru telah dibuat dengan ID: {new_purchase_order_id}")
 
                     self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                 self.target_client.uid, self.target_client.password,
                                                 'purchase.order', 'button_confirm',
                                                 [[new_purchase_order_id]])
-                    print(f"Tombol button_confirm telah dijalankan untuk PO ID: {new_purchase_order_id}")
+                    print(f"button_confirm dijalankan untuk PO ID: {new_purchase_order_id}")
 
+                    # =============================================
+                    # STEP 2: PROCESS RECEIPT (stock.picking)
+                    # =============================================
                     self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                 self.target_client.uid, self.target_client.password,
                                                 'purchase.order', 'action_view_picking',
                                                 [[new_purchase_order_id]])
-                    print(f"Tombol receive telah dijalankan untuk PO ID: {new_purchase_order_id}")
+                    print(f"action_view_picking dijalankan untuk PO ID: {new_purchase_order_id}")
 
                     picking_ids = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                             self.target_client.uid, self.target_client.password,
                                             'stock.picking', 'search_read',
-                                            [[['purchase_id', '=', [new_purchase_order_id]]]],
+                                            [[['purchase_id', '=', new_purchase_order_id]]],
                                             {'fields': ['id', 'move_ids_without_package']})
-                    
-                    purchase_order_data = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+
+                    purchase_order_read = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                         self.target_client.uid, self.target_client.password,
                                                         'purchase.order', 'read',
                                                         [[new_purchase_order_id]], {'fields': ['name', 'vit_trxid']})
-                    
-                    purchase_order_name = purchase_order_data[0]['name']
 
-                    for picking in picking_ids:    
+                    purchase_order_name = purchase_order_read[0]['name']
+
+                    for picking in picking_ids:
                         self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                             self.target_client.uid, self.target_client.password,
                                                             'stock.picking', 'write',
-                                                            [[picking['id']], {'origin': purchase_order_name, 'vit_trxid': record.get('vit_trxid'), 'is_integrated': True}])                    
+                                                            [[picking['id']], {
+                                                                'origin': purchase_order_name,
+                                                                'vit_trxid': record.get('vit_trxid'),
+                                                                'is_integrated': True
+                                                            }])
+
                         for move_id in picking['move_ids_without_package']:
-                            # Baca stock.move untuk mendapatkan quantity
                             move_data = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                                     self.target_client.uid, self.target_client.password,
                                                                     'stock.move', 'read',
                                                                     [[move_id]], {'fields': ['product_uom_qty']})
-
                             if move_data:
                                 quantity_done = move_data[0]['product_uom_qty']
-                                
-                                # Update product_uom_qty dengan quantity_done
                                 self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
                                                             self.target_client.uid, self.target_client.password,
                                                             'stock.move', 'write',
-                                                            [[move_id], {'quantity': quantity_done, 'origin': purchase_order_name}])
-                    
+                                                            [[move_id], {
+                                                                'quantity': quantity_done,
+                                                                'origin': purchase_order_name
+                                                            }])
+
+                        # Validate the picking (done receipt)
+                        self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                    self.target_client.uid, self.target_client.password,
+                                                    'stock.picking', 'button_validate',
+                                                    [[picking['id']]])
+                        print(f"Receipt ID {picking['id']} telah divalidasi.")
+
+                    # =============================================
+                    # STEP 3: CREATE VENDOR BILL (account.move)
+                    # =============================================
+                    # Trigger Odoo's native "Create Bill" action
+                    self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                self.target_client.uid, self.target_client.password,
+                                                'purchase.order', 'action_create_invoice',
+                                                [[new_purchase_order_id]])
+                    print(f"action_create_invoice dijalankan untuk PO ID: {new_purchase_order_id}")
+
+                    # Fetch the created vendor bill
+                    vendor_bill = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                self.target_client.uid, self.target_client.password,
+                                                                'account.move', 'search_read',
+                                                                [[['purchase_id', '=', new_purchase_order_id],
+                                                                  ['move_type', '=', 'in_invoice']]],
+                                                                {'fields': ['id', 'name'], 'limit': 1})
+
+                    if vendor_bill:
+                        vendor_bill_id = vendor_bill[0]['id']
+                        vendor_bill_name = vendor_bill[0]['name']
+                        print(f"Vendor Bill ditemukan: ID={vendor_bill_id}, Name={vendor_bill_name}")
+
+                        # Update vendor bill: set vit_trxid, is_integrated, currency_id
+                        bill_write_data = {
+                            'vit_trxid': record.get('vit_trxid'),
+                            'is_integrated': True,
+                        }
+                        if currency_id:
+                            bill_write_data['currency_id'] = int(currency_id)
+
+                        self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                    self.target_client.uid, self.target_client.password,
+                                                    'account.move', 'write',
+                                                    [[vendor_bill_id], bill_write_data])
+
+                        # Post (confirm) the vendor bill
+                        self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                    self.target_client.uid, self.target_client.password,
+                                                    'account.move', 'action_post',
+                                                    [[vendor_bill_id]])
+                        print(f"Vendor Bill ID {vendor_bill_id} telah diposting.")
+                    else:
+                        print(f"Vendor Bill tidak ditemukan untuk PO ID: {new_purchase_order_id}")
+
+                    # =============================================
+                    # STEP 4: MARK SOURCE AS INTEGRATED
+                    # =============================================
                     self.source_client.call_odoo(
                             'object', 'execute_kw', self.source_client.db,
                             self.source_client.uid, self.source_client.password,
                             'purchase.order', 'write',
                             [[record['id']], {'is_integrated': True}]
                     )
-                    
+
                     end_time = time.time()
                     duration = end_time - start_time
 
                     write_date = self.get_write_date(model_name, record['id'])
                     self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Purchase Order', write_date)
                     self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Purchase Order', write_date)
+
                 except Exception as e:
-                    message_exception = f"Terjadi kesalahan saat membuat invoice: {e}"
+                    write_date = self.get_write_date(model_name, record['id'])
+                    message_exception = f"Terjadi kesalahan saat memproses Purchase Order: {e}"
+                    print(message_exception)
                     self.set_log_ss.create_log_note_failed(record, 'Purchase Order', message_exception, write_date)
                     self.set_log_mc.create_log_note_failed(record, 'Purchase Order', message_exception, write_date)
 
@@ -3982,7 +4154,7 @@ class DataTransaksiMCtoSS:
                 concurrent.futures.wait(futures)
 
         except Exception as e:
-                print(f"Gagal membuat atau memposting Purchase Order di Source baru: {e}")
+            print(f"Gagal membuat atau memposting Purchase Order di Source baru: {e}")
 
     def payment_method_from_mc(self, model_name, fields, description, date_from, date_to):
         try:

@@ -20,49 +20,7 @@
             <field name="vit_is_discount"/>
             <field name="index_store" widget="many2many_tags"/>
         </xpath>
-        
-        <!-- Field-field utama yang readonly -->
-        <field name="categ_id" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="standard_price" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="sale_ok" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="purchase_ok" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="taxes_id" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="detailed_type" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="invoice_policy" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="uom_id" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        <field name="uom_po_id" position="attributes">
-          <attribute name="readonly">1</attribute>
-        </field>
-        
-        <!-- Field yang bisa diubah dan log ke chatter -->
-        <field name="list_price" position="attributes">
-          <attribute name="force_save">1</attribute>
-        </field>
-        <field name="product_tag_ids" position="attributes">
-          <attribute name="force_save">1</attribute>
-        </field>
-        <field name="brand" position="attributes">
-          <attribute name="force_save">1</attribute>
-        </field>
-        <field name="vit_is_discount" position="attributes">
-          <attribute name="force_save">1</attribute>
-        </field>
+      
         <field name="index_store" position="attributes">
           <attribute name="force_save">1</attribute>
         </field>
