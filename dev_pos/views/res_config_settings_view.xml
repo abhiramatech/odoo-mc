@@ -1,0 +1,49 @@
+<odoo>
+    <record id="pos_manager_validation_res_config_settings" model="ir.ui.view">
+        <field name="name">pos.manager.validation.res.config.settings.view.form</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <app data-string="Point of sale" string="Point of Sale" name="point_of_sale" groups="point_of_sale.group_pos_manager">
+                <block title="Pricelist Configuration" id="pos_pricelist_configuration">
+                    <!-- Main Pricelist Configuration Toggle -->
+                    <setting id="pricelist_configuration" string="Pricelist Configuration"
+                        help="Enable POSVIT 2.0 Pricelist Configuration.">
+                        <field name="pricelist_configuration"/>
+                        
+                        <!-- Sub-settings container -->
+                        <div class="content-group" invisible="not pricelist_configuration">
+                            <div class="mt16 ms-4">
+                                <!-- Customer Pricelist Option -->
+                                <div class="o_setting_box">
+                                    <div class="o_setting_left_pane">
+                                        <field name="vit_cust_pricelist" widget="boolean_toggle"/>
+                                    </div>
+                                    <div class="o_setting_right_pane">
+                                        <label for="vit_cust_pricelist" string="Customer Pricelist"/>
+                                        <div class="text-muted">
+                                            Use individual customer pricelist when available
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Customer Group Pricelist Option -->
+                                <div class="o_setting_box">
+                                    <div class="o_setting_left_pane">
+                                        <field name="vit_cust_group_pricelist" widget="boolean_toggle"/>
+                                    </div>
+                                    <div class="o_setting_right_pane">
+                                        <label for="vit_cust_group_pricelist" string="Customer Group Pricelist"/>
+                                        <div class="text-muted">
+                                            Use customer group pricelist when customer group is assigned
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </setting>
+                </block>
+            </app>
+        </field>
+    </record>
+</odoo>

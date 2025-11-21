@@ -12,6 +12,125 @@ class DataTransaksiMCtoSS:
         self.set_log_mc = SetLogMC(self.source_client)
         self.set_log_ss = SetLogSS(self.target_client)
 
+    def transfer_customer_group(self, model_name, fields, description, date_from, date_to):
+        # Ambil data dari sumber
+        transaksi_customer_group = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                        self.source_client.uid, self.source_client.password,
+                                                        model_name, 'search_read',
+                                                        [[]],
+                                                        {'fields': fields})
+        
+        if not transaksi_customer_group:
+            print("Tidak ada master yang ditemukan untuk ditransfer.")
+            return
+        
+        pricelist_ids = [record.get('vit_pricelist_id')[0] if isinstance(record.get('vit_pricelist_id'), list) else record.get('vit_pricelist_id') for record in transaksi_customer_group]
+
+        pricelist_id = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                        self.target_client.uid, self.target_client.password,
+                                                        'product.pricelist', 'search_read',
+                                                        [[['id_mc', 'in', str(pricelist_ids)]]],
+                                                        {'fields': ['id', 'name']})
+        
+        pricelist_id_dict = {record['id']: record['id'] for record in pricelist_id}
+
+        # Kirim data ke target
+        for record in transaksi_customer_group:
+            customer_group_name = record.get('vit_group_name', False)
+            
+            existing_customer_group = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                            self.source_client.uid, self.source_client.password,
+                                                                            'customer.group', 'search_read',
+                                                                            [[['vit_group_name', '=', customer_group_name]]],
+                                                                            {'fields': ['id'], 'limit': 1})
+            if not existing_customer_group:
+                existing_groups = self.source_client.call_odoo('object', 'execute_kw', self.source_client.db,
+                                                                                self.source_client.uid, self.source_client.password,
+                                                                                'customer.group', 'search_read',
+                                                                                [[['name', '=', customer_group_name]]],
+                                                                                {'fields': ['id'], 'limit': 1})
+                if existing_groups:
+                    print(f"Customer Groups dengan nama {customer_group_name} sudah ada di master customer group.")
+                    continue
+
+                pricelist_id = pricelist_id_dict.get(record.get('vit_pricelist_id')[0] if isinstance(record.get('vit_pricelist_id'), list) else record.get('vit_pricelist_id'), False)
+
+                customer_group_data = {
+                    'vit_group_name': customer_group_name,
+                    'vit_pricelist_id': int(pricelist_id) if pricelist_id else False,
+                }
+                
+                write_date = self.get_write_date(model_name, record['id'])
+                
+                try:
+                    start_time = time.time()
+                    new_customer_group = self.target_client.call_odoo('object', 'execute_kw', self.target_client.db,
+                                                                        self.target_client.uid, self.target_client.password,
+                                                                        'customer.group', 'create',
+                                                                        [customer_group_data])
+                    print(f"Customer Group telah dibuat dengan ID: {new_customer_group}")
+
+                    end_time = time.time()
+                    duration = end_time - start_time
+
+                    self.set_log_mc.create_log_note_success(record, start_time, end_time, duration, 'Customer Group', write_date)
+                    self.set_log_ss.create_log_note_success(record, start_time, end_time, duration, 'Customer Group', write_date)
+                    
+                    # Update is_integrated dan index_store di target_client (source)
+                    try:
+                        index_store_ids = record.get('index_store', [])
+                        
+                        # Ambil setting config yang aktif untuk target integrasi
+                        setting_config_ids = self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'setting.config', 'search_read',
+                            [[['vit_config_server', '=', 'ss'], ['vit_linked_server', '=', True]]],
+                            {'fields': ['id']}
+                        )
+                        setting_config_ids = [config['id'] for config in setting_config_ids]
+
+                        # Update index_store dengan setting config IDs yang aktif
+                        self.source_client.call_odoo(
+                            'object', 'execute_kw', self.source_client.db,
+                            self.source_client.uid, self.source_client.password,
+                            'customer.group', 'write',
+                            [[record['id']], {
+                                'index_store': [(4, setting_config_ids[0])] if setting_config_ids else [(5, 0, 0)]
+                            }]
+                        )
+                        print(f"📌 Field index_store diperbarui untuk Customer Group ID {record['id']}.")
+
+                        # Periksa apakah semua setting config sudah tercakup di index_store
+                        if len(index_store_ids) + 1 >= len(setting_config_ids):
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'customer.group', 'write',
+                                [[record['id']], {
+                                    'is_integrated': True,
+                                    'index_store': [(5, 0, 0)]  # clear
+                                }]
+                            )
+                            print(f"✅ Customer Group ID {record['id']} telah diintegrasi ke semua target.")
+                        else:
+                            self.source_client.call_odoo(
+                                'object', 'execute_kw', self.source_client.db,
+                                self.source_client.uid, self.source_client.password,
+                                'customer.group', 'write',
+                                [[record['id']], {
+                                    'is_integrated': False
+                                }]
+                            )
+                            print(f"⌛ Customer Group ID {record['id']} belum terintegrasi ke semua target.")
+                    except Exception as e:
+                        print(f"⚠️ Gagal update index_store/is_integrated untuk Customer Group {record['id']}: {e}")
+                        
+                except Exception as e:
+                    message_exception = f"An error occurred while creating customer group: {e}"
+                    self.set_log_mc.create_log_note_failed(record, 'Customer Group', message_exception, write_date)
+                    self.set_log_ss.create_log_note_failed(record, 'Customer Group', message_exception, write_date)
+
     def transfer_bom_master(self, model_name, fields, description, date_from, date_to):
         try:
             # Step 1: Fetch BoM master from source

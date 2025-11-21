@@ -12,7 +12,19 @@ class ResPartner(models.Model):
     index_store = fields.Many2many('setting.config', string="Index Store", readonly=True)
     vit_customer_group = fields.Many2one('customer.group', string="Customer Group", tracking=True)
 
+    @api.onchange('vit_customer_group')
+    def _onchange_vit_customer_group(self):
+        """Auto fill pricelist when customer group is selected"""
+        if self.vit_customer_group and self.vit_customer_group.vit_pricelist_id:
+            self.property_product_pricelist = self.vit_customer_group.vit_pricelist_id
+
     def write(self, vals):
+        # Auto fill pricelist when customer group is updated via write
+        if 'vit_customer_group' in vals and vals['vit_customer_group']:
+            customer_group = self.env['customer.group'].browse(vals['vit_customer_group'])
+            if customer_group and customer_group.vit_pricelist_id:
+                vals['property_product_pricelist'] = customer_group.vit_pricelist_id.id
+        
         # Log perubahan untuk field tertentu ke chatter
         for partner in self:
             changes = []
@@ -83,9 +95,49 @@ class ResPartner(models.Model):
                 if old_stores != new_stores:
                     changes.append(f"Index Store: {old_stores} → {new_stores}")
             
+            # Track customer group changes
+            if 'vit_customer_group' in vals:
+                old_group = partner.vit_customer_group.vit_group_name if partner.vit_customer_group else 'Not Set'
+                new_group_id = vals['vit_customer_group']
+                if new_group_id:
+                    new_group_record = self.env['customer.group'].browse(new_group_id)
+                    new_group = new_group_record.vit_group_name if new_group_record else 'Not Set'
+                else:
+                    new_group = 'Not Set'
+                
+                if old_group != new_group:
+                    changes.append(f"Customer Group: {old_group} → {new_group}")
+            
+            # Track pricelist changes
+            if 'property_product_pricelist' in vals:
+                old_pricelist = partner.property_product_pricelist.name if partner.property_product_pricelist else 'Not Set'
+                new_pricelist_id = vals['property_product_pricelist']
+                if new_pricelist_id:
+                    new_pricelist_record = self.env['product.pricelist'].browse(new_pricelist_id)
+                    new_pricelist = new_pricelist_record.name if new_pricelist_record else 'Not Set'
+                else:
+                    new_pricelist = 'Not Set'
+                
+                if old_pricelist != new_pricelist:
+                    changes.append(f"Pricelist: {old_pricelist} → {new_pricelist}")
+            
             # Post message to chatter if there are changes
             if changes:
                 message = '\n'.join(changes)
                 partner.message_post(body=message, subject="Partner Information Updated")
         
         return super(ResPartner, self).write(vals)
+
+    @api.model
+    def create(self, vals):
+        """Auto fill pricelist when creating partner with customer group"""
+        if 'vit_customer_group' in vals and vals['vit_customer_group']:
+            # Cari customer group berdasarkan vit_group_name
+            customer_group = self.env['customer.group'].search([
+                ('vit_group_name', '=', vals['vit_customer_group'])
+            ], limit=1)
+            
+            if customer_group and customer_group.vit_pricelist_id and 'property_product_pricelist' not in vals:
+                vals['property_product_pricelist'] = customer_group.vit_pricelist_id.id
+        
+        return super(ResPartner, self).create(vals)

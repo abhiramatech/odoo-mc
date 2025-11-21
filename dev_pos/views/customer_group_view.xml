@@ -1,7 +1,7 @@
 <odoo>
   <data>
 
-  <!-- Tree View untuk Customer Group -->
+    <!-- Tree View untuk Customer Group -->
     <record model="ir.ui.view" id="view_customer_group_tree">
       <field name="name">customer.group.tree</field>
       <field name="model">customer.group</field>
@@ -9,6 +9,8 @@
         <tree string="Customer Groups">
           <field name="vit_group_name" string="Group"/>
           <field name="vit_pricelist_id" string="Pricelist"/>
+          <field name="is_integrated" optional="hide"/>
+          <field name="is_updated" optional="hide"/>
         </tree>
       </field>
     </record>
@@ -20,16 +22,46 @@
       <field name="arch" type="xml">
         <form string="Customer Group">
           <sheet>
+            <div class="oe_title">
+              <h1>
+                <field name="vit_group_name" placeholder="Customer Group Name" required="1"/>
+              </h1>
+            </div>
             <group>
-              <group>
-                <field name="vit_group_name" string="Group" tracking="True"/>
+              <group string="Pricelist Information">
+                <field name="vit_pricelist_id" 
+                       options="{'no_create': True, 'no_open': True}"
+                       required="1"/>
               </group>
-              <group>
-                <field name="vit_pricelist_id" string="Pricelist" tracking="True"/>
+              <group string="Integration">
+                <field name="is_integrated"/>
+                <field name="is_updated"/>
+                <field name="index_store" widget="many2many_tags"/>
               </group>
             </group>
           </sheet>
         </form>
+      </field>
+    </record>
+
+    <!-- Search View untuk Customer Group -->
+    <record model="ir.ui.view" id="view_customer_group_search">
+      <field name="name">customer.group.search</field>
+      <field name="model">customer.group</field>
+      <field name="arch" type="xml">
+        <search string="Customer Groups">
+          <field name="vit_group_name" string="Group Name"
+                 filter_domain="[('vit_group_name', 'ilike', self)]"/>
+          <field name="vit_pricelist_id" string="Pricelist"/>
+          <filter name="integrated" string="Integrated" 
+                  domain="[('is_integrated', '=', True)]"/>
+          <filter name="not_integrated" string="Not Integrated" 
+                  domain="[('is_integrated', '=', False)]"/>
+          <group expand="0" string="Group By">
+            <filter name="group_by_pricelist" string="Pricelist" 
+                    context="{'group_by': 'vit_pricelist_id'}"/>
+          </group>
+        </search>
       </field>
     </record>
 
@@ -38,21 +70,27 @@
       <field name="name">Customer Groups</field>
       <field name="res_model">customer.group</field>
       <field name="view_mode">tree,form</field>
-      <field name="context">{'search_default_group': 1}</field>
+      <field name="search_view_id" ref="view_customer_group_search"/>
+      <field name="context">{}</field>
       <field name="help" type="html">
         <p class="o_view_nocontent_smiling_face">
           Create your first customer group!
+        </p>
+        <p>
+          Customer groups allow you to assign specific pricelists to groups of customers.
         </p>
       </field>
     </record>
 
     <!-- Menu untuk Customer Group dalam Contacts Configuration -->
+    <!-- Menu ini akan hilang jika vit_cust_group_pricelist TIDAK dicentang -->
     <menuitem 
         id="menu_customer_group" 
         name="Customer Groups" 
         parent="contacts.res_partner_menu_config" 
         action="action_customer_group" 
-        sequence="10"/>
+        sequence="10"
+        groups="base.group_no_one"/>
 
   </data>
 </odoo>

@@ -10,6 +10,350 @@ from odoo.exceptions import AccessError
 
 _logger = logging.getLogger(__name__)
 
+
+# ==================== CUSTOMER GROUP API ====================
+
+def is_customer_group_pricelist_enabled():
+    """Check if vit_cust_group_pricelist is enabled"""
+    config = request.env['ir.config_parameter'].sudo()
+    return config.get_param('pos.vit_cust_group_pricelist') == 'True'
+
+def is_customer_group_pricelist_enabled():
+    config = request.env['ir.config_parameter'].sudo()
+    return config.get_param('pos.vit_cust_group_pricelist') == 'True'
+
+
+class POSTCustomerGroup(http.Controller):
+
+    @http.route('/api/master_customer_group', type='json', auth='none', methods=['POST'], csrf=False)
+    def post_customer_group(self, **kw):
+        try:
+            # 🔐 Cek fitur aktif
+            if not is_customer_group_pricelist_enabled():
+                return {
+                    'status': 'Failed',
+                    'code': 403,
+                    'message': 'Customer Group Pricelist feature is not enabled. Enable in POS Settings.'
+                }
+
+            # 🔐 Authentication
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {'status': 'Failed', 'code': 500, 'message': "Configuration not found."}
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            env = request.env(user=request.env.ref('base.user_admin').id)
+
+            # JSON Input
+            data = request.get_json_data()
+            items = data.get('items', [])
+
+            # Normalize input → harus list
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
+
+            created = []
+            failed = []
+
+            # 🚀 Process each group
+            for row in items:
+                try:
+                    name = row.get('group_name')
+                    pricelist_id = row.get('pricelist_id')
+
+                    if not name:
+                        failed.append({'data': row, 'message': "Missing group_name", 'id': None})
+                        continue
+
+                    if not pricelist_id:
+                        failed.append({'data': row, 'message': "Missing pricelist_id", 'id': None})
+                        continue
+
+                    # Cek duplikat
+                    existing = env['customer.group'].sudo().search(
+                        [('vit_group_name', '=', name)], limit=1
+                    )
+                    if existing:
+                        failed.append({
+                            'data': row,
+                            'message': f"Duplicate customer group '{name}'",
+                            'id': existing.id
+                        })
+                        continue
+
+                    # Validasi pricelist
+                    pricelist = env['product.pricelist'].sudo().browse(pricelist_id)
+                    if not pricelist.exists():
+                        failed.append({
+                            'data': row,
+                            'message': f"Pricelist ID {pricelist_id} not found",
+                            'id': None
+                        })
+                        continue
+
+                    # Create
+                    vals = {
+                        'vit_group_name': name,
+                        'vit_pricelist_id': pricelist_id,
+                        'create_uid': uid,
+                    }
+
+                    group = env['customer.group'].sudo().create(vals)
+
+                    created.append({
+                        'id': group.id,
+                        'group_name': group.vit_group_name,
+                        'pricelist_id': group.vit_pricelist_id.id,
+                        'pricelist_name': group.vit_pricelist_id.name,
+                    })
+
+                except Exception as e:
+                    failed.append({
+                        'data': row,
+                        'message': f"Error: {str(e)}",
+                        'id': None
+                    })
+
+            return {
+                'code': 200 if not failed else 207,
+                'status': 'success' if not failed else 'partial_success',
+                'created_groups': created,
+                'failed_groups': failed
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Failed to create customer groups: {str(e)}", exc_info=True)
+            return {
+                'status': 'Failed',
+                'code': 500,
+                'message': f"Failed to create customer groups: {str(e)}"
+            }
+        
+class PATCHCustomerGroup(http.Controller):
+
+    @http.route('/api/master_customer_group', type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_customer_group(self, **kwargs):
+        try:
+            # 🔐 Cek fitur aktif
+            if not is_customer_group_pricelist_enabled():
+                return {
+                    'status': 'Failed',
+                    'code': 403,
+                    'message': 'Customer Group Pricelist feature is not enabled. Enable in POS Settings.'
+                }
+
+            # 🔐 Authentication
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {'status': 'Failed', 'code': 500, 'message': "Configuration not found."}
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            env = request.env(user=request.env.ref('base.user_admin').id)
+
+            # JSON Input
+            data = request.get_json_data()
+            items = data.get('items', [])
+
+            # Normalize → harus list
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
+
+            updated = []
+            failed = []
+
+            # 🚀 Process each update
+            for row in items:
+                try:
+                    group_id = row.get('id')
+                    if not group_id:
+                        failed.append({'id': None, 'message': "Missing customer group ID"})
+                        continue
+
+                    group = env['customer.group'].sudo().browse(group_id)
+                    if not group.exists():
+                        failed.append({'id': group_id, 'message': "Customer group not found"})
+                        continue
+
+                    vals = {}
+
+                    # Update name
+                    if 'group_name' in row:
+                        vals['vit_group_name'] = row['group_name']
+
+                    # Update pricelist
+                    if 'pricelist_id' in row:
+                        pricelist = env['product.pricelist'].sudo().browse(row['pricelist_id'])
+                        if not pricelist.exists():
+                            failed.append({
+                                'id': group_id,
+                                'message': f"Pricelist ID {row['pricelist_id']} not found"
+                            })
+                            continue
+                        vals['vit_pricelist_id'] = row['pricelist_id']
+
+                    vals['write_uid'] = uid
+
+                    # Clean None
+                    vals = {k: v for k, v in vals.items() if v is not None}
+
+                    group.sudo().write(vals)
+
+                    updated.append({
+                        'id': group.id,
+                        'group_name': group.vit_group_name,
+                        'pricelist_id': group.vit_pricelist_id.id,
+                        'pricelist_name': group.vit_pricelist_id.name,
+                    })
+
+                except Exception as e:
+                    failed.append({
+                        'id': row.get('id'),
+                        'message': f"Error: {str(e)}"
+                    })
+
+            return {
+                'code': 200 if not failed else 207,
+                'status': 'success' if not failed else 'partial_success',
+                'updated_groups': updated,
+                'failed_groups': failed
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Error updating customer group: {str(e)}", exc_info=True)
+            return {
+                'code': 500,
+                'status': 'Failed',
+                'message': f"Error updating customer groups: {str(e)}"
+            }
+
+class POSTMasterTax(http.Controller):
+
+    @http.route('/api/master_tax', type='json', auth='none', methods=['POST'], csrf=False)
+    def post_master_tax(self, **kw):
+        try:
+            # 🔐 Authentication
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {
+                    'status': "Failed",
+                    'code': 500,
+                    'message': "Configuration not found."
+                }
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            # Use admin user to avoid access issues
+            env = request.env(user=request.env.ref('base.user_admin').id)
+
+            data = request.get_json_data()
+            items = data.get('items', [])
+
+            if not isinstance(items, list):
+                return {'status': "Failed", 'code': 400, 'message': "'items' must be a list."}
+
+            created = []
+            failed = []
+
+            # 🧾 Process each tax item
+            for tax_data in items:
+                try:
+                    name = tax_data.get('name')
+
+                    # Cek duplicate by name
+                    existing_tax = env['account.tax'].sudo().search(
+                        [('name', '=', name)], limit=1
+                    )
+
+                    if existing_tax:
+                        failed.append({
+                            'data': tax_data,
+                            'message': f"Tax '{name}' already exists.",
+                            'id': existing_tax.id
+                        })
+                        continue
+
+                    # Build tax fields
+                    vals = {
+                        'name': name,
+                        'description': tax_data.get('description'),
+                        'amount_type': 'percent',
+                        'active': tax_data.get('active', True),
+                        'amount': tax_data.get('amount', 0),
+                        'invoice_label': tax_data.get('invoice_label'),
+                    }
+
+                    tax = env['account.tax'].sudo().create(vals)
+
+                    created.append({
+                        'id': tax.id,
+                        'name': tax.name,
+                        'amount': tax.amount,
+                        'active': tax.active,
+                    })
+
+                except Exception as e:
+                    failed.append({
+                        'data': tax_data,
+                        'message': f"Error: {str(e)}",
+                        'id': None
+                    })
+
+            return {
+                'code': 200,
+                'status': 'success',
+                'created_taxes': created,
+                'failed_taxes': failed
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Failed to create taxes: {str(e)}", exc_info=True)
+            return {
+                'status': "Failed",
+                'code': 500,
+                'message': f"Failed to create taxes: {str(e)}"
+            }
+
 class POSTEmployee(http.Controller):
     @http.route('/api/hr_employee', type='json', auth='none', methods=['POST'], csrf=False)
     def post_employee(self, **kw):
@@ -189,16 +533,12 @@ class POSTMasterItem(http.Controller):
     @http.route('/api/master_item', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_item(self, **kw):
         try:
-            # Autentikasi
+            # 🔐 Autentikasi
             config = request.env['setting.config'].sudo().search(
                 [('vit_config_server', '=', 'mc')], limit=1
             )
             if not config:
-                return {
-                    'code': 500,
-                    'status': 'Failed',
-                    'message': 'Configuration not found.'
-                }
+                return {'code': 500, 'status': 'Failed', 'message': 'Configuration not found.'}
 
             uid = request.session.authenticate(
                 request.session.db,
@@ -206,39 +546,39 @@ class POSTMasterItem(http.Controller):
                 config.vit_config_password_api
             )
             if not uid:
-                return {
-                    'code': 401,
-                    'status': 'Failed',
-                    'message': 'Authentication failed.'
-                }
+                return {'code': 401, 'status': 'Failed', 'message': 'Authentication failed.'}
 
             json_data = request.get_json_data()
             items = json_data.get('items', [])
             if isinstance(items, dict):
                 items = [items]
-            elif not isinstance(items, list):
-                return {
-                    'code': 400,
-                    'status': 'Failed',
-                    'message': "'items' must be a list or object."
-                }
 
             vals_list, created, errors = [], [], []
 
-            # 🔹 Validasi & siapkan data
+            # 💾 CACHE untuk menghindari banyak search
+            cache_categories = {}
+            cache_uom = {}
+            cache_pos = {}
+            cache_tax = {}
+
+            model_category = request.env['product.category'].sudo()
+            model_uom = request.env['uom.uom'].sudo()
+            model_pos = request.env['pos.category'].sudo()
+            model_tax = request.env['account.tax'].sudo()
+            model_product = request.env['product.template'].sudo()
+
+            BATCH_SIZE = 50  # ⬅ untuk mencegah overloading create()
+
+            # 🔹 Validasi & Siapkan data
             for data in items:
                 try:
                     product_code = data.get('product_code')
                     if not product_code:
-                        errors.append({
-                            'id': None,
-                            'product_code': None,
-                            'message': "Missing product_code"
-                        })
+                        errors.append({'id': -1, 'product_code': None, 'message': "Missing product_code"})
                         continue
 
-                    # Cek duplikat
-                    existing_product = request.env['product.template'].sudo().search(
+                    # Duplicate check
+                    existing_product = model_product.search(
                         [('default_code', '=', product_code)], limit=1
                     )
                     if existing_product:
@@ -249,91 +589,137 @@ class POSTMasterItem(http.Controller):
                         })
                         continue
 
-                    # Cek kategori
+                    # CATEGORY CACHE
                     category_name = data.get('category_name')
-                    category = request.env['product.category'].sudo().search(
-                        [('complete_name', '=', category_name)], limit=1
-                    )
-                    category_id = category.id if category else False
-                    if not category_id:
-                        _logger.warning(f"Category not found in database: {category_name}")
+                    if not category_name:
+                        errors.append({'id': -1, 'product_code': product_code, 'message': "category_name missing"})
+                        continue
 
-                    # POS Category
+                    if category_name in cache_categories:
+                        category = cache_categories[category_name]
+                    else:
+                        category = model_category.search([('complete_name', '=', category_name)], limit=1)
+                        cache_categories[category_name] = category
+
+                    if not category:
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': f"Category '{category_name}' not found."})
+                        continue
+
+                    # POS CATEGORY CACHE
                     pos_categ_command = []
-                    pos_categ_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
-                    if not isinstance(pos_categ_data, list):
-                        pos_categ_data = [pos_categ_data]
-                    for categ_id in pos_categ_data:
-                        pos_category = request.env['pos.category'].sudo().search([('id', '=', categ_id)], limit=1)
-                        if pos_category:
-                            pos_categ_command.append((4, categ_id))
-                        else:
-                            errors.append({
-                                'id': None,
-                                'product_code': product_code,
-                                'message': f"POS category with ID {categ_id} not found."
-                            })
+                    pos_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
+                    if not isinstance(pos_data, list):
+                        pos_data = [pos_data]
 
-                    # Pajak
+                    for cid in pos_data:
+                        if cid in cache_pos:
+                            pos_obj = cache_pos[cid]
+                        else:
+                            pos_obj = model_pos.search([('id', '=', cid)], limit=1)
+                            cache_pos[cid] = pos_obj
+
+                        if pos_obj:
+                            pos_categ_command.append((4, cid))
+                        else:
+                            errors.append({'id': -1, 'product_code': product_code,
+                                           'message': f"POS category ID {cid} not found."})
+
+                    # TAX CACHE
                     tax_command = []
                     tax_names = data.get('taxes_names', [])
                     if not isinstance(tax_names, list):
                         tax_names = [tax_names]
+
                     for tax_name in tax_names:
-                        tax = request.env['account.tax'].sudo().search([('name', '=', tax_name)], limit=1)
+                        if tax_name in cache_tax:
+                            tax = cache_tax[tax_name]
+                        else:
+                            tax = model_tax.search([('name', '=', tax_name)], limit=1)
+                            cache_tax[tax_name] = tax
+
                         if tax:
                             tax_command.append((4, tax.id))
                         else:
-                            errors.append({
-                                'id': None,
-                                'product_code': product_code,
-                                'message': f"Tax with name '{tax_name}' not found."
-                            })
+                            errors.append({'id': -1, 'product_code': product_code,
+                                           'message': f"Tax '{tax_name}' not found."})
 
-                    # Data produk
+                    # UOM CACHE
+                    uom_name = data.get('uom_name')
+                    if not uom_name:
+                        errors.append({'id': -1, 'product_code': product_code, 'message': "uom_name missing"})
+                        continue
+
+                    if uom_name in cache_uom:
+                        uom = cache_uom[uom_name]
+                    else:
+                        uom = model_uom.search([('name', '=', uom_name)], limit=1)
+                        cache_uom[uom_name] = uom
+
+                    if not uom:
+                        errors.append({'id': -1, 'product_code': product_code, 'message': f"UoM '{uom_name}' not found."})
+                        continue
+
+                    # UOM PO CACHE
+                    uom_po_name = data.get('uom_po_name')
+                    if not uom_po_name:
+                        errors.append({'id': -1, 'product_code': product_code, 'message': "uom_po_name missing"})
+                        continue
+
+                    if uom_po_name in cache_uom:
+                        uom_po = cache_uom[uom_po_name]
+                    else:
+                        uom_po = model_uom.search([('name', '=', uom_po_name)], limit=1)
+                        cache_uom[uom_po_name] = uom_po
+
+                    if not uom_po:
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': f"Purchase UoM '{uom_po_name}' not found."})
+                        continue
+
+                    # Cek kategori uom = wajib sama
+                    if uom.category_id.id != uom_po.category_id.id:
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': "Default UoM and Purchase UoM must match."})
+                        continue
+
+                    # Append vals
                     cost = data.get('standard_price', data.get('cost', 0.0))
+
                     vals_list.append({
                         'name': data.get('product_name'),
                         'active': data.get('active'),
                         'default_code': product_code,
                         'detailed_type': data.get('product_type'),
                         'invoice_policy': data.get('invoice_policy'),
-                        'create_date': data.get('create_date'),
                         'list_price': data.get('sales_price'),
                         'standard_price': cost,
-                        'uom_id': data.get('uom_id'),
-                        'uom_po_id': data.get('uom_po_id'),
+                        'uom_id': uom.id,
+                        'uom_po_id': uom_po.id,
                         'pos_categ_ids': pos_categ_command,
-                        'categ_id': category_id,
+                        'categ_id': category.id,
                         'taxes_id': tax_command,
                         'available_in_pos': data.get('available_in_pos'),
-                        'image_1920': data.get('image_1920'),
                         'barcode': data.get('barcode'),
+                        'image_1920': data.get('image_1920'),
                         'create_uid': uid,
-                        'vit_sub_div': data.get('vit_sub_div'),
-                        'vit_item_kel': data.get('vit_item_kel'),
-                        'vit_item_type': data.get('vit_item_type'),
-                        'brand': data.get('vit_item_brand'),
                     })
+
+                    # ⏳ Create batch per 50 item
+                    if len(vals_list) >= BATCH_SIZE:
+                        products = model_product.create(vals_list)
+                        for rec in products:
+                            created.append({'id': rec.id, 'product_code': rec.default_code, 'name': rec.name})
+                        vals_list = []  # kosongkan batch
 
                 except Exception as e:
-                    errors.append({
-                        'id': None,
-                        'product_code': data.get('product_code'),
-                        'message': f"Exception: {str(e)}"
-                    })
+                    errors.append({'id': -1, 'product_code': data.get('product_code'), 'message': str(e)})
 
-            # 🔹 Bulk create kalau ada data valid
+            # Create sisa batch
             if vals_list:
-                products = request.env['product.template'].sudo().create(vals_list)
+                products = model_product.create(vals_list)
                 for rec in products:
-                    created.append({
-                        'id': rec.id,
-                        'product_code': rec.default_code,
-                        'name': rec.name,
-                        'list_price': rec.list_price,
-                        'status': 'success'
-                    })
+                    created.append({'id': rec.id, 'product_code': rec.default_code, 'name': rec.name})
 
             return {
                 'code': 200 if not errors else 207,
@@ -344,12 +730,8 @@ class POSTMasterItem(http.Controller):
 
         except Exception as e:
             request.env.cr.rollback()
-            _logger.error(f"Failed to create items: {str(e)}")
-            return {
-                'status': 'Failed',
-                'code': 500,
-                'message': f"Failed to create items: {str(e)}"
-            }
+            return {'status': 'Failed', 'code': 500, 'message': str(e)}
+
 
 
 class POSTMasterPricelist(http.Controller):
@@ -714,6 +1096,7 @@ class POSTMasterCustomer(http.Controller):
                         'mobile': data.get('mobile'),
                         'website': data.get('website'),
                         'create_uid': uid,
+                        ''
                         'customer_rank': 1,  # supaya otomatis dianggap customer
                     })
 

@@ -530,9 +530,11 @@ class SettingConfig(models.Model):
         date_from, date_to = self.convert_datetime_to_string(date_from, date_to)
 
         for ss_client in ss_clients:
+            integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
             integrator_master = DataIntegrator(mc_client, ss_client)
             integrator_master.transfer_data('res.partner.title', ['name', 'shortcut', 'create_date', 'write_date'], 'Master Customer Title', date_from, date_to)
-            integrator_master.transfer_data('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
+            integrator_master.transfer_data('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'vit_customer_group', 'property_product_pricelist', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
+            integrator_transaksiMCtoSS.transfer_customer_group('customer.group', ['id', 'vit_group_name', 'vit_pricelist_id'], 'Insert Customer Group')
 
     def create_master_customers_from_ss_to_mc(self, mc, ss, datefrom, dateto):
         if mc and ss:
@@ -556,7 +558,7 @@ class SettingConfig(models.Model):
             integrator_master = DataIntegrator(mc_client, ss_client)
             # raise ValidationError(_(f"{mc_client}, {ss_client}, {ss_clients}, {mc}, {ss}, {datefrom}, {dateto}, {date_from}, {date_to}")) buat check debug ya
             integrator_master.transfer_data_mc('res.partner.title', ['name', 'shortcut', 'create_date', 'write_date'], 'Master Customer Title', date_from, date_to)
-            integrator_master.transfer_data_mc('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
+            integrator_master.transfer_data_mc('res.partner', ['name', 'street', 'street2', 'phone', 'mobile', 'email', 'website','title','customer_rank', 'supplier_rank', 'customer_code', 'vit_customer_group', 'property_product_pricelist', 'create_date', 'write_date'], 'Master Customer', date_from, date_to)
             integrator_master.transfer_data_mc('loyalty.card', ['code', 'points_display', 'expiration_date', 'partner_id', 'points', 'program_id'], 'Master Loyalty', date_from, date_to)
 
     def create_master_employee_from_ss_to_mc(self, mc, ss, datefrom, dateto):
