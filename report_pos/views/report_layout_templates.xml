@@ -233,7 +233,7 @@
     </t>
   </template>
 
-  <template id="report_sales_hourly" name="Report Sales Hourly">
+  <!-- <template id="report_sales_hourly" name="Report Sales Hourly">
     <t t-call="web.html_container">
       <div class="container mt-4">
         <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
@@ -321,91 +321,11 @@
         </t>
       </div>
     </t>
-  </template>
-
-  <!-- <template id="report_sales_hourly_payment" name="Report Sales Hourly Payment">
-    <t t-call="web.html_container">
-      <div class="container mt-4">
-        <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-        <h5 class="text-center">Laporan History Penjualan By Store</h5>
-        <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
-
-        <t t-set="cols_per_page" t-value="10"/>
-        <t t-set="tanggal_chunks" t-value="[tanggal_list[i:i+cols_per_page] for i in range(0, len(tanggal_list), cols_per_page)]"/>
-
-        <t t-foreach="tanggal_chunks" t-as="chunk">
-          <div class="page">
-            <div class="table-responsive">
-              <table class="table table-bordered table-sm text-center" style="font-size:12px; min-width: 1200px;">
-                <thead style="background-color: #ffd700; font-weight: bold;">
-                  <tr>
-                    <th>Kategori</th>
-                    <t t-foreach="jam_list" t-as="jam">
-                      <th>Qty-<t t-esc="jam"/></th>
-                      <th>Trx-<t t-esc="jam"/></th>
-                      <th>Sales-<t t-esc="jam"/></th>
-                    </t>
-                  </tr>
-                </thead>
-                <tbody>
-                  <t t-foreach="data_rows" t-as="row">
-                    <tr>
-                      <td><t t-esc="row['kategori']"/></td>
-                      <t t-foreach="jam_list" t-as="jam">
-                        <td><t t-esc="row.get(jam+'_qty', '')"/></td>
-                        <td><t t-esc="row.get(jam+'_trx', '')"/></td>
-                        <td><t t-esc="row.get(jam+'_sales', '')"/></td>
-                      </t>
-                    </tr>
-                  </t>
-                </tbody>
-          </table>
-        </div>
-      </div>
-    </t>
   </template> -->
-
-  <!-- Template Portal -->
-  <template id="portal_contribution_report_template" name="Contribution Report by Category">
-      <t t-call="portal.portal_layout">
-          <div class="o_portal_my_doc table-responsive">
-              <h3>Report Contribution by Category</h3>
-              <p>Periode: <t t-esc="date_from"/> s/d <t t-esc="date_to"/></p>
-
-              <a t-att-href="'/my/sales/report/contribution_by_category/pdf?date_from=%s&amp;date_to=%s' % (date_from, date_to)"
-                  class="btn btn-primary mb-3">
-                  <i class="fa fa-download"/> Download PDF
-              </a>
-
-              <table class="table table-bordered">
-                  <thead>
-                      <tr>
-                          <th>No</th>
-                          <th>Order</th>
-                          <th>Customer</th>
-                          <th>Tanggal</th>
-                          <th>Total</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <t t-foreach="orders" t-as="order" t-esc-options='{"widget": "text"}'>
-                          <tr>
-                              <td><t t-esc="order.id"/></td>
-                              <td><t t-esc="order.name"/></td>
-                              <td><t t-esc="order.partner_id.name"/></td>
-                              <td><t t-esc="order.date_order"/></td>
-                              <td><t t-esc="order.amount_total"/></td>
-                          </tr>
-                      </t>
-                  </tbody>
-              </table>
-          </div>
-      </t>
-  </template>
 
   <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
     <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-    <!-- <t t-set="o_portal_fullwidth_alert">
+    <t t-set="o_portal_fullwidth_alert">
       <t t-call="report_pos.portal_back_in_edit_mode"/>
     </t>
     <t t-call="portal.portal_layout">
@@ -503,7 +423,7 @@
             </div>
           </div>  
         </div> 
-    </t> -->
+    </t>
   </template>  
 
 
