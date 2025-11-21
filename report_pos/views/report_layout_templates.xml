@@ -436,17 +436,17 @@
             <t t-set="shifts" t-value="data['shifts']"/>
             
             <!-- Header Kategori -->
-            <div class="bg-secondary text-white p-2 mt-4 mb-2 rounded">
+            <div>
               <strong><t t-esc="kategori"/></strong>
             </div>
 
             <table class="table table-bordered table-sm">
-              <thead class="table-light">
+              <thead>
                 <tr>
-                  <th>User</th>
-                  <th>Kasir</th>
+                  <!-- <th>User</th>
+                  <th>Kasir</th> -->
                   <th>Tanggal</th>
-                  <th>Kode Store</th>
+                  <!-- <th>Kode Store</th> -->
                   <th>Nama Store</th>
                   <th>Payment Method</th>
                   <th class="text-end">Amount</th>
@@ -461,14 +461,14 @@
                   <t t-if="shift.line_ids">
                     <t t-foreach="shift.line_ids" t-as="line">
                       <tr>
-                        <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
-                        <td><t t-esc="shift.cashier_id.name or ''"/></td>
+                        <!-- <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
+                        <td><t t-esc="shift.cashier_id.name or ''"/></td> -->
                         <td>
                           <t t-if="line.payment_date">
                             <t t-esc="line.payment_date.strftime('%d/%m/%Y %H:%M:%S')"/>
                           </t>
                         </td>
-                        <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                        <!-- <td><t t-esc="shift.session_id.config_id.name or ''"/></td> -->
                         <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
                         <td><t t-esc="line.payment_method_id.name or ''"/></td>
                         <td class="text-end"><t t-esc="format_number(line.amount or 0)"/></td>
@@ -488,10 +488,10 @@
                   </t>
                   <t t-if="not shift.line_ids">
                     <tr class="table-light">
-                      <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
-                      <td><t t-esc="shift.cashier_id.name or ''"/></td>
+                      <!-- <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
+                      <td><t t-esc="shift.cashier_id.name or ''"/></td> -->
                       <td class="text-muted">-</td>
-                      <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                      <!-- <td><t t-esc="shift.session_id.config_id.name or ''"/></td> -->
                       <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
                       <td class="text-muted">-</td>
                       <td class="text-end text-muted">0</td>
@@ -501,10 +501,13 @@
                       <td><t t-esc="shift.session_id.name or ''"/></td>
                     </tr>
                   </t>
+      
+                  <t t-esc="shift.vit_notes or ''"/>
+                  
                 </t>
               </tbody>
               <!-- Subtotal per Kategori -->
-              <tfoot class="table-warning">
+              <tfoot>
                 <tr>
                   <td colspan="6" class="text-end"><strong>Subtotal:</strong></td>
                   <td class="text-end"><strong><t t-esc="format_number(data['subtotal_amount'])"/></strong></td>
@@ -535,7 +538,7 @@
           <!-- Grand Total -->
           <t t-if="grouped_end_shift">
             <table class="table table-bordered mt-4">
-              <tfoot class="table-dark">
+              <tfoot>
                 <tr>
                   <td colspan="6" class="text-end"><strong>GRAND TOTAL:</strong></td>
                   <td class="text-end"><strong><t t-esc="format_number(grand_total_amount)"/></strong></td>
