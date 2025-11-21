@@ -10,6 +10,7 @@ from odoo.exceptions import AccessError
 
 _logger = logging.getLogger(__name__)
 
+
 class POSTEmployee(http.Controller):
     @http.route('/api/hr_employee', type='json', auth='none', methods=['POST'], csrf=False)
     def post_employee(self, **kw):
@@ -636,11 +637,394 @@ class POSTMasterUoM(http.Controller):
             }
 
 
+def is_customer_group_pricelist_enabled():
+    """Check if vit_cust_group_pricelist is enabled"""
+    config = request.env['ir.config_parameter'].sudo()
+    return config.get_param('pos.vit_cust_group_pricelist') == 'True'
+
+
+def serialize_response(data, total_records, total_pages):
+    """Serialize successful response"""
+    response = {
+        'code': 200,
+        'status': 'success',
+        'data': data,
+        'total_records': total_records,
+        'total_pages': total_pages
+    }
+    return http.Response(
+        json.dumps(response),
+        content_type='application/json',
+        status=200
+    )
+
+
+def serialize_error_response(message, code=500):
+    """Serialize error response"""
+    response = {
+        'code': code,
+        'status': 'failed',
+        'message': message
+    }
+    return http.Response(
+        json.dumps(response),
+        content_type='application/json',
+        status=code
+    )
+
+
+def paginate_records(model_name, domain, page_size, page):
+    """Paginate records"""
+    Model = request.env[model_name].sudo()
+    total_records = Model.search_count(domain)
+    offset = (int(page) - 1) * int(page_size)
+    records = Model.search(domain, limit=int(page_size), offset=offset, order='id desc')
+    return records, total_records
+
+def check_authorization():
+    """Check API authorization"""
+    config = request.env['setting.config'].sudo().search(
+        [('vit_config_server', '=', 'mc')], limit=1
+    )
+    if not config:
+        raise Exception("Configuration not found.")
+    
+    uid = request.session.authenticate(
+        request.session.db,
+        config.vit_config_username,
+        config.vit_config_password_api
+    )
+    if not uid:
+        raise Exception("Authentication failed.")
+    
+    return uid, config
+
+
+# ==================== CUSTOMER GROUP API ====================
+
+class GETCustomerGroup(http.Controller):
+    @http.route(['/api/master_customer_group/'], type='http', auth='public', methods=['GET'], csrf=False)
+    def get_customer_groups(self, group_id=None, group_name=None, pageSize=200, page=1, **params):
+        """
+        GET Customer Groups
+        Params:
+            - group_id: Filter by specific group ID
+            - group_name: Filter by group name (ilike)
+            - pageSize: Number of records per page (default: 200)
+            - page: Page number (default: 1)
+        """
+        try:
+            # Check if customer group pricelist is enabled
+            if not is_customer_group_pricelist_enabled():
+                return serialize_error_response(
+                    "Customer Group Pricelist feature is not enabled. Please enable it in POS Settings.",
+                    code=403
+                )
+
+            check_authorization()
+
+            if int(page) == 0:
+                return serialize_response([], 0, 0)
+
+            domain = []
+
+            # Filtering
+            if group_id:
+                domain.append(('id', '=', int(group_id)))
+            if group_name:
+                domain.append(('vit_group_name', 'ilike', group_name))
+
+            pageSize = int(pageSize) if pageSize else 200
+
+            # Get records with pagination
+            if not group_id and not group_name:
+                customer_groups = request.env['customer.group'].sudo().search([])
+                total_records = len(customer_groups)
+            else:
+                customer_groups, total_records = paginate_records(
+                    'customer.group', domain, pageSize, page
+                )
+
+            # Apply pagination if not filtering by specific ID
+            if not group_id:
+                customer_groups, total_records = paginate_records(
+                    'customer.group', domain, pageSize, page
+                )
+
+            data = []
+            for group in customer_groups:
+                data.append({
+                    'id': group.id,
+                    'group_name': group.vit_group_name,
+                    'pricelist_id': group.vit_pricelist_id.id if group.vit_pricelist_id else None,
+                    'pricelist_name': group.vit_pricelist_id.name if group.vit_pricelist_id else None,
+                })
+
+            total_pages = (total_records + pageSize - 1) // pageSize
+
+            return serialize_response(data, total_records, total_pages)
+
+        except Exception as e:
+            _logger.error(f"Error getting customer groups: {str(e)}")
+            return serialize_error_response(str(e))
+
+
+class POSTCustomerGroup(http.Controller):
+    @http.route('/api/master_customer_group', type='json', auth='none', methods=['POST'], csrf=False)
+    def post_customer_group(self, **kw):
+        """
+        POST Customer Group
+        JSON Body:
+        {
+            "items": [
+                {
+                    "group_name": "Group A",
+                    "pricelist_id": 1
+                }
+            ]
+        }
+        """
+        try:
+            # Check if customer group pricelist is enabled
+            if not is_customer_group_pricelist_enabled():
+                return {
+                    'status': 'Failed',
+                    'code': 403,
+                    'message': 'Customer Group Pricelist feature is not enabled. Please enable it in POS Settings.'
+                }
+
+            # Authentication
+            uid, config = check_authorization()
+
+            json_data = request.get_json_data()
+            items = json_data.get('items')
+
+            # Handle single dict or list
+            if isinstance(items, dict):
+                items = [items]
+            elif items is None and isinstance(json_data, dict):
+                items = [json_data]
+            elif not isinstance(items, list):
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
+
+            vals_list, created, errors = [], [], []
+
+            # Validate & collect data
+            for data in items:
+                try:
+                    group_name = data.get('group_name')
+                    pricelist_id = data.get('pricelist_id')
+
+                    if not group_name:
+                        errors.append({
+                            'id': None,
+                            'group_name': None,
+                            'message': "Missing group_name"
+                        })
+                        continue
+
+                    if not pricelist_id:
+                        errors.append({
+                            'id': None,
+                            'group_name': group_name,
+                            'message': "Missing pricelist_id"
+                        })
+                        continue
+
+                    # Check for duplicate group name
+                    existing = request.env['customer.group'].sudo().search(
+                        [('vit_group_name', '=', group_name)], limit=1
+                    )
+                    if existing:
+                        errors.append({
+                            'id': existing.id,
+                            'group_name': group_name,
+                            'message': f"Duplicate customer group: {group_name}"
+                        })
+                        continue
+
+                    # Validate pricelist exists
+                    pricelist = request.env['product.pricelist'].sudo().browse(pricelist_id)
+                    if not pricelist.exists():
+                        errors.append({
+                            'id': None,
+                            'group_name': group_name,
+                            'message': f"Pricelist ID {pricelist_id} not found"
+                        })
+                        continue
+
+                    # Prepare customer group data
+                    vals_list.append({
+                        'vit_group_name': group_name,
+                        'vit_pricelist_id': pricelist_id,
+                        'create_uid': uid,
+                    })
+
+                except Exception as e:
+                    errors.append({
+                        'id': None,
+                        'group_name': data.get('group_name'),
+                        'message': f"Exception: {str(e)}"
+                    })
+
+            # Bulk create if there are valid records
+            if vals_list:
+                groups = request.env['customer.group'].sudo().create(vals_list)
+                for rec in groups:
+                    created.append({
+                        'id': rec.id,
+                        'group_name': rec.vit_group_name,
+                        'pricelist_id': rec.vit_pricelist_id.id,
+                        'pricelist_name': rec.vit_pricelist_id.name,
+                        'status': 'success'
+                    })
+
+            return {
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'created_groups': created,
+                'errors': errors
+            }
+
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.error(f"Failed to create customer groups: {str(e)}")
+            return {
+                'status': 'Failed',
+                'code': 500,
+                'message': f"Failed to create customer groups: {str(e)}"
+            }
+
+
+class PATCHCustomerGroup(http.Controller):
+    @http.route(['/api/master_customer_group'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_customer_group(self, **kwargs):
+        """
+        PATCH Customer Group
+        JSON Body:
+        {
+            "items": [
+                {
+                    "id": 1,
+                    "group_name": "Updated Group Name",
+                    "pricelist_id": 2
+                }
+            ]
+        }
+        """
+        try:
+            # Check if customer group pricelist is enabled
+            if not is_customer_group_pricelist_enabled():
+                return {
+                    'status': 'Failed',
+                    'code': 403,
+                    'message': 'Customer Group Pricelist feature is not enabled. Please enable it in POS Settings.'
+                }
+
+            # Authentication
+            uid, config = check_authorization()
+
+            json_data = request.get_json_data()
+            items = json_data.get('items')
+
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
+                return {
+                    'status': 'Failed',
+                    'code': 400,
+                    'message': "'items' must be a list or object."
+                }
+
+            updated, errors = [], []
+
+            for data in items:
+                try:
+                    group_id = data.get('id')
+                    if not group_id:
+                        errors.append({
+                            'id': None,
+                            'message': "Missing customer group ID"
+                        })
+                        continue
+
+                    # Find customer group by ID
+                    customer_group = request.env['customer.group'].sudo().search(
+                        [('id', '=', group_id)], limit=1
+                    )
+
+                    if not customer_group:
+                        errors.append({
+                            'id': group_id,
+                            'message': "Customer group not found."
+                        })
+                        continue
+
+                    # Prepare update data
+                    update_data = {}
+                    
+                    if 'group_name' in data:
+                        update_data['vit_group_name'] = data['group_name']
+                    
+                    if 'pricelist_id' in data:
+                        pricelist_id = data['pricelist_id']
+                        # Validate pricelist exists
+                        pricelist = request.env['product.pricelist'].sudo().browse(pricelist_id)
+                        if not pricelist.exists():
+                            errors.append({
+                                'id': group_id,
+                                'message': f"Pricelist ID {pricelist_id} not found"
+                            })
+                            continue
+                        update_data['vit_pricelist_id'] = pricelist_id
+
+                    update_data['write_uid'] = uid
+
+                    # Remove None values
+                    update_data = {
+                        key: val for key, val in update_data.items() if val is not None
+                    }
+
+                    # Update record
+                    customer_group.sudo().write(update_data)
+
+                    updated.append({
+                        'id': customer_group.id,
+                        'group_name': customer_group.vit_group_name,
+                        'pricelist_id': customer_group.vit_pricelist_id.id,
+                        'pricelist_name': customer_group.vit_pricelist_id.name,
+                        'status': 'success'
+                    })
+
+                except Exception as e:
+                    errors.append({
+                        'id': data.get('id'),
+                        'message': f"Exception: {str(e)}"
+                    })
+
+            return {
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'updated_groups': updated,
+                'errors': errors
+            }
+
+        except Exception as e:
+            _logger.error(f"Error updating customer group: {str(e)}")
+            return {'code': 500, 'status': 'failed', 'message': str(e)}
+
+
+# ==================== MASTER CUSTOMER API (UPDATED) ====================
+
 class POSTMasterCustomer(http.Controller):
     @http.route('/api/master_customer', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_customer(self, **kw):
         try:
-            # Autentikasi
+            # Authentication
             config = request.env['setting.config'].sudo().search(
                 [('vit_config_server', '=', 'mc')], limit=1
             )
@@ -663,10 +1047,13 @@ class POSTMasterCustomer(http.Controller):
                     'message': 'Authentication failed.'
                 }
 
+            # Check if customer group pricelist is enabled
+            group_pricelist_enabled = is_customer_group_pricelist_enabled()
+
             json_data = request.get_json_data()
             items = json_data.get('items')
 
-            # ✅ Bisa single dict atau list
+            # Handle single dict or list
             if isinstance(items, dict):
                 items = [items]
             elif items is None and isinstance(json_data, dict):
@@ -678,9 +1065,9 @@ class POSTMasterCustomer(http.Controller):
                     'message': "'items' must be a list or object."
                 }
 
-            vals_list, created, errors = [], [], []
+            vals_list, created, errors = [], []
 
-            # 🔹 Validasi & kumpulkan data
+            # Validate & collect data
             for data in items:
                 try:
                     customer_code = data.get('customer_code')
@@ -692,7 +1079,28 @@ class POSTMasterCustomer(http.Controller):
                         })
                         continue
 
-                    # Cek duplikat
+                    # ✅ Validate vit_customer_group if group pricelist is enabled
+                    if group_pricelist_enabled:
+                        vit_customer_group = data.get('vit_customer_group')
+                        if not vit_customer_group:
+                            errors.append({
+                                'id': None,
+                                'customer_code': customer_code,
+                                'message': "vit_customer_group is required when Customer Group Pricelist is enabled"
+                            })
+                            continue
+                        
+                        # Validate customer group exists
+                        customer_group = request.env['customer.group'].sudo().browse(vit_customer_group)
+                        if not customer_group.exists():
+                            errors.append({
+                                'id': None,
+                                'customer_code': customer_code,
+                                'message': f"Customer group ID {vit_customer_group} not found"
+                            })
+                            continue
+
+                    # Check duplicate customer code
                     existing = request.env['res.partner'].sudo().search(
                         [('customer_code', '=', customer_code)], limit=1
                     )
@@ -700,12 +1108,12 @@ class POSTMasterCustomer(http.Controller):
                         errors.append({
                             'id': existing.id,
                             'customer_code': customer_code,
-                            'message': f"Duplicate Customer code: {customer_code}"
+                            'message': f"Duplicate customer code: {customer_code}"
                         })
                         continue
 
-                    # Data customer
-                    vals_list.append({
+                    # Prepare customer data
+                    customer_vals = {
                         'name': data.get('name'),
                         'customer_code': customer_code,
                         'street': data.get('street'),
@@ -714,8 +1122,28 @@ class POSTMasterCustomer(http.Controller):
                         'mobile': data.get('mobile'),
                         'website': data.get('website'),
                         'create_uid': uid,
-                        'customer_rank': 1,  # supaya otomatis dianggap customer
-                    })
+                        'customer_rank': 1,
+                    }
+
+                    # Add property_product_pricelist if provided
+                    if 'property_product_pricelist' in data and data['property_product_pricelist']:
+                        pricelist_id = data['property_product_pricelist']
+                        pricelist = request.env['product.pricelist'].sudo().browse(pricelist_id)
+                        if pricelist.exists():
+                            customer_vals['property_product_pricelist'] = pricelist_id
+                        else:
+                            errors.append({
+                                'id': None,
+                                'customer_code': customer_code,
+                                'message': f"Pricelist ID {pricelist_id} not found"
+                            })
+                            continue
+
+                    # Add vit_customer_group if provided and enabled
+                    if group_pricelist_enabled and 'vit_customer_group' in data:
+                        customer_vals['vit_customer_group'] = data['vit_customer_group']
+
+                    vals_list.append(customer_vals)
 
                 except Exception as e:
                     errors.append({
@@ -724,7 +1152,7 @@ class POSTMasterCustomer(http.Controller):
                         'message': f"Exception: {str(e)}"
                     })
 
-            # 🔹 Bulk create kalau ada data valid
+            # Bulk create if there are valid records
             if vals_list:
                 customers = request.env['res.partner'].sudo().create(vals_list)
                 for rec in customers:
@@ -733,6 +1161,8 @@ class POSTMasterCustomer(http.Controller):
                         'customer_code': rec.customer_code,
                         'name': rec.name,
                         'email': rec.email,
+                        'vit_customer_group': rec.vit_customer_group.id if rec.vit_customer_group else None,
+                        'property_product_pricelist': rec.property_product_pricelist.id if rec.property_product_pricelist else None,
                         'status': 'success'
                     })
 
@@ -751,6 +1181,136 @@ class POSTMasterCustomer(http.Controller):
                 'code': 500,
                 'message': f"Failed to create customers: {str(e)}"
             }
+
+
+class MasterCustomerPATCH(http.Controller):
+    @http.route(['/api/master_customer'], type='json', auth='none', methods=['PATCH'], csrf=False)
+    def update_master_customer(self, **kwargs):
+        try:
+            # Authentication
+            config = request.env['setting.config'].sudo().search(
+                [('vit_config_server', '=', 'mc')], limit=1
+            )
+            if not config:
+                return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
+
+            uid = request.session.authenticate(
+                request.session.db,
+                config.vit_config_username,
+                config.vit_config_password_api
+            )
+            if not uid:
+                return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
+
+            # Check if customer group pricelist is enabled
+            group_pricelist_enabled = is_customer_group_pricelist_enabled()
+
+            json_data = request.get_json_data()
+            items = json_data.get('items')
+
+            if isinstance(items, dict):
+                items = [items]
+            elif not isinstance(items, list):
+                return {'status': 'Failed', 'code': 400, 'message': "'items' must be a list or object."}
+
+            updated, errors = [], []
+
+            for data in items:
+                try:
+                    customer_code = data.get('customer_code')
+                    if not customer_code:
+                        errors.append({'customer_code': None, 'message': "Missing customer_code"})
+                        continue
+
+                    # ✅ Validate vit_customer_group if group pricelist is enabled
+                    if group_pricelist_enabled and 'vit_customer_group' in data:
+                        vit_customer_group = data.get('vit_customer_group')
+                        if vit_customer_group:
+                            # Validate customer group exists
+                            customer_group = request.env['customer.group'].sudo().browse(vit_customer_group)
+                            if not customer_group.exists():
+                                errors.append({
+                                    'customer_code': customer_code,
+                                    'message': f"Customer group ID {vit_customer_group} not found"
+                                })
+                                continue
+
+                    master_customer = request.env['res.partner'].sudo().search(
+                        [('customer_code', '=', customer_code)], limit=1
+                    )
+                    if not master_customer:
+                        errors.append({
+                            'customer_code': customer_code,
+                            'message': "Customer not found."
+                        })
+                        continue
+
+                    # Prepare update data
+                    update_data = {
+                        'name': data.get('name'),
+                        'street': data.get('street'),
+                        'email': data.get('email'),
+                        'mobile': data.get('mobile'),
+                        'website': data.get('website'),
+                        'write_uid': uid,
+                    }
+
+                    # Add property_product_pricelist if provided
+                    if 'property_product_pricelist' in data:
+                        pricelist_id = data['property_product_pricelist']
+                        if pricelist_id:
+                            pricelist = request.env['product.pricelist'].sudo().browse(pricelist_id)
+                            if pricelist.exists():
+                                update_data['property_product_pricelist'] = pricelist_id
+                            else:
+                                errors.append({
+                                    'customer_code': customer_code,
+                                    'message': f"Pricelist ID {pricelist_id} not found"
+                                })
+                                continue
+                        else:
+                            update_data['property_product_pricelist'] = False
+
+                    # Add vit_customer_group if provided and enabled
+                    if group_pricelist_enabled and 'vit_customer_group' in data:
+                        vit_customer_group = data['vit_customer_group']
+                        if vit_customer_group:
+                            update_data['vit_customer_group'] = vit_customer_group
+                        else:
+                            update_data['vit_customer_group'] = False
+
+                    # Remove None values
+                    update_data = {
+                        key: val for key, val in update_data.items() if val is not None
+                    }
+
+                    master_customer.sudo().write(update_data)
+
+                    updated.append({
+                        'id': master_customer.id,
+                        'customer_code': master_customer.customer_code,
+                        'name': master_customer.name,
+                        'vit_customer_group': master_customer.vit_customer_group.id if master_customer.vit_customer_group else None,
+                        'property_product_pricelist': master_customer.property_product_pricelist.id if master_customer.property_product_pricelist else None,
+                        'status': 'success'
+                    })
+
+                except Exception as e:
+                    errors.append({
+                        'customer_code': data.get('customer_code'),
+                        'message': f"Exception: {str(e)}"
+                    })
+
+            return {
+                'code': 200 if not errors else 207,
+                'status': 'success' if not errors else 'partial_success',
+                'updated_customers': updated,
+                'errors': errors
+            }
+
+        except Exception as e:
+            _logger.error(f"Error updating master customer: {str(e)}")
+            return {'code': 500, 'status': 'failed', 'message': str(e)}
     
 class POSTMasterWarehouse(http.Controller):
     @http.route('/api/master_warehouse', type='json', auth='none', methods=['POST'], csrf=False)
