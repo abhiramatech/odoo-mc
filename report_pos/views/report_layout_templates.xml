@@ -440,7 +440,7 @@
               <strong><t t-esc="kategori"/></strong>
             </div>
 
-            <table class="table table-bordered table-sm">
+            <table class="table table-bordered table-sm table-responsive mb-4">
               <thead>
                 <tr>
                   <!-- <th>User</th>
@@ -509,7 +509,7 @@
               <!-- Subtotal per Kategori -->
               <tfoot>
                 <tr>
-                  <td colspan="6" class="text-end"><strong>Subtotal:</strong></td>
+                  <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
                   <td class="text-end"><strong><t t-esc="format_number(data['subtotal_amount'])"/></strong></td>
                   <td class="text-end"><strong><t t-esc="format_number(data['subtotal_expected'])"/></strong></td>
                   <td class="text-end">
@@ -540,7 +540,7 @@
             <table class="table table-bordered mt-4">
               <tfoot>
                 <tr>
-                  <td colspan="6" class="text-end"><strong>GRAND TOTAL:</strong></td>
+                  <td colspan="3" class="text-end"><strong>GRAND TOTAL:</strong></td>
                   <td class="text-end"><strong><t t-esc="format_number(grand_total_amount)"/></strong></td>
                   <td class="text-end"><strong><t t-esc="format_number(grand_total_expected)"/></strong></td>
                   <td class="text-end">
