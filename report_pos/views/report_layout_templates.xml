@@ -403,7 +403,7 @@
       </t>
   </template>
 
-    <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
+  <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
     <t t-set="o_portal_fullwidth_alert">
       <!-- Uses backend_url provided in rendering values -->
       <t t-call="report_pos.portal_back_in_edit_mode"/>
@@ -441,7 +441,7 @@
                           <th>Session</th>
                       </tr>
                   </thead>
-<!-- 
+
                   <tbody>
                       <t t-foreach="end_shift" t-as="shift">
                           <t t-if="shift.line_ids">
@@ -480,10 +480,10 @@
                                       <td><t t-esc="shift.session_id.name or ''"/></td>
                                   </tr>
                               </t>
-                          </t> -->
+                          </t>
 
                           <!-- Jika tidak ada line_ids -->
-                          <!-- <t t-if="not shift.line_ids">
+                          <t t-if="not shift.line_ids">
                               <tr>
                                   <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
                                   <td><t t-esc="shift.cashier_id.name or ''"/></td>
@@ -504,8 +504,8 @@
                                   <td><t t-esc="shift.session_id.name or ''"/></td>
                               </tr>
                           </t>
-                      </t> -->
-                  <!-- </tbody> -->
+                      </t>
+                  </tbody>
               </table>
 
             </div>
