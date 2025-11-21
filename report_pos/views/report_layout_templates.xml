@@ -441,7 +441,7 @@
                           <th>Session</th>
                       </tr>
                   </thead>
-
+<!-- 
                   <tbody>
                       <t t-foreach="end_shift" t-as="shift">
                           <t t-if="shift.line_ids">
@@ -450,14 +450,12 @@
                                       <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
                                       <td><t t-esc="shift.cashier_id.name or ''"/></td>
 
-                                      <!-- Tanggal Payment -->
                                       <td>
                                           <t t-if="line.payment_date">
                                               <t t-esc="line.payment_date.strftime('%d/%m/%Y %H:%M:%S')"/>
                                           </t>
                                       </td>
 
-                                      <!-- Kategori -->
                                       <td>
                                           END OF SHIFT (
                                           <t t-esc="shift.start_date"/> - <t t-esc="shift.end_date"/>
@@ -465,35 +463,27 @@
                                           - <t t-esc="shift.session_id.config_id.name"/>
                                       </td>
 
-                                      <!-- Kode Store -->
                                       <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
 
-                                      <!-- Nama Store -->
                                       <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
 
-                                      <!-- Payment Method -->
                                       <td><t t-esc="line.payment_method_id.name or ''"/></td>
 
-                                      <!-- Amount -->
                                       <td><t t-esc="line.amount or ''"/></td>
 
-                                      <!-- Expected Amount -->
                                       <td><t t-esc="line.expected_amount or ''"/></td>
 
-                                      <!-- Amount Difference -->
                                       <td><t t-esc="line.amount_difference or ''"/></td>
 
-                                      <!-- Shift Number -->
                                       <td><t t-esc="shift.doc_num or ''"/></td>
 
-                                      <!-- Session -->
                                       <td><t t-esc="shift.session_id.name or ''"/></td>
                                   </tr>
                               </t>
-                          </t>
+                          </t> -->
 
                           <!-- Jika tidak ada line_ids -->
-                          <t t-if="not shift.line_ids">
+                          <!-- <t t-if="not shift.line_ids">
                               <tr>
                                   <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
                                   <td><t t-esc="shift.cashier_id.name or ''"/></td>
@@ -514,7 +504,7 @@
                                   <td><t t-esc="shift.session_id.name or ''"/></td>
                               </tr>
                           </t>
-                      </t>
+                      </t> -->
                   </tbody>
               </table>
 
