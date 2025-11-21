@@ -323,7 +323,7 @@
     </t>
   </template> -->
 
-  <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
+  <!-- <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
     <t t-set="o_portal_fullwidth_alert">
       <t t-call="report_pos.portal_back_in_edit_mode"/>
     </t>
@@ -334,7 +334,7 @@
           <div class="o_portal_content table-responsive border-0 d-flex justify-content-center my-3 ">
             <div class="o_portal_html_view position-relative bg-white shadow overflow-hidden">
               <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
-              <h5 class="text-center">Laporan Penjualan</h5>
+              <h5 class="text-center">END OF SHIFT</h5>
               <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
 
               <table class="table table-bordered table-sm">
@@ -362,34 +362,24 @@
                                   <tr>
                                       <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
                                       <td><t t-esc="shift.cashier_id.name or ''"/></td>
-
                                       <td>
                                           <t t-if="line.payment_date">
                                               <t t-esc="line.payment_date.strftime('%d/%m/%Y %H:%M:%S')"/>
                                           </t>
                                       </td>
-
                                       <td>
                                           END OF SHIFT (
                                           <t t-esc="shift.start_date"/> - <t t-esc="shift.end_date"/>
                                           ) - <t t-esc="shift.cashier_id.name"/>
                                           - <t t-esc="shift.session_id.config_id.name"/>
                                       </td>
-
                                       <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
-
                                       <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
-
                                       <td><t t-esc="line.payment_method_id.name or ''"/></td>
-
                                       <td><t t-esc="line.amount or ''"/></td>
-
                                       <td><t t-esc="line.expected_amount or ''"/></td>
-
                                       <td><t t-esc="line.amount_difference or ''"/></td>
-
                                       <td><t t-esc="shift.doc_num or ''"/></td>
-
                                       <td><t t-esc="shift.session_id.name or ''"/></td>
                                   </tr>
                               </t>
@@ -423,7 +413,164 @@
           </div>  
         </div> 
     </t>
-  </template>  
+  </template>   -->
+
+  <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
+  <t t-set="o_portal_fullwidth_alert">
+    <t t-call="report_pos.portal_back_in_edit_mode"/>
+  </t>
+  <t t-call="portal.portal_layout">
+    <t t-set="no_breadcrumbs" t-value="1"/>
+    <div class="o_portal_my_doc_table table-responsive">
+      <div class="o_portal_content table-responsive border-0 d-flex justify-content-center my-3">
+        <div class="o_portal_html_view position-relative bg-white shadow overflow-hidden p-3" style="min-width: 1200px;">
+          <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
+          <h5 class="text-center">END OF SHIFT</h5>
+          <p class="text-center">[ <t t-esc="date_from"/> - <t t-esc="date_to"/> ]</p>
+          <p class="text-center text-muted">Tanggal Cetak: <t t-esc="tanggal_cetak"/></p>
+
+          <!-- Loop per Kategori -->
+          <t t-foreach="grouped_end_shift.items()" t-as="group">
+            <t t-set="kategori" t-value="group[0]"/>
+            <t t-set="data" t-value="group[1]"/>
+            <t t-set="shifts" t-value="data['shifts']"/>
+            
+            <!-- Header Kategori -->
+            <div class="bg-secondary text-white p-2 mt-4 mb-2 rounded">
+              <strong><t t-esc="kategori"/></strong>
+            </div>
+
+            <table class="table table-bordered table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>User</th>
+                  <th>Kasir</th>
+                  <th>Tanggal</th>
+                  <th>Kode Store</th>
+                  <th>Nama Store</th>
+                  <th>Payment Method</th>
+                  <th class="text-end">Amount</th>
+                  <th class="text-end">Expected Amount</th>
+                  <th class="text-end">Amount Difference</th>
+                  <th>Shift Number</th>
+                  <th>Session</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-foreach="shifts" t-as="shift">
+                  <t t-if="shift.line_ids">
+                    <t t-foreach="shift.line_ids" t-as="line">
+                      <tr>
+                        <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
+                        <td><t t-esc="shift.cashier_id.name or ''"/></td>
+                        <td>
+                          <t t-if="line.payment_date">
+                            <t t-esc="line.payment_date.strftime('%d/%m/%Y %H:%M:%S')"/>
+                          </t>
+                        </td>
+                        <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                        <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                        <td><t t-esc="line.payment_method_id.name or ''"/></td>
+                        <td class="text-end"><t t-esc="format_number(line.amount or 0)"/></td>
+                        <td class="text-end"><t t-esc="format_number(line.expected_amount or 0)"/></td>
+                        <td class="text-end">
+                          <t t-if="(line.amount_difference or 0) != 0">
+                            <span class="text-danger"><t t-esc="format_number(line.amount_difference or 0)"/></span>
+                          </t>
+                          <t t-else="">
+                            <t t-esc="format_number(line.amount_difference or 0)"/>
+                          </t>
+                        </td>
+                        <td><t t-esc="shift.doc_num or ''"/></td>
+                        <td><t t-esc="shift.session_id.name or ''"/></td>
+                      </tr>
+                    </t>
+                  </t>
+                  <t t-if="not shift.line_ids">
+                    <tr class="table-light">
+                      <td><t t-esc="shift.session_id.user_id.name or ''"/></td>
+                      <td><t t-esc="shift.cashier_id.name or ''"/></td>
+                      <td class="text-muted">-</td>
+                      <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                      <td><t t-esc="shift.session_id.config_id.name or ''"/></td>
+                      <td class="text-muted">-</td>
+                      <td class="text-end text-muted">0</td>
+                      <td class="text-end text-muted">0</td>
+                      <td class="text-end text-muted">0</td>
+                      <td><t t-esc="shift.doc_num or ''"/></td>
+                      <td><t t-esc="shift.session_id.name or ''"/></td>
+                    </tr>
+                  </t>
+                </t>
+              </tbody>
+              <!-- Subtotal per Kategori -->
+              <tfoot class="table-warning">
+                <tr>
+                  <td colspan="6" class="text-end"><strong>Subtotal:</strong></td>
+                  <td class="text-end"><strong><t t-esc="format_number(data['subtotal_amount'])"/></strong></td>
+                  <td class="text-end"><strong><t t-esc="format_number(data['subtotal_expected'])"/></strong></td>
+                  <td class="text-end">
+                    <strong>
+                      <t t-if="data['subtotal_diff'] != 0">
+                        <span class="text-danger"><t t-esc="format_number(data['subtotal_diff'])"/></span>
+                      </t>
+                      <t t-else="">
+                        <t t-esc="format_number(data['subtotal_diff'])"/>
+                      </t>
+                    </strong>
+                  </td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </t>
+
+          <!-- Pesan jika tidak ada data -->
+          <t t-if="not grouped_end_shift">
+            <div class="alert alert-info text-center mt-4">
+              Tidak ada data End of Shift untuk periode ini.
+            </div>
+          </t>
+
+          <!-- Grand Total -->
+          <t t-if="grouped_end_shift">
+            <table class="table table-bordered mt-4">
+              <tfoot class="table-dark">
+                <tr>
+                  <td colspan="6" class="text-end"><strong>GRAND TOTAL:</strong></td>
+                  <td class="text-end"><strong><t t-esc="format_number(grand_total_amount)"/></strong></td>
+                  <td class="text-end"><strong><t t-esc="format_number(grand_total_expected)"/></strong></td>
+                  <td class="text-end">
+                    <strong>
+                      <t t-if="grand_total_diff != 0">
+                        <span class="text-warning"><t t-esc="format_number(grand_total_diff)"/></span>
+                      </t>
+                      <t t-else="">
+                        <t t-esc="format_number(grand_total_diff)"/>
+                      </t>
+                    </strong>
+                  </td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </t>
+
+          <!-- Tombol Kembali -->
+          <div class="text-center mt-4">
+            <a t-att-href="backend_url" class="btn btn-secondary">
+              <i class="fa fa-arrow-left"/> Kembali
+            </a>
+            <button onclick="window.print()" class="btn btn-primary">
+              <i class="fa fa-print"/> Cetak
+            </button>
+          </div>
+
+        </div>
+      </div>  
+    </div> 
+  </t>
+</template>
 
 
 </odoo>

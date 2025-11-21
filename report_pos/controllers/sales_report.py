@@ -2,6 +2,7 @@ from odoo import models, fields, _, api, http
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from datetime import datetime
+from collections import defaultdict
 
 class SalesReportDetailController(http.Controller):
 
@@ -535,12 +536,38 @@ class SalesReportDetailController(http.Controller):
             
         end_shift = request.env['end.shift'].sudo().search(domain, order='id desc')
 
+        # Grouping per kategori
+        grouped_end_shift = defaultdict(lambda: {'shifts': [], 'subtotal_amount': 0, 'subtotal_expected': 0, 'subtotal_diff': 0})
+        grand_total_amount = 0
+        grand_total_expected = 0
+        grand_total_diff = 0
+
+        for shift in end_shift:
+            # Buat key kategori
+            kategori = f"END OF SHIFT ({shift.start_date} - {shift.end_date}) - {shift.cashier_id.name or ''} - {shift.session_id.config_id.name or ''}"
+            
+            grouped_end_shift[kategori]['shifts'].append(shift)
+            
+            # Hitung subtotal per kategori
+            for line in shift.line_ids:
+                grouped_end_shift[kategori]['subtotal_amount'] += line.amount or 0
+                grouped_end_shift[kategori]['subtotal_expected'] += line.expected_amount or 0
+                grouped_end_shift[kategori]['subtotal_diff'] += line.amount_difference or 0
+                
+                grand_total_amount += line.amount or 0
+                grand_total_expected += line.expected_amount or 0
+                grand_total_diff += line.amount_difference or 0
+
         values = {
-            'end_shift': end_shift,
+            'end_shift': end_shift,  # tetap kirim untuk backward compatibility
+            'grouped_end_shift': dict(grouped_end_shift),
+            'grand_total_amount': grand_total_amount,
+            'grand_total_expected': grand_total_expected,
+            'grand_total_diff': grand_total_diff,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
             'backend_url': self.back_to_pos_view(),
-            'format_number': self.format_number,  # tambahkan ini
+            'format_number': self.format_number,
         }
         return request.render('report_pos.report_sales_settlement_end_of_shift', values)
