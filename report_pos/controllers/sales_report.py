@@ -529,9 +529,9 @@ class SalesReportDetailController(http.Controller):
         
         domain = []
         if date_from:
-            domain.append(('date_order', '>=', date_from))
+            domain.append(('start_date', '>=', date_from))
         if date_to:
-            domain.append(('date_order', '<=', date_to))
+            domain.append(('start_date', '<=', date_to))
             
         end_shift = request.env['end.shift'].sudo().search(domain, order='id desc')
 
