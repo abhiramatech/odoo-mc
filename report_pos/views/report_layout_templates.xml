@@ -324,7 +324,6 @@
   </template> -->
 
   <template id="report_sales_settlement_end_of_shift" name="Report Sales Settlement End of Shift">
-    <h4 class="text-center"><b>PT KEMANG KARSA</b></h4>
     <t t-set="o_portal_fullwidth_alert">
       <t t-call="report_pos.portal_back_in_edit_mode"/>
     </t>

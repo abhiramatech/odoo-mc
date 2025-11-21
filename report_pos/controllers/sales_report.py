@@ -536,7 +536,7 @@ class SalesReportDetailController(http.Controller):
         end_shift = request.env['end.shift'].sudo().search(domain, order='id desc')
 
         values = {
-            'orders': end_shift,
+            'end_shift': end_shift,
             'date_from': fields.Date.from_string(date_from).strftime('%d/%m/%Y'),
             'date_to': fields.Date.from_string(date_to).strftime('%d/%m/%Y'),
             'tanggal_cetak': fields.Date.today().strftime("%d %b %Y"),
