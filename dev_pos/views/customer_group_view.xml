@@ -26,6 +26,9 @@
               </group>
               <group>
                 <field name="vit_pricelist_id" string="Pricelist" tracking="True"/>
+                <field name="is_integrated"/>
+                <field name="is_updated"/>
+                <field name="index_store" widget="many2many_tags"/>
               </group>
             </group>
           </sheet>

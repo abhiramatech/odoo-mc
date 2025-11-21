@@ -48,3 +48,4 @@ from . import account_move_line
 from . import loyalty_history
 from . import report_stock
 from . import customer_group
+from . import res_config_settings
