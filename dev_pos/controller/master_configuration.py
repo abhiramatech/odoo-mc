@@ -634,7 +634,9 @@ class SettingConfig(models.Model):
 
         for ss_client in ss_clients:
             integrator_transaksi = DataTransaksi(ss_client, mc_client)
+            integrator_transaksiMCtoSS = DataTransaksiMCtoSS(mc_client, ss_client)
             integrator_transaksi.transfer_pos_order_invoice_ss_to_mc('pos.order', ['id', 'name', 'vit_pos_store', 'date_order', 'session_id', 'user_id', 'partner_id', 'pos_reference', 'vit_trxid', 'tracking_number', 'pricelist_id', 'employee_id', 'margin', 'amount_tax', 'amount_total', 'amount_paid', 'amount_return', 'state', 'lines', 'payment_ids'], 'Transaksi PoS Order Invoice', date_from, date_to)
+            integrator_transaksiMCtoSS.validate_invoice('pos.order', ['id'], 'Validate PoS Order Invoice', date_from, date_to)
 
     def transfer_pos_order_invoice_rescue(self, mc, ss, datefrom, dateto):
         if mc and ss:
