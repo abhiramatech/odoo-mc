@@ -18,7 +18,7 @@ class SettingConfig(models.Model):
     ]
 
     vit_config_server = fields.Selection(selection=SERVER_SELECTION, string='Server Selection')
-    vit_config_server_name = fields.Char(string='Server Name')
+    vit_config_server_name = fields.Char(string='Warehouse Name')
     vit_config_url = fields.Char(string='url')
     vit_config_db = fields.Char(string='Database Name')
     vit_config_username = fields.Char(string='Username')
