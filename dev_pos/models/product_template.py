@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
   
 
 class ProductTemplate(models.Model):
@@ -20,16 +20,16 @@ class ProductTemplate(models.Model):
 
     def write(self, vals):
         # Field-field yang readonly - tidak boleh diubah
-        readonly_fields = [
-            'id_mc', 'vit_sub_div', 'vit_item_kel', 'vit_item_type', 'is_fixed_price', 'brand',
-            'default_code', 'categ_id', 'standard_price', 'sale_ok', 'purchase_ok', 
-            'taxes_id', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id'
-        ]
+        # readonly_fields = [
+        #     'id_mc', 'vit_sub_div', 'vit_item_kel', 'vit_item_type', 'is_fixed_price', 'brand',
+        #     'default_code', 'categ_id', 'standard_price', 'sale_ok', 'purchase_ok', 
+        #     'taxes_id', 'detailed_type', 'invoice_policy', 'uom_id', 'uom_po_id'
+        # ]
         
-        # Cek jika ada field readonly yang mencoba diubah
-        for field in readonly_fields:
-            if field in vals:
-                raise UserError(f"Cannot modify field '{self._fields[field].string}' as it is read-only.")
+        # # Cek jika ada field readonly yang mencoba diubah
+        # for field in readonly_fields:
+        #     if field in vals:
+        #         raise UserError(f"Cannot modify field '{self._fields[field].string}' as it is read-only.")
         
         # Simpan nilai lama SEBELUM super().write() dipanggil
         old_values = {}
