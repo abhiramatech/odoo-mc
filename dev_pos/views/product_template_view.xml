@@ -16,7 +16,7 @@
         
         <!-- Tambahkan field baru setelah product_tag_ids -->
         <xpath expr="//field[@name='product_tag_ids']" position="after">
-            <field name="is_integrated" readonly="1"/>
+            <field name="is_integrated"/>
             <field name="vit_is_discount"/>
             <field name="index_store" widget="many2many_tags"/>
         </xpath>
