@@ -89,7 +89,7 @@
         name="Customer Groups" 
         parent="contacts.res_partner_menu_config" 
         action="action_customer_group" 
-        sequence="10"
+        sequence="99"
         groups="base.group_no_one"/>
 
   </data>

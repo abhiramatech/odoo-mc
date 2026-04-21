@@ -25,6 +25,7 @@ class DataIntegrator:
                 'loyalty.card': 'code',
                 'multiple.barcode': 'barcode',
                 'purchase.order': 'vit_trxid',
+                'customer.group': 'vit_group_name',
             }
             return field_uniq_mapping.get(model, 'name')
         except Exception as e:
@@ -738,6 +739,8 @@ class DataIntegrator:
                         field_data = field_value[1] if field_value else False
                         if model == 'purchase.order' and field_name == 'picking_type_id':
                             field_data = field_data.split(': ')[1]
+                        elif model == 'res.partner' and field_name == 'property_product_pricelist':
+                            field_data = field_data.split(" (")[0]
                 elif field_metadata == 'many2many' and isinstance(field_value, list):
                     name_datas_source = dict_relation_source.get(relation_model, [])
                     if model == 'product.tag':
