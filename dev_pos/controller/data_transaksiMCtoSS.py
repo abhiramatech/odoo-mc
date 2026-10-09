@@ -4,6 +4,12 @@ import pytz
 import re
 import concurrent.futures
 
+
+import logging
+from collections import defaultdict
+
+_logger = logging.getLogger(__name__)
+
 # kalau ada case store nya beda zona waktu gimana
 class DataTransaksiMCtoSS:
     def __init__(self, source_client, target_client):
@@ -2946,7 +2952,16 @@ class DataTransaksiMCtoSS:
                 self.set_log_ss.create_log_note_failed(record, 'Invoice', message_exception, write_date)
                 self.set_log_mc.create_log_note_failed(record, 'Invoice', message_exception, write_date)
 
-    from collections import defaultdict
+    # Contoh konfigurasi (letakkan di entry point aplikasi, bukan di sini):
+    #
+    # logging.basicConfig(
+    #     level=logging.INFO,
+    #     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    #     handlers=[
+    #         logging.StreamHandler(),
+    #         logging.FileHandler("validate_grpo.log", encoding="utf-8"),
+    #     ],
+    # )
 
 
     def validate_GRPO(self, model_name, fields, description, date_from, date_to):
@@ -2986,6 +3001,8 @@ class DataTransaksiMCtoSS:
 
             res_model = action['res_model']
             ctx = action.get('context', {}) or {}
+            _logger.info("button_validate mengembalikan wizard %s untuk picking id=%s",
+                        res_model, picking_id)
 
             if res_model == 'stock.backorder.confirmation':
                 # Source sudah done & qty sudah disamakan -> tidak perlu backorder
@@ -2993,15 +3010,22 @@ class DataTransaksiMCtoSS:
                             [{'pick_ids': [(4, picking_id)]}], {'context': ctx})
                 call(client, res_model, 'process_cancel_backorder',
                     [[wiz_id]], {'context': ctx})
+                _logger.info("Wizard backorder diproses (tanpa backorder) untuk picking id=%s", picking_id)
                 return True
 
             if res_model == 'stock.immediate.transfer':
                 wiz_id = call(client, res_model, 'create',
                             [{'pick_ids': [(4, picking_id)]}], {'context': ctx})
                 call(client, res_model, 'process', [[wiz_id]], {'context': ctx})
+                _logger.info("Wizard immediate transfer diproses untuk picking id=%s", picking_id)
                 return True
 
             raise Exception(f"Wizard tidak dikenal dari button_validate: {res_model}")
+
+        stats = {'success': 0, 'skipped': 0, 'failed': 0}
+
+        _logger.info("=== validate_GRPO mulai | model=%s | %s s/d %s ===",
+                    model_name, date_from, date_to)
 
         # ------------------------------------------------- 1. GRPO source yang perlu diproses
         GRPO_validates = call(
@@ -3018,28 +3042,33 @@ class DataTransaksiMCtoSS:
         )
 
         if not GRPO_validates:
-            print("Tidak ada GRPO yang ditemukan di source.")
+            _logger.info("Tidak ada GRPO yang ditemukan di source.")
             return
+
+        _logger.info("Ditemukan %d GRPO di source: %s",
+                    len(GRPO_validates), [r['name'] for r in GRPO_validates])
 
         # ------------------------------------------------- 2. vit_trxid PO di source
         source_po_ids = list({r['purchase_id'][0] for r in GRPO_validates if r.get('purchase_id')})
         if not source_po_ids:
-            print("GRPO source tidak memiliki Purchase Order, tidak ada yang bisa dicocokkan.")
+            _logger.warning("GRPO source tidak memiliki Purchase Order, tidak ada yang bisa dicocokkan.")
             return
 
         source_pos = call(self.source_client, 'purchase.order', 'read',
-                        [source_po_ids], {'fields': ['id', 'vit_trxid']})
+                        [source_po_ids], {'fields': ['id', 'name', 'vit_trxid']})
         source_po_trxid = {po['id']: po['vit_trxid'] for po in source_pos}
         po_trxids = [t for t in source_po_trxid.values() if t]
+        _logger.info("PO source: %s", {po['name']: po['vit_trxid'] for po in source_pos})
 
         if not po_trxids:
-            print("PO di source tidak memiliki vit_trxid.")
+            _logger.warning("PO di source tidak memiliki vit_trxid.")
             return
 
         # ------------------------------------------------- 3. PO target dengan vit_trxid yang sama
         target_pos = call(self.target_client, 'purchase.order', 'search_read',
                         [[['vit_trxid', 'in', po_trxids]]],
                         {'fields': ['id', 'name', 'vit_trxid']})
+        _logger.info("PO target yang cocok: %s", {po['name']: po['vit_trxid'] for po in target_pos})
 
         target_po_trxid_by_id = {po['id']: po['vit_trxid'] for po in target_pos}
 
@@ -3049,7 +3078,7 @@ class DataTransaksiMCtoSS:
             count_by_trxid[po['vit_trxid']] += 1
         for trxid, cnt in count_by_trxid.items():
             if cnt > 1:
-                print(f"PERINGATAN: vit_trxid PO {trxid} ada {cnt}x di target, pencocokan bisa ambigu.")
+                _logger.warning("vit_trxid PO %s ada %dx di target, pencocokan bisa ambigu.", trxid, cnt)
 
         # ------------------------------------------------- 4. Receipt target kandidat
         GRPO_needs_validate = call(
@@ -3062,6 +3091,7 @@ class DataTransaksiMCtoSS:
             ]],
             {'fields': ['id', 'name', 'move_ids_without_package', 'purchase_id']}
         )
+        _logger.info("Kandidat receipt target: %s", [g['name'] for g in GRPO_needs_validate])
 
         # vit_trxid PO -> list kandidat picking target
         target_candidates = defaultdict(list)
@@ -3105,8 +3135,12 @@ class DataTransaksiMCtoSS:
             po_key = source_po_trxid.get(res['purchase_id'][0]) if res.get('purchase_id') else None
             candidates = target_candidates.get(po_key, []) if po_key else []
 
+            _logger.info("Proses GRPO source %s (PO vit_trxid=%s)", res['name'], po_key)
+
             if not candidates:
-                print(f"GRPO source {res['name']} (PO vit_trxid={po_key}) tidak ditemukan di target.")
+                _logger.warning("GRPO source %s (PO vit_trxid=%s) tidak ditemukan di target.",
+                                res['name'], po_key)
+                stats['skipped'] += 1
                 continue
 
             target_grpo = None
@@ -3123,16 +3157,21 @@ class DataTransaksiMCtoSS:
                         raise Exception(f"Produk id {move['product_id'][0]} di source tidak punya default_code")
                     source_qty_by_code[code] += move['quantity']
                 source_codes_set = set(source_qty_by_code.keys())
+                _logger.info("Source %s produk/qty: %s", res['name'], dict(source_qty_by_code))
 
                 # ---- Pilih kandidat target: set kode produk harus sama persis
                 matched = [c for c in candidates if target_codes_of(c) == source_codes_set]
                 if not matched:
-                    print(f"GRPO source {res['name']}: ada {len(candidates)} receipt target untuk PO "
-                        f"{po_key}, tetapi tidak ada yang kode produknya sama. Dilewati.")
+                    _logger.warning(
+                        "GRPO source %s: ada %d receipt target untuk PO %s, tetapi tidak ada "
+                        "yang kode produknya sama. Dilewati.", res['name'], len(candidates), po_key)
+                    stats['skipped'] += 1
                     continue
 
                 target_grpo = matched[0]
                 candidates.remove(target_grpo)  # agar tidak dipakai dua kali
+                _logger.info("Source %s dipasangkan dengan target %s (id=%s)",
+                            res['name'], target_grpo['name'], target_grpo['id'])
 
                 # ---- Bandingkan & samakan qty target dengan source
                 target_move_ids = target_grpo['move_ids_without_package']
@@ -3150,13 +3189,18 @@ class DataTransaksiMCtoSS:
                     tm = tms[0]
                     source_qty = source_qty_by_code[code]
                     if source_qty != tm['quantity']:
+                        _logger.info("Qty %s di %s: %s -> %s",
+                                    code, target_grpo['name'], tm['quantity'], source_qty)
                         moves_to_update.append((1, tm['id'], {'quantity': source_qty}))
 
                 if moves_to_update:
                     call(self.target_client, 'stock.picking', 'write',
                         [[target_grpo['id']], {'move_ids_without_package': moves_to_update}])
-                    print(f"Updated quantities for {len(moves_to_update)} products "
-                        f"in target GRPO {target_grpo['name']}")
+                    _logger.info("Updated quantities for %d products in target GRPO %s",
+                                len(moves_to_update), target_grpo['name'])
+                else:
+                    _logger.info("Qty target %s sudah sama dengan source, tidak ada update.",
+                                target_grpo['name'])
 
                 # ---- Tandai flag sebelum validate (sesuai alur asli; kemungkinan dipakai
                 #      untuk mencegah sinkronisasi balik). Di-rollback bila validate gagal.
@@ -3176,34 +3220,42 @@ class DataTransaksiMCtoSS:
                     # Kembalikan flag agar dokumen bisa diproses ulang pada run berikutnya
                     call(self.target_client, 'stock.picking', 'write',
                         [[target_grpo['id']], {'is_integrated': False, 'is_closed': False}])
+                    _logger.warning("Flag is_integrated/is_closed target %s dikembalikan ke False",
+                                    target_grpo['name'])
                     raise
 
-                print(f"Validated GRPO {target_grpo['name']} in target_client.")
+                _logger.info("Validated GRPO %s in target_client.", target_grpo['name'])
 
                 # ---- Tandai source selesai (hanya setelah target benar-benar done)
                 call(self.source_client, 'stock.picking', 'write',
                     [[res['id']], {'is_updated': True}])
+                _logger.info("Source %s ditandai is_updated = True", res['name'])
 
-                # ---- Log (write_date harus diambil SEBELUM dipakai)
+                # ---- Log note (write_date harus diambil SEBELUM dipakai)
                 write_date = self.get_write_date(model_name, res['id'])
                 message_success = (f"Successfully validated and updated GRPO "
                                 f"{target_grpo['name']} (source {res['name']})")
                 self.set_log_mc.create_log_note_success(res, 'GRPO', message_success, write_date)
                 self.set_log_ss.create_log_note_success(res, 'GRPO', message_success, write_date)
 
+                stats['success'] += 1
+
             except Exception as e:
+                stats['failed'] += 1
                 target_name = target_grpo['name'] if target_grpo else '-'
                 message_exception = (f"Failed to validate and update GRPO {target_name} "
                                     f"(source {res['name']}): {e}")
-                print(message_exception)
+                # logger.exception menyertakan traceback lengkap
+                _logger.exception(message_exception)
                 try:
                     write_date = self.get_write_date(model_name, res['id'])
                     self.set_log_mc.create_log_note_failed(res, 'GRPO', message_exception, write_date)
                     self.set_log_ss.create_log_note_failed(res, 'GRPO', message_exception, write_date)
                 except Exception as log_err:
-                    print(f"Gagal menulis log: {log_err}")
+                    _logger.error("Gagal menulis log note untuk %s: %s", res['name'], log_err)
 
-        print("GRPO validation and quantity update completed.")
+        _logger.info("=== validate_GRPO selesai | berhasil=%d, dilewati=%d, gagal=%d ===",
+                    stats['success'], stats['skipped'], stats['failed'])
 
     def transfer_internal_transfers_mc_to_ss(self, model_name, fields, description, date_from, date_to):
         try:
