@@ -2358,28 +2358,41 @@ class DataTransaksi:
             [[
                 ['picking_type_id.name', '=', 'GRPO'],
                 ['vit_trxid', 'in', all_vit_trxids],
-                ['is_integrated', '=', True],
-                ['state', '=', 'assigned']
+                ['state', '=', 'assigned'],
             ]],
-            {'fields': ['id', 'move_ids_without_package', 'vit_trxid']}
+            {'fields': ['id', 'name', 'move_ids_without_package', 'vit_trxid']}
         )
-        target_grpo_dict = {g['vit_trxid']: g for g in GRPO_needs_validate}
+        target_grpo_dict = {}
+        for g in GRPO_needs_validate:
+            target_grpo_dict.setdefault(g['vit_trxid'], []).append(g)
         _logger.info("Ditemukan %d GRPO di target yang menunggu validasi", len(GRPO_needs_validate))
 
         stats = {"success": 0, "failed": 0, "skipped": 0}
 
         for res in GRPO_validates:
             vit_trxid = res.get('vit_trxid', False)
-            target_grpo = target_grpo_dict.get(vit_trxid)
+            candidates = target_grpo_dict.get(vit_trxid, [])
 
-            if not target_grpo:
+            if not candidates:
                 stats["skipped"] += 1
                 _logger.warning(
                     "SKIP GRPO source id=%s name=%s vit_trxid=%s: tidak ada di target "
-                    "(is_integrated=False & state=assigned)",
+                    "(state=assigned)",
                     res['id'], res.get('name'), vit_trxid
                 )
                 continue
+
+            if len(candidates) > 1:
+                stats["skipped"] += 1
+                _logger.warning(
+                    "SKIP GRPO source id=%s vit_trxid=%s: %d kandidat di target "
+                    "(ids=%s names=%s), cek manual",
+                    res['id'], vit_trxid, len(candidates),
+                    [c['id'] for c in candidates], [c['name'] for c in candidates]
+                )
+                continue
+
+            target_grpo = candidates[0]
 
             # write_date diisi sebelum try supaya selalu tersedia di blok except
             write_date = self.get_write_date(model_name, res['id'])
