@@ -2358,7 +2358,7 @@ class DataTransaksi:
             [[
                 ['picking_type_id.name', '=', 'GRPO'],
                 ['vit_trxid', 'in', all_vit_trxids],
-                ['is_integrated', '=', False],
+                ['is_integrated', '=', True],
                 ['state', '=', 'assigned']
             ]],
             {'fields': ['id', 'move_ids_without_package', 'vit_trxid']}
