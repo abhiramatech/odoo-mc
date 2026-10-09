@@ -6,10 +6,6 @@ import concurrent.futures
 from threading import Lock
 import datetime
 
-import logging
-_logger = logging.getLogger(__name__)
-
-
 # kalau ada case store nya beda zona waktu gimana
 class DataTransaksi:
     def __init__(self, source_client, target_client):
@@ -2299,17 +2295,14 @@ class DataTransaksi:
                         self.set_log_ss.create_log_note_failed(gi, 'Goods Issue', message_exception, write_date)
 
     def validate_GRPO(self, model_name, fields, description, date_from, date_to):
-        t_func = time.time()
-        _logger.info("START validate_GRPO | date_from=%s date_to=%s", date_from, date_to)
-
-        # Ambil GRPO di source (MC) yang sudah done tapi belum di-update
+        # Retrieve GRPO records that match the specified criteria from the source database
         GRPO_validates = self.source_client.call_odoo(
-            'object', 'execute_kw',
+            'object', 'execute_kw', 
             self.source_client.db, self.source_client.uid, self.source_client.password,
             'stock.picking', 'search_read',
             [[
-                ['picking_type_id.name', '=', 'GRPO'],
-                ['is_integrated', '=', True],
+                ['picking_type_id.name', '=', 'GRPO'], 
+                ['is_integrated', '=', True], 
                 ['is_updated', '=', False],
                 ['write_date', '>=', date_from], ['write_date', '<=', date_to],
                 ['state', '=', 'done'],
@@ -2317,20 +2310,19 @@ class DataTransaksi:
             {'fields': ['id', 'name', 'move_ids_without_package', 'vit_trxid']}
         )
 
+        # Check if any GRPO records are found
         if not GRPO_validates:
-            _logger.info("Tidak ada GRPO di source yang perlu divalidasi.")
+            print("Tidak ada GRPO yang ditemukan di target.")
             return
-        _logger.info("Ditemukan %d GRPO di source", len(GRPO_validates))
 
-        # Kumpulkan semua move_id dan vit_trxid
+        # Collect all move_ids and vit_trxids
         all_source_move_ids = []
         all_vit_trxids = []
         for res in GRPO_validates:
             all_source_move_ids.extend(res['move_ids_without_package'])
             all_vit_trxids.append(res.get('vit_trxid', False))
-        _logger.debug("Total source move=%d | vit_trxid=%s", len(all_source_move_ids), all_vit_trxids)
 
-        # Ambil semua move line source sekaligus
+        # Fetch all source move lines in one call
         source_move_lines = self.source_client.call_odoo(
             'object', 'execute_kw',
             self.source_client.db, self.source_client.uid, self.source_client.password,
@@ -2339,8 +2331,8 @@ class DataTransaksi:
             {'fields': ['id', 'product_id', 'quantity']}
         )
 
-        # Ambil default_code produk source sekaligus
-        source_product_ids = list({m['product_id'][0] for m in source_move_lines})
+        # Fetch all source product codes in one call
+        source_product_ids = list(set([move['product_id'][0] for move in source_move_lines]))
         source_products = self.source_client.call_odoo(
             'object', 'execute_kw',
             self.source_client.db, self.source_client.uid, self.source_client.password,
@@ -2348,73 +2340,50 @@ class DataTransaksi:
             [[('id', 'in', source_product_ids)]],
             {'fields': ['id', 'default_code']}
         )
-        source_product_dict = {p['id']: p['default_code'] for p in source_products}
+        source_product_dict = {product['id']: product['default_code'] for product in source_products}
 
-        # Ambil GRPO di target (SS) yang menunggu validasi
+        # Fetch all target GRPO records that need validation
         GRPO_needs_validate = self.target_client.call_odoo(
-            'object', 'execute_kw',
+            'object', 'execute_kw', 
             self.target_client.db, self.target_client.uid, self.target_client.password,
             'stock.picking', 'search_read',
             [[
-                ['picking_type_id.name', '=', 'GRPO'],
-                ['vit_trxid', 'in', all_vit_trxids],
-                ['state', '=', 'assigned'],
+                ['picking_type_id.name', '=', 'GRPO'], 
+                ['vit_trxid', 'in', all_vit_trxids], 
+                ['is_integrated', '=', False], 
+                ['state', '=', 'assigned']
             ]],
-            {'fields': ['id', 'name', 'move_ids_without_package', 'vit_trxid']}
+            {'fields': ['id', 'move_ids_without_package', 'vit_trxid']}
         )
-        target_grpo_dict = {}
-        for g in GRPO_needs_validate:
-            target_grpo_dict.setdefault(g['vit_trxid'], []).append(g)
-        _logger.info("Ditemukan %d GRPO di target yang menunggu validasi", len(GRPO_needs_validate))
 
-        stats = {"success": 0, "failed": 0, "skipped": 0}
+        # Create a dictionary to map vit_trxid to target GRPO records
+        target_grpo_dict = {grpo['vit_trxid']: grpo for grpo in GRPO_needs_validate}
 
         for res in GRPO_validates:
             vit_trxid = res.get('vit_trxid', False)
-            candidates = target_grpo_dict.get(vit_trxid, [])
+            target_grpo = target_grpo_dict.get(vit_trxid)
 
-            if not candidates:
-                stats["skipped"] += 1
-                _logger.warning(
-                    "SKIP GRPO source id=%s name=%s vit_trxid=%s: tidak ada di target "
-                    "(state=assigned)",
-                    res['id'], res.get('name'), vit_trxid
-                )
+            if not target_grpo:
                 continue
-
-            if len(candidates) > 1:
-                stats["skipped"] += 1
-                _logger.warning(
-                    "SKIP GRPO source id=%s vit_trxid=%s: %d kandidat di target "
-                    "(ids=%s names=%s), cek manual",
-                    res['id'], vit_trxid, len(candidates),
-                    [c['id'] for c in candidates], [c['name'] for c in candidates]
-                )
-                continue
-
-            target_grpo = candidates[0]
-
-            # write_date diisi sebelum try supaya selalu tersedia di blok except
-            write_date = self.get_write_date(model_name, res['id'])
-            start_time = time.time()
-            ctx = f"[GRPO src_id={res['id']} name={res.get('name')} tgt_id={target_grpo['id']} vit_trxid={vit_trxid}]"
-            _logger.info("%s mulai diproses", ctx)
 
             try:
-                # Move line source untuk GRPO ini
-                grpo_source_move_lines = [m for m in source_move_lines if m['id'] in res['move_ids_without_package']]
+                # Get source move lines for this GRPO
+                grpo_source_move_lines = [move for move in source_move_lines if move['id'] in res['move_ids_without_package']]
+                
+                # Get source product codes and quantities
                 source_product_info = {
-                    source_product_dict.get(m['product_id'][0]): {
-                        'product_id': m['product_id'][0],
-                        'quantity': m['quantity']
+                    source_product_dict.get(move['product_id'][0]): {
+                        'product_id': move['product_id'][0],
+                        'quantity': move['quantity']
                     }
-                    for m in grpo_source_move_lines
+                    for move in grpo_source_move_lines
                 }
                 source_codes_set = set(source_product_info.keys())
-                _logger.debug("%s source codes=%s", ctx, source_codes_set)
 
-                # Move line target
+                # Get target move_ids
                 target_move_ids = target_grpo['move_ids_without_package']
+
+                # Fetch all target move lines in one call
                 target_move_lines = self.target_client.call_odoo(
                     'object', 'execute_kw',
                     self.target_client.db, self.target_client.uid, self.target_client.password,
@@ -2423,7 +2392,8 @@ class DataTransaksi:
                     {'fields': ['id', 'product_id', 'quantity']}
                 )
 
-                target_product_ids = [m['product_id'][0] for m in target_move_lines]
+                # Fetch all target product codes in one call
+                target_product_ids = [move['product_id'][0] for move in target_move_lines]
                 target_products = self.target_client.call_odoo(
                     'object', 'execute_kw',
                     self.target_client.db, self.target_client.uid, self.target_client.password,
@@ -2431,48 +2401,47 @@ class DataTransaksi:
                     [[('id', 'in', target_product_ids)]],
                     {'fields': ['id', 'default_code']}
                 )
-                target_product_dict = {p['id']: p['default_code'] for p in target_products}
+                target_product_dict = {product['id']: product['default_code'] for product in target_products}
 
                 moves_to_remove = []
                 moves_to_update = []
 
                 for target_move in target_move_lines:
-                    code = target_product_dict.get(target_move['product_id'][0])
-
-                    if code not in source_codes_set:
+                    target_product_id = target_move['product_id'][0]
+                    target_product_code = target_product_dict.get(target_product_id)
+                    
+                    if target_product_code not in source_codes_set:
                         moves_to_remove.append(target_move['id'])
-                        _logger.debug("%s move %s (%s) tidak ada di source -> dihapus", ctx, target_move['id'], code)
                     else:
-                        src_qty = source_product_info[code]['quantity']
-                        tgt_qty = target_move['quantity']
-                        if src_qty != tgt_qty:
-                            moves_to_update.append((1, target_move['id'], {'quantity': src_qty}))
-                            _logger.debug("%s move %s (%s) qty %s -> %s", ctx, target_move['id'], code, tgt_qty, src_qty)
-
-                # Produk yang ada di source tapi tidak ada di target (tidak ditangani kode ini)
-                target_codes = {target_product_dict.get(m['product_id'][0]) for m in target_move_lines}
-                missing_in_target = source_codes_set - target_codes
-                if missing_in_target:
-                    _logger.warning("%s produk ada di source tapi tidak ada di target: %s", ctx, missing_in_target)
+                        source_quantity = source_product_info[target_product_code]['quantity']
+                        target_quantity = target_move['quantity']
+                        
+                        if source_quantity != target_quantity:
+                            moves_to_update.append((1, target_move['id'], {
+                                'quantity': source_quantity
+                            }))
 
                 if moves_to_remove:
+                    # Delete the target move lines for products that no longer exist in source
                     self.target_client.call_odoo(
                         'object', 'execute_kw',
                         self.target_client.db, self.target_client.uid, self.target_client.password,
                         'stock.move', 'unlink',
                         [moves_to_remove]
                     )
-                    _logger.info("%s hapus %d move dari target", ctx, len(moves_to_remove))
+                    print(f"Deleted {len(moves_to_remove)} products from target_client for GRPO {target_grpo['id']}")
 
                 if moves_to_update:
+                    # Update the quantities of the target move lines
                     self.target_client.call_odoo(
                         'object', 'execute_kw',
                         self.target_client.db, self.target_client.uid, self.target_client.password,
                         'stock.picking', 'write',
                         [[target_grpo['id']], {'move_ids_without_package': moves_to_update}]
                     )
-                    _logger.info("%s update qty %d move di target", ctx, len(moves_to_update))
+                    print(f"Updated quantities for {len(moves_to_update)} products in target_client for GRPO {target_grpo['id']}")
 
+            
                 self.target_client.call_odoo(
                     'object', 'execute_kw',
                     self.target_client.db, self.target_client.uid, self.target_client.password,
@@ -2480,20 +2449,15 @@ class DataTransaksi:
                     [[target_grpo['id']], {'is_integrated': True, 'is_closed': True}]
                 )
 
-                result = self.target_client.call_odoo(
+                self.target_client.call_odoo(
                     'object', 'execute_kw',
                     self.target_client.db, self.target_client.uid, self.target_client.password,
                     'stock.picking', 'button_validate',
                     [[target_grpo['id']]]
                 )
-                # button_validate bisa mengembalikan dict wizard (backorder/immediate transfer);
-                # kalau itu terjadi, picking belum benar-benar done
-                if isinstance(result, dict):
-                    _logger.warning("%s button_validate mengembalikan wizard: res_model=%s", ctx, result.get('res_model'))
-                else:
-                    _logger.info("%s tervalidasi di target", ctx)
+                print(f"Validated GRPO {target_grpo['id']} in target_client.")
 
-                # Tandai sudah di-update di source
+                # Mark the GRPO as updated in the source system
                 self.source_client.call_odoo(
                     'object', 'execute_kw',
                     self.source_client.db, self.source_client.uid, self.source_client.password,
@@ -2501,25 +2465,17 @@ class DataTransaksi:
                     [[res['id']], {'is_updated': True}]
                 )
 
-                end_time = time.time()
-                duration = end_time - start_time
-                self.set_log_mc.create_log_note_success(res, start_time, end_time, duration, 'GRPO', write_date)
-                self.set_log_ss.create_log_note_success(res, start_time, end_time, duration, 'GRPO', write_date)
-
-                stats["success"] += 1
-                _logger.info("%s SELESAI dalam %.2f detik", ctx, duration)
+                message_success = f"Successfully validated and updated GRPO {target_grpo['id']}"
+                self.set_log_mc.create_log_note_success(res, 'GRPO', message_success, write_date)
+                self.set_log_ss.create_log_note_success(res, 'GRPO', message_success, write_date)
+                write_date = self.get_write_date(model_name, res['id'])
 
             except Exception as e:
-                stats["failed"] += 1
-                _logger.exception("%s GAGAL: %s", ctx, e)  # otomatis menyertakan traceback
                 message_exception = f"Failed to validate and update GRPO {target_grpo['id']}: {e}"
-                self.set_log_mc.create_log_note_failed(res, 'GRPO', message_exception, write_date)
-                self.set_log_ss.create_log_note_failed(res, 'GRPO', message_exception, write_date)
+                # self.set_log_mc.create_log_note_failed(res, 'GRPO', message_exception, write_date)
+                # self.set_log_ss.create_log_note_failed(res, 'GRPO', message_exception, write_date)
 
-        _logger.info(
-            "END validate_GRPO | success=%d failed=%d skipped=%d | total %.2f detik",
-            stats["success"], stats["failed"], stats["skipped"], time.time() - t_func
-        )
+        print("GRPO validation and quantity update completed.")
 
     def transfer_internal_transfers_ss_to_mc(self, model_name, fields, description, date_from, date_to):
         try:
