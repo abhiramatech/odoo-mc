@@ -1,0 +1,4 @@
+id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
+access_transfer_type,access_transfer.type,model_transfer_type,stock.group_stock_user,1,1,1,1
+access_transfer_request,access_transfer.request,model_transfer_request,stock.group_stock_user,1,1,1,1
+access_transfer_request_line,access_transfer.request.line,model_transfer_request_line,stock.group_stock_user,1,1,1,1

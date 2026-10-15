@@ -529,11 +529,90 @@ class POSTMasterBoM(http.Controller):
                 'message': f"Failed to create BoM: {str(e)}"
             }
 
+# controllers/master_item.py
+import logging
+import time
+
+import psycopg2
+import psycopg2.errors
+from odoo import http
+from odoo.http import request
+
+_logger = logging.getLogger(__name__)
+
+# =========================================================
+# KONFIGURASI BATCH
+# =========================================================
+LOOKUP_CHUNK            = 5000   # chunk query preload (default_code & data master)
+BATCH_CREATE_SIZE       = 500    # jumlah produk per batch ORM create
+COMMIT_MAX_RETRIES      = 3      # retry commit kalau kena serialization failure
+COMMIT_RETRY_BASE_SLEEP = 0.2    # detik; backoff = base * attempt
+
+# Context create massal: tidak membuat tracking value / log chatter
+# "Product created" / auto-follow untuk tiap produk (sangat mahal di volume besar).
+BULK_CREATE_CONTEXT = {
+    'tracking_disable':         True,
+    'mail_create_nolog':        True,
+    'mail_create_nosubscribe':  True,
+    'mail_notrack':             True,
+}
+
+
+# =========================================================
+# HELPER
+# =========================================================
+def _chunks(values, size):
+    values = list(values)
+    for i in range(0, len(values), size):
+        yield values[i:i + size]
+
+
+def _as_list(value):
+    """None / '' / False -> []; nilai tunggal -> [nilai]; list -> list."""
+    if value is None or value is False or value == '':
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _bulk_read(model, field, values, fields):
+    """search_read dengan operator 'in' per chunk -> list of dict."""
+    rows = []
+    for chunk in _chunks(values, LOOKUP_CHUNK):
+        rows.extend(model.search_read([(field, 'in', chunk)], fields))
+    return rows
+
+
+def _advisory_lock(cr, key):
+    """Transaction-level advisory lock (hash dari key), otomatis lepas saat
+    commit/rollback. Mengurangi konflik kalau beberapa request paralel
+    menyentuh product_code yang sama."""
+    cr.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (key,))
+
+
+def _commit_with_retry(cr, max_retries=COMMIT_MAX_RETRIES, context=""):
+    """Commit dengan retry kalau kena serialization failure (SQLSTATE 40001)."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            cr.commit()
+            return
+        except psycopg2.errors.SerializationFailure as e:
+            cr.rollback()
+            _logger.warning(
+                f"[{context}] Serialization failure on commit "
+                f"(attempt {attempt}/{max_retries}): {e}"
+            )
+            if attempt == max_retries:
+                _logger.error(f"[{context}] Commit gagal setelah {max_retries} retry, menyerah.")
+                raise
+            time.sleep(COMMIT_RETRY_BASE_SLEEP * attempt)
+
+
 class POSTMasterItem(http.Controller):
+
     @http.route('/api/master_item', type='json', auth='none', methods=['POST'], csrf=False)
     def post_master_item(self, **kw):
         try:
-            # 🔐 Autentikasi
+            # 🔐 Autentikasi (TETAP seperti versi lama)
             config = request.env['setting.config'].sudo().search(
                 [('vit_config_server', '=', 'mc')], limit=1
             )
@@ -548,28 +627,99 @@ class POSTMasterItem(http.Controller):
             if not uid:
                 return {'code': 401, 'status': 'Failed', 'message': 'Authentication failed.'}
 
+            env = request.env
+            cr = request.env.cr
+
+            Product  = env['product.template'].sudo().with_context(**BULK_CREATE_CONTEXT)
+            Category = env['product.category'].sudo()
+            Uom      = env['uom.uom'].sudo()
+            PosCateg = env['pos.category'].sudo()
+            Tax      = env['account.tax'].sudo()
+
             json_data = request.get_json_data()
             items = json_data.get('items', [])
             if isinstance(items, dict):
                 items = [items]
+            if not items:
+                return {'code': 400, 'status': 'Failed', 'message': 'No items provided.'}
 
-            vals_list, created, errors = [], [], []
+            # ============================================================
+            # 1. KUMPULKAN KEY UNIK dari seluruh payload
+            # ============================================================
+            all_codes, all_categ_names, all_uom_names = set(), set(), set()
+            all_pos_ids, all_tax_names = set(), set()
 
-            # 💾 CACHE untuk menghindari banyak search
-            cache_categories = {}
-            cache_uom = {}
-            cache_pos = {}
-            cache_tax = {}
+            for data in items:
+                if data.get('product_code'):
+                    all_codes.add(data['product_code'])
+                if data.get('category_name'):
+                    all_categ_names.add(data['category_name'])
+                for key in ('uom_name', 'uom_po_name'):
+                    if data.get(key):
+                        all_uom_names.add(data[key])
+                all_pos_ids.update(_as_list(data.get('pos_categ_ids', data.get('pos_categ_id', []))))
+                all_tax_names.update(_as_list(data.get('taxes_names', [])))
 
-            model_category = request.env['product.category'].sudo()
-            model_uom = request.env['uom.uom'].sudo()
-            model_pos = request.env['pos.category'].sudo()
-            model_tax = request.env['account.tax'].sudo()
-            model_product = request.env['product.template'].sudo()
+            # ============================================================
+            # 2. PRELOAD SEMUA LOOKUP SEKALIGUS (chunked, tanpa query di dalam loop)
+            # ============================================================
+            # Produk yang sudah ada -- TERMASUK yang diarsipkan (active=False)
+            existing_ids = {}
+            for row in _bulk_read(Product.with_context(active_test=False),
+                                  'default_code', all_codes, ['default_code']):
+                existing_ids.setdefault(row['default_code'], row['id'])
 
-            BATCH_SIZE = 50  # ⬅ untuk mencegah overloading create()
+            categ_map = {}
+            for row in _bulk_read(Category, 'complete_name', all_categ_names, ['complete_name']):
+                categ_map.setdefault(row['complete_name'], row['id'])
 
-            # 🔹 Validasi & Siapkan data
+            uom_map = {}   # name -> (id, category_id)
+            for row in _bulk_read(Uom, 'name', all_uom_names, ['name', 'category_id']):
+                uom_map.setdefault(row['name'], (row['id'], row['category_id'][0]))
+
+            pos_ids_found = {row['id'] for row in _bulk_read(PosCateg, 'id', all_pos_ids, ['id'])}
+
+            tax_map = {}
+            for row in _bulk_read(Tax, 'name', all_tax_names, ['name']):
+                tax_map.setdefault(row['name'], row['id'])
+
+            # ============================================================
+            # 3. VALIDASI + SIAPKAN VALS (tanpa query), create per batch
+            # ============================================================
+            created, errors = [], []
+            pending = []            # [(product_code, vals), ...]
+            seen_codes = set()      # deteksi kode dobel DI DALAM payload yang sama
+
+            def flush_pending():
+                """Create 1 batch dalam savepoint; kalau batch gagal, ulangi
+                satu-per-satu supaya hanya record bermasalah yang jadi error."""
+                nonlocal pending
+                if not pending:
+                    return
+                batch, pending = pending, []
+                new_items = []
+                try:
+                    with cr.savepoint():
+                        for code, _vals in batch:
+                            _advisory_lock(cr, f"product.template:{code}")
+                        recs = Product.create([vals for _code, vals in batch])
+                    new_items = [{'id': r.id, 'product_code': r.default_code, 'name': r.name}
+                                 for r in recs]
+                except Exception as bulk_err:
+                    _logger.warning(f"Bulk create produk gagal, fallback satu-per-satu: {bulk_err}")
+                    for code, single_vals in batch:
+                        try:
+                            with cr.savepoint():
+                                _advisory_lock(cr, f"product.template:{code}")
+                                rec = Product.create(single_vals)
+                            new_items.append({'id': rec.id, 'product_code': rec.default_code,
+                                              'name': rec.name})
+                        except Exception as single_err:
+                            errors.append({'id': -1, 'product_code': code,
+                                           'message': f"Create failed: {single_err}"})
+                _commit_with_retry(cr, context=f"item_create_{len(created) + len(new_items)}")
+                created.extend(new_items)
+
             for data in items:
                 try:
                     product_code = data.get('product_code')
@@ -577,168 +727,162 @@ class POSTMasterItem(http.Controller):
                         errors.append({'id': -1, 'product_code': None, 'message': "Missing product_code"})
                         continue
 
-                    # Duplicate check
-                    existing_product = model_product.search(
-                        [('default_code', '=', product_code)], limit=1
-                    )
-                    if existing_product:
-                        errors.append({
-                            'id': existing_product.id,
-                            'product_code': product_code,
-                            'message': f"Duplicate item code: {product_code}"
-                        })
+                    # Duplicate check (database + payload yang sama)
+                    if product_code in existing_ids:
+                        errors.append({'id': existing_ids[product_code], 'product_code': product_code,
+                                       'message': f"Duplicate item code: {product_code}"})
+                        continue
+                    if product_code in seen_codes:
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': f"Duplicate item code in payload: {product_code}"})
                         continue
 
-                    # CATEGORY CACHE
+                    # Category
                     category_name = data.get('category_name')
                     if not category_name:
-                        errors.append({'id': -1, 'product_code': product_code, 'message': "category_name missing"})
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': "category_name missing"})
                         continue
-
-                    if category_name in cache_categories:
-                        category = cache_categories[category_name]
-                    else:
-                        category = model_category.search([('complete_name', '=', category_name)], limit=1)
-                        cache_categories[category_name] = category
-
-                    if not category:
+                    category_id = categ_map.get(category_name)
+                    if not category_id:
                         errors.append({'id': -1, 'product_code': product_code,
                                        'message': f"Category '{category_name}' not found."})
                         continue
 
-                    # POS CATEGORY CACHE
-                    pos_categ_command = []
-                    pos_data = data.get('pos_categ_ids', data.get('pos_categ_id', []))
-                    if not isinstance(pos_data, list):
-                        pos_data = [pos_data]
-
-                    for cid in pos_data:
-                        if cid in cache_pos:
-                            pos_obj = cache_pos[cid]
-                        else:
-                            pos_obj = model_pos.search([('id', '=', cid)], limit=1)
-                            cache_pos[cid] = pos_obj
-
-                        if pos_obj:
-                            pos_categ_command.append((4, cid))
+                    # POS category & Tax: kalau ADA yang tidak ditemukan, item dilewati
+                    # (semua kesalahan item ini tetap dilaporkan)
+                    lookup_error = False
+                    pos_ids = []
+                    for cid in _as_list(data.get('pos_categ_ids', data.get('pos_categ_id', []))):
+                        if cid in pos_ids_found:
+                            pos_ids.append(cid)
                         else:
                             errors.append({'id': -1, 'product_code': product_code,
                                            'message': f"POS category ID {cid} not found."})
+                            lookup_error = True
 
-                    # TAX CACHE
-                    tax_command = []
-                    tax_names = data.get('taxes_names', [])
-                    if not isinstance(tax_names, list):
-                        tax_names = [tax_names]
-
-                    for tax_name in tax_names:
-                        if tax_name in cache_tax:
-                            tax = cache_tax[tax_name]
-                        else:
-                            tax = model_tax.search([('name', '=', tax_name)], limit=1)
-                            cache_tax[tax_name] = tax
-
-                        if tax:
-                            tax_command.append((4, tax.id))
+                    tax_ids = []
+                    for tax_name in _as_list(data.get('taxes_names', [])):
+                        if tax_name in tax_map:
+                            tax_ids.append(tax_map[tax_name])
                         else:
                             errors.append({'id': -1, 'product_code': product_code,
                                            'message': f"Tax '{tax_name}' not found."})
+                            lookup_error = True
+                    if lookup_error:
+                        continue
 
-                    # UOM CACHE
+                    # UoM
                     uom_name = data.get('uom_name')
                     if not uom_name:
                         errors.append({'id': -1, 'product_code': product_code, 'message': "uom_name missing"})
                         continue
-
-                    if uom_name in cache_uom:
-                        uom = cache_uom[uom_name]
-                    else:
-                        uom = model_uom.search([('name', '=', uom_name)], limit=1)
-                        cache_uom[uom_name] = uom
-
+                    uom = uom_map.get(uom_name)
                     if not uom:
-                        errors.append({'id': -1, 'product_code': product_code, 'message': f"UoM '{uom_name}' not found."})
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': f"UoM '{uom_name}' not found."})
                         continue
 
-                    # UOM PO CACHE
                     uom_po_name = data.get('uom_po_name')
                     if not uom_po_name:
                         errors.append({'id': -1, 'product_code': product_code, 'message': "uom_po_name missing"})
                         continue
-
-                    if uom_po_name in cache_uom:
-                        uom_po = cache_uom[uom_po_name]
-                    else:
-                        uom_po = model_uom.search([('name', '=', uom_po_name)], limit=1)
-                        cache_uom[uom_po_name] = uom_po
-
+                    uom_po = uom_map.get(uom_po_name)
                     if not uom_po:
                         errors.append({'id': -1, 'product_code': product_code,
                                        'message': f"Purchase UoM '{uom_po_name}' not found."})
                         continue
 
-                    # Cek kategori uom = wajib sama
-                    if uom.category_id.id != uom_po.category_id.id:
+                    if uom[1] != uom_po[1]:   # kategori UoM wajib sama
                         errors.append({'id': -1, 'product_code': product_code,
                                        'message': "Default UoM and Purchase UoM must match."})
                         continue
 
-                    # Append vals
-                    cost = data.get('standard_price', data.get('cost', 0.0))
+                    if not data.get('product_name'):
+                        errors.append({'id': -1, 'product_code': product_code,
+                                       'message': "Missing product_name"})
+                        continue
 
-                    vals_list.append({
-                        'name': data.get('product_name'),
-                        'active': data.get('active'),
-                        'default_code': product_code,
-                        'detailed_type': data.get('product_type'),
-                        'invoice_policy': data.get('invoice_policy'),
-                        'list_price': data.get('sales_price'),
-                        'standard_price': cost,
-                        'uom_id': uom.id,
-                        'uom_po_id': uom_po.id,
-                        'pos_categ_ids': pos_categ_command,
-                        'categ_id': category.id,
-                        'taxes_id': tax_command,
-                        'available_in_pos': data.get('available_in_pos'),
-                        'barcode': data.get('barcode'),
-                        'image_1920': data.get('image_1920'),
-                        'create_uid': uid,
-                    })
+                    # Build vals -- field & nama sama seperti versi lama.
+                    # Field opsional hanya dikirim kalau ADA di payload (dulu None
+                    # dikirim eksplisit, mis. 'active': None membuat produk nonaktif).
+                    vals = {
+                        'name':           data['product_name'],
+                        'default_code':   product_code,
+                        'standard_price': data.get('standard_price', data.get('cost', 0.0)),
+                        'uom_id':         uom[0],
+                        'uom_po_id':      uom_po[0],
+                        'categ_id':       category_id,
+                        'create_uid':     uid,   # sama seperti versi lama
+                        'pos_categ_ids':  [(6, 0, pos_ids)],
+                        'taxes_id':       [(6, 0, tax_ids)],   # selalu dikirim: kosong = tanpa pajak default
+                    }
+                    for payload_key, field_name in (
+                        ('active',           'active'),
+                        ('product_type',     'detailed_type'),
+                        ('invoice_policy',   'invoice_policy'),
+                        ('sales_price',      'list_price'),
+                        ('available_in_pos', 'available_in_pos'),
+                        ('barcode',          'barcode'),
+                        ('image_1920',       'image_1920'),
+                    ):
+                        if payload_key in data:
+                            vals[field_name] = data[payload_key]
 
-                    # ⏳ Create batch per 50 item
-                    if len(vals_list) >= BATCH_SIZE:
-                        products = model_product.create(vals_list)
-                        for rec in products:
-                            created.append({'id': rec.id, 'product_code': rec.default_code, 'name': rec.name})
-                        vals_list = []  # kosongkan batch
+                    seen_codes.add(product_code)
+                    pending.append((product_code, vals))
+                    if len(pending) >= BATCH_CREATE_SIZE:
+                        flush_pending()
 
                 except Exception as e:
                     errors.append({'id': -1, 'product_code': data.get('product_code'), 'message': str(e)})
 
-            # Create sisa batch
-            if vals_list:
-                products = model_product.create(vals_list)
-                for rec in products:
-                    created.append({'id': rec.id, 'product_code': rec.default_code, 'name': rec.name})
+            flush_pending()   # sisa batch
 
             return {
-                'code': 200 if not errors else 207,
-                'status': 'success' if not errors else 'partial_success',
+                'code':          200 if not errors else 207,
+                'status':        'success' if not errors else 'partial_success',
                 'created_items': created,
-                'errors': errors
+                'errors':        errors,
+                'total_created': len(created),
+                'total_errors':  len(errors),
             }
 
         except Exception as e:
             request.env.cr.rollback()
+            _logger.error(f"Master Item API Fatal Error: {e}", exc_info=True)
             return {'status': 'Failed', 'code': 500, 'message': str(e)}
 
 
 
+# controllers/master_pricelist.py
+import logging
+from datetime import datetime
+
+from odoo import http
+from odoo.http import request
+
+_logger = logging.getLogger(__name__)
+
+# =========================================================
+# KONFIGURASI BATCH
+# =========================================================
+LOOKUP_CHUNK      = 5000   # jumlah default_code per query preload produk
+LINE_CREATE_CHUNK = 5000   # jumlah baris pricelist per batch ORM create
+
+
+def _chunks(values, size):
+    values = list(values)
+    for i in range(0, len(values), size):
+        yield values[i:i + size]
+
+
 class POSTMasterPricelist(http.Controller):
+
     @http.route('/api/master_pricelist', type='json', auth='none', methods=['POST'], csrf=False)
     def post_pricelist(self, **kw):
         try:
-            # Authentication
+            # Authentication (TETAP seperti versi lama)
             config = request.env['setting.config'].sudo().search([('vit_config_server', '=', 'mc')], limit=1)
             if not config:
                 return {'status': "Failed", 'code': 500, 'message': "Configuration not found."}
@@ -748,28 +892,30 @@ class POSTMasterPricelist(http.Controller):
                 return {'status': "Failed", 'code': 401, 'message': "Authentication failed."}
 
             env = request.env(user=request.env.ref('base.user_admin').id)
-            
+            cr = request.env.cr
+
             data = request.get_json_data()
-            
+
             # Validate required fields
             required_fields = ['name', 'currency_id', 'pricelist_ids']
             missing_fields = [field for field in required_fields if not data.get(field)]
             if missing_fields:
                 return {
-                    'status': "Failed", 
-                    'code': 400, 
+                    'status': "Failed",
+                    'code': 400,
                     'message': f"Missing required fields: {', '.join(missing_fields)}"
                 }
 
             name = data.get('name')
             currency_id = data.get('currency_id')
+            lines = data.get('pricelist_ids', [])
 
             # Validate currency
             currency = env['res.currency'].sudo().browse(currency_id)
             if not currency.exists():
                 return {
-                    'status': "Failed", 
-                    'code': 400, 
+                    'status': "Failed",
+                    'code': 400,
                     'message': f"Currency with ID {currency_id} not found."
                 }
 
@@ -777,48 +923,69 @@ class POSTMasterPricelist(http.Controller):
             existing_pricelist = env['product.pricelist'].sudo().search([('name', '=', name)], limit=1)
             if existing_pricelist:
                 return {
-                    'status': "Failed", 
-                    'code': 400, 
+                    'status': "Failed",
+                    'code': 400,
                     'message': f"Pricelist with name '{name}' already exists.",
                     'id': existing_pricelist.id
                 }
 
-            # Validate all products first
+            # =========================================================
+            # PRELOAD SEMUA PRODUK SEKALIGUS (chunked) -- dulu 1 search per baris
+            # =========================================================
+            all_codes = {line.get('product_code') for line in lines if line.get('product_code')}
+            product_tmpl_map = {}   # default_code -> product_tmpl_id
+            Product = env['product.product'].sudo()
+            for chunk in _chunks(all_codes, LOOKUP_CHUNK):
+                for row in Product.search_read([('default_code', 'in', chunk)],
+                                               ['default_code', 'product_tmpl_id']):
+                    # setdefault: kalau 1 kode punya >1 varian, ambil yang pertama
+                    # (sama dengan search(..., limit=1) pada versi lama)
+                    product_tmpl_map.setdefault(row['default_code'], row['product_tmpl_id'][0])
+
+            # =========================================================
+            # VALIDASI SEMUA BARIS (tanpa query di dalam loop)
+            # =========================================================
             missing_products = []
             invalid_dates = []
             items_lines_data = []
+            date_cache = {}   # string tanggal yang sama tidak di-parse berulang
 
-            for line in data.get('pricelist_ids', []):
+            def parse_dt(value):
+                if value not in date_cache:
+                    date_cache[value] = datetime.strptime(value.split('.')[0], '%Y-%m-%d %H:%M:%S')
+                return date_cache[value]
+
+            for line in lines:
                 product_code = line.get('product_code')
                 if not product_code:
                     return {
-                        'status': "Failed", 
-                        'code': 400, 
+                        'status': "Failed",
+                        'code': 400,
                         'message': "Product code is required for all pricelist items."
                     }
 
-                product = env['product.product'].sudo().search([('default_code', '=', product_code)], limit=1)
-                if not product:
+                tmpl_id = product_tmpl_map.get(product_code)
+                if not tmpl_id:
                     missing_products.append(product_code)
                     continue
 
                 # Validate and parse dates
                 date_start = line.get('date_start')
                 date_end = line.get('date_end')
-                
+
                 try:
                     if date_start:
-                        date_start = datetime.strptime(date_start.split('.')[0], '%Y-%m-%d %H:%M:%S')
+                        date_start = parse_dt(date_start)
                     if date_end:
-                        date_end = datetime.strptime(date_end.split('.')[0], '%Y-%m-%d %H:%M:%S')
-                        
+                        date_end = parse_dt(date_end)
+
                     if date_start and date_end and date_start > date_end:
                         invalid_dates.append(product_code)
                         continue
                 except ValueError as e:
                     return {
-                        'status': "Failed", 
-                        'code': 400, 
+                        'status': "Failed",
+                        'code': 400,
                         'message': f"Invalid date format for product {product_code}: {str(e)}"
                     }
 
@@ -826,19 +993,19 @@ class POSTMasterPricelist(http.Controller):
                 compute_price = line.get('compute_price')
                 if compute_price == 'percentage' and not line.get('percent_price'):
                     return {
-                        'status': "Failed", 
-                        'code': 400, 
+                        'status': "Failed",
+                        'code': 400,
                         'message': f"Percent price is required for percentage computation for product {product_code}"
                     }
                 elif compute_price == 'fixed' and not line.get('fixed_price'):
                     return {
-                        'status': "Failed", 
-                        'code': 400, 
+                        'status': "Failed",
+                        'code': 400,
                         'message': f"Fixed price is required for fixed computation for product {product_code}"
                     }
 
                 items_lines_data.append({
-                    'product_tmpl_id': product.product_tmpl_id.id,
+                    'product_tmpl_id': tmpl_id,
                     'applied_on': line.get('conditions'),
                     'compute_price': compute_price,
                     'percent_price': line.get('percent_price'),
@@ -863,23 +1030,26 @@ class POSTMasterPricelist(http.Controller):
                     'message': f"Invalid date range for products: {', '.join(invalid_dates)}"
                 }
 
+            # =========================================================
+            # CREATE: header dulu, baris per chunk -- semuanya dalam 1 savepoint
+            # (atomik: kalau 1 chunk gagal, pricelist + semua barisnya dibatalkan)
+            # =========================================================
             try:
-                # Create pricelist
-                pricelist_data = {
-                    'name': name,
-                    'currency_id': currency_id,
-                    'create_uid': uid,
-                    'item_ids': [(0, 0, line_data) for line_data in items_lines_data],
-                }
-
-                pricelist = env['product.pricelist'].sudo().create(pricelist_data)
+                with cr.savepoint():
+                    pricelist = env['product.pricelist'].sudo().create({
+                        'name': name,
+                        'currency_id': currency_id,
+                        'create_uid': uid,   # sama seperti versi lama
+                    })
+                    PricelistItem = env['product.pricelist.item'].sudo()
+                    for chunk in _chunks(items_lines_data, LINE_CREATE_CHUNK):
+                        PricelistItem.create([dict(vals, pricelist_id=pricelist.id) for vals in chunk])
 
             except Exception as create_error:
-                request.env.cr.rollback()
                 _logger.error(f"Failed to create pricelist: {str(create_error)}", exc_info=True)
                 return {
-                    'status': "Failed", 
-                    'code': 500, 
+                    'status': "Failed",
+                    'code': 500,
                     'message': f"Failed to create pricelist: {str(create_error)}"
                 }
 
@@ -895,8 +1065,8 @@ class POSTMasterPricelist(http.Controller):
             request.env.cr.rollback()
             _logger.error(f"Failed to create Pricelist: {str(e)}", exc_info=True)
             return {
-                'status': "Failed", 
-                'code': 500, 
+                'status': "Failed",
+                'code': 500,
                 'message': f"Failed to create Pricelist: {str(e)}"
             }
         
