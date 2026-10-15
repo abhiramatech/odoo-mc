@@ -1,0 +1,186 @@
+# ==============================================================================
+# .gitignore - odoo-mc (VIT POS)
+#
+# Catatan: workflow deploy (.github/workflows/deploy.yml) melakukan rsync
+# seluruh tree ke server produksi, jadi apa pun yang ikut ke-commit akan
+# mendarat di server. Pola di bawah menjaga supaya file sampah tidak terbawa.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Python / Odoo
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+develop-eggs/
+.installed.cfg
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+.python-version
+.direnv/
+
+# Tools / cache
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.pytype/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# ------------------------------------------------------------------------------
+# Runtime Odoo: log, config lokal, filestore, sesi
+# ------------------------------------------------------------------------------
+*.log
+*.log.*
+odoo.conf
+odoo-server.conf
+openerp-server.conf
+*.local.conf
+.odoorc
+.openerp_serverrc
+filestore/
+sessions/
+data_dir/
+
+# ------------------------------------------------------------------------------
+# Dump / backup database lokal
+# ------------------------------------------------------------------------------
+*.sql
+*.sql.gz
+*.dump
+*.bak
+*.backup
+*.tar.gz
+# Dump Odoo biasanya berbentuk .zip. Dibiarkan aktif karena repo ini tidak
+# punya .zip yang sah. Hapus baris ini kalau nanti perlu commit file .zip.
+*.zip
+
+# ------------------------------------------------------------------------------
+# Windows
+# ------------------------------------------------------------------------------
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# ------------------------------------------------------------------------------
+# macOS
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.AppleDB
+.AppleDesktop
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.fseventsd
+.DocumentRevisions-V100
+.apdisk
+Network Trash Folder
+Temporary Items
+Icon?
+
+# ------------------------------------------------------------------------------
+# Linux
+# ------------------------------------------------------------------------------
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ------------------------------------------------------------------------------
+# Editor / IDE
+# ------------------------------------------------------------------------------
+.vscode/
+.history/
+*.code-workspace
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*.swn
+*~.nib
+.spyderproject
+.spyproject
+.ropeproject
+nbproject/
+
+# ------------------------------------------------------------------------------
+# Artefak sesi AI / agent
+# ------------------------------------------------------------------------------
+.claude/
+.cursor/
+.aider*
+.continue/
+
+# ------------------------------------------------------------------------------
+# Dokumen kerja di root repo (blueprint, ToBeDesign, laporan client, dsb)
+#
+# Sengaja dibatasi ke root saja (pakai awalan "/") supaya aset modul yang sah
+# di dalam subfolder - misal dev_pos/static/description/*.png - tetap bisa
+# di-commit seperti biasa.
+# ------------------------------------------------------------------------------
+/*.pdf
+/*.doc
+/*.docx
+/*.xls
+/*.xlsx
+/*.ppt
+/*.pptx
+/*.csv
+/*.eml
+/*.msg
+/*.rar
+/*.7z
+
+# ------------------------------------------------------------------------------
+# Scratch lokal
+# ------------------------------------------------------------------------------
+tmp/
+temp/
+scratch/
+*.tmp
+*.orig
+*.rej
+*.patch.local
