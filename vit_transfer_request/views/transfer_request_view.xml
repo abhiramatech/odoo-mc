@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+    <!-- tree view -->
+    <record id="view_transfer_request_tree" model="ir.ui.view">
+      <field name="name">transfer.request.tree</field>
+      <field name="model">transfer.request</field>
+      <field name="arch" type="xml">
+        <tree decoration-muted="state == 'cancel'"
+              decoration-info="state == 'draft'"
+              decoration-warning="state == 'in_progress'"
+              decoration-success="state == 'done'">
+          <field name="doc_num" string="Request Number"/>
+          <field name="request_date" string="Request Date"/>
+          <field name="request_type" string="Request Type"/>
+          <field name="warehouse_id" string="Source Warehouse"/>
+          <field name="warehouse_dest_id" string="Destination Warehouse"/>
+          <field name="requested_by_id" string="Requested By"/>
+          <field name="total_qty_requested" string="Requested" sum="Total Requested"/>
+          <field name="total_qty_transferred" string="Transferred" sum="Total Transferred"/>
+          <field name="is_integrated" string="Integrated"/>
+          <field name="state" string="Status" widget="badge"/>
+        </tree>
+      </field>
+    </record>
+
+    <!-- form view -->
+    <record id="view_transfer_request_form" model="ir.ui.view">
+      <field name="name">transfer.request.form</field>
+      <field name="model">transfer.request</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_submit" string="Submit" type="object"
+                    class="oe_highlight" invisible="state != 'draft'"/>
+            <button name="action_approve" string="Approve" type="object"
+                    class="oe_highlight" invisible="state != 'to_approve'"/>
+            <button name="action_create_transfer_out" string="Create Transfer Out" type="object"
+                    class="oe_highlight" invisible="state not in ('approved', 'in_progress')"/>
+            <button name="action_reset_draft" string="Reset to Draft" type="object"
+                    invisible="state not in ('to_approve', 'approved', 'cancel')"/>
+            <button name="action_cancel" string="Cancel" type="object"
+                    invisible="state in ('done', 'cancel')"/>
+            <field name="state" widget="statusbar"
+                   statusbar_visible="draft,to_approve,approved,in_progress,done"/>
+          </header>
+          <sheet>
+            <div class="oe_button_box" name="button_box">
+              <button name="action_view_transfer_out" type="object" class="oe_stat_button" icon="fa-truck"
+                      invisible="picking_count == 0">
+                <field name="picking_count" widget="statinfo" string="Transfer Out"/>
+              </button>
+            </div>
+            <div class="oe_title">
+              <h1>
+                <field name="doc_num" placeholder="TR/..." readonly="1"/>
+              </h1>
+            </div>
+            <group>
+              <group string="Request">
+                <field name="request_type" readonly="state != 'draft'"/>
+                <field name="transfer_type_id" readonly="state != 'draft'"/>
+                <field name="request_date" readonly="state != 'draft'"/>
+                <field name="scheduled_date" readonly="state in ('done', 'cancel')"/>
+                <field name="requested_by_id" readonly="state != 'draft'"/>
+                <field name="company_id" groups="base.group_multi_company" readonly="state != 'draft'"/>
+              </group>
+              <group string="Lokasi">
+                <field name="warehouse_id" readonly="state != 'draft'"/>
+                <field name="location_id" readonly="state != 'draft'"/>
+                <field name="warehouse_dest_id" readonly="state != 'draft'"/>
+                <field name="location_dest_id" readonly="state != 'draft'"/>
+              </group>
+            </group>
+            <group string="Integrasi SAP">
+              <group>
+                <field name="vit_trxid" readonly="1" force_save="1"/>
+                <field name="is_integrated"/>
+              </group>
+            </group>
+            <notebook>
+              <page string="Request Lines">
+                <field name="line_ids" readonly="state in ('done', 'cancel')">
+                  <tree editable="bottom">
+                    <field name="product_id" readonly="qty_transferred &gt; 0"/>
+                    <field name="product_code" string="Product Code"/>
+                    <field name="product_uom_qty" string="Requested Qty"/>
+                    <field name="product_uom_id" string="UoM" options="{'no_create': True}"/>
+                    <field name="qty_transferred" string="Transferred Qty" readonly="1"/>
+                    <field name="qty_remaining" string="Remaining Qty" readonly="1"/>
+                    <field name="vit_notes" string="Keterangan"/>
+                  </tree>
+                </field>
+              </page>
+              <page string="Keterangan">
+                <field name="vit_notes" nolabel="1" placeholder="Tambahkan keterangan di sini..."
+                       options="{'resizable': true}" readonly="state in ('done', 'cancel')"/>
+              </page>
+            </notebook>
+          </sheet>
+          <div class="oe_chatter">
+            <field name="message_follower_ids" widget="mail_followers"/>
+            <field name="activity_ids" widget="mail_activity"/>
+            <field name="message_ids" widget="mail_thread"/>
+          </div>
+        </form>
+      </field>
+    </record>
+
+    <!-- search view -->
+    <record id="view_transfer_request_search" model="ir.ui.view">
+      <field name="name">transfer.request.search</field>
+      <field name="model">transfer.request</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="doc_num"/>
+          <field name="warehouse_id"/>
+          <field name="warehouse_dest_id"/>
+          <field name="requested_by_id"/>
+          <field name="vit_trxid"/>
+          <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+          <filter name="filter_to_approve" string="To Approve" domain="[('state', '=', 'to_approve')]"/>
+          <filter name="filter_approved" string="Approved" domain="[('state', '=', 'approved')]"/>
+          <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
+          <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
+          <separator/>
+          <filter name="filter_allocation" string="Alokasi ke Store" domain="[('request_type', '=', 'allocation')]"/>
+          <filter name="filter_borrow" string="Peminjaman ke WH" domain="[('request_type', '=', 'borrow')]"/>
+          <separator/>
+          <filter name="filter_not_integrated" string="Belum Terintegrasi" domain="[('is_integrated', '=', False)]"/>
+          <group expand="0" string="Group By">
+            <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            <filter name="group_request_type" string="Request Type" context="{'group_by': 'request_type'}"/>
+            <filter name="group_warehouse" string="Source Warehouse" context="{'group_by': 'warehouse_id'}"/>
+            <filter name="group_warehouse_dest" string="Destination Warehouse" context="{'group_by': 'warehouse_dest_id'}"/>
+            <filter name="group_request_date" string="Request Date" context="{'group_by': 'request_date'}"/>
+          </group>
+        </search>
+      </field>
+    </record>
+
+    <!-- action -->
+    <record id="action_transfer_request" model="ir.actions.act_window">
+      <field name="name">Transfer Request</field>
+      <field name="res_model">transfer.request</field>
+      <field name="view_mode">tree,form</field>
+      <field name="search_view_id" ref="view_transfer_request_search"/>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smart_button">
+          Buat Transfer Request pertama untuk alokasi stock ke store atau peminjaman ke WH.
+        </p>
+      </field>
+    </record>
+
+    <!-- menu -->
+    <!-- Parent sengaja dipasang ke root Inventory (stock.menu_stock_root) karena xmlid itu
+         pasti ada. Kalau mau dipindah ke bawah Operations, ganti parent-nya setelah
+         dipastikan xmlid menu Operations ada di Odoo 17 yang terpasang di server. -->
+    <menuitem
+      id="menu_transfer_request"
+      name="Transfer Request"
+      action="action_transfer_request"
+      parent="stock.menu_stock_root"
+      sequence="15"/>
+  </data>
+</odoo>
