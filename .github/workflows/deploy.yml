@@ -1,32 +1,38 @@
-name: Deploy to Ubuntu Server
+name: Deploy to Windows Server (git pull)
 
 on:
-  push:
-    branches:
-      - main  # atau branch lain yang Anda inginkan
+  workflow_dispatch:        # jalankan manual dulu: tab Actions -> Run workflow
+  # push:                   # aktifkan setelah uji manual berhasil
+  #   branches: [main]
+
+concurrency:
+  group: deploy-windows-server
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-
+    runs-on: [self-hosted, windows, odoo17]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Update clone repo (addons_path menunjuk ke folder ini)
+        shell: powershell
+        env:
+          REPO: 'C:\Program Files\Odoo 17.0.20250624\server\POSVIT\odoo-mc'
+          BRANCH: main
+        run: |
+          # git menulis progres ke stderr; jangan dianggap error (kegagalan dicek lewat exit code)
+          $ErrorActionPreference = 'Continue'
+          $fwd = $env:REPO -replace '\\', '/'
+          if (-not ((git config --global --get-all safe.directory) -contains $fwd)) { git config --global --add safe.directory $fwd }
+          git -C $env:REPO fetch origin "+refs/heads/${env:BRANCH}:refs/remotes/origin/${env:BRANCH}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $env:REPO reset --hard "origin/${env:BRANCH}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $env:REPO log -1 --oneline
 
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-    - name: Copy files via SSH
-      run: |
-        rsync -avz -e "ssh -o StrictHostKeyChecking=no -p 23567" --exclude '.git*' ./ root@116.254.101.213:/root/vit/odoo/odoo17/addons_new
-
-    - name: Restart Odoo Service
-      run: |
-        echo "${{ secrets.SSH_PASSWORD }}" | ssh -o StrictHostKeyChecking=no -p 23567 root@116.254.101.213 'sudo -S systemctl restart odoo17dev.service'
-
-    # - name: Run Python Script
-    #   run: |
-    #     echo "${{ secrets.SSH_PASSWORD }}" | ssh -o StrictHostKeyChecking=no -p 21787 root@116.254.101.213 'sudo -S python3 /vit/odoo/odoo17/encrypt_addon.py'
-    #     echo "${{ secrets.SSH_PASSWORD }}" | ssh -o StrictHostKeyChecking=no -p 23567 root@116.254.101.213 'sudo -S python3 /vit/odoo/odoo17/encrypt_addon.py'
+      - name: Restart Odoo service
+        shell: powershell
+        env:
+          SERVICE: odoo-server-17.0
+        run: |
+          Restart-Service -Name $env:SERVICE -Force
+          (Get-Service -Name $env:SERVICE).WaitForStatus('Running', '00:01:00')
