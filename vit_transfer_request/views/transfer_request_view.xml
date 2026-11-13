@@ -153,14 +153,12 @@
     </record>
 
     <!-- menu -->
-    <!-- Parent sengaja dipasang ke root Inventory (stock.menu_stock_root) karena xmlid itu
-         pasti ada. Kalau mau dipindah ke bawah Operations, ganti parent-nya setelah
-         dipastikan xmlid menu Operations ada di Odoo 17 yang terpasang di server. -->
+    <!-- Parent: master menu "Transfer" (views/transfer_menu.xml), urutan nomor 1. -->
     <menuitem
       id="menu_transfer_request"
       name="Transfer Request"
       action="action_transfer_request"
-      parent="stock.menu_stock_root"
-      sequence="15"/>
+      parent="menu_transfer_root"
+      sequence="1"/>
   </data>
 </odoo>
