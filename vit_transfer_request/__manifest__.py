@@ -28,6 +28,7 @@ Modul ini hanya menambah di sisi MC, tidak ada perubahan di POSVIT Store.
         'views/transfer_type_view.xml',
         'views/transfer_request_view.xml',
         'views/stock_picking_view.xml',
+        'views/report_deliveryslip.xml',
     ],
     'license': 'LGPL-3',
     'installable': True,
