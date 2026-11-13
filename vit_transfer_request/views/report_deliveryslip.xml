@@ -9,12 +9,12 @@
         <div t-if="o.location_id" class="col-auto col-3 mw-100 mb-2" name="div_vit_source_warehouse">
           <strong>Gudang Pengirim:</strong>
           <p class="m-0"
-             t-esc="o.location_id.warehouse_id.name or o.location_id.display_name"/>
+             t-esc="o.location_id.display_name or ''"/>
         </div>
         <div t-if="o.location_dest_id" class="col-auto col-3 mw-100 mb-2" name="div_vit_dest_warehouse">
           <strong>Gudang Penerima:</strong>
           <p class="m-0"
-             t-esc="o.location_dest_id.warehouse_id.name or o.location_dest_id.display_name"/>
+             t-esc="o.location_dest_id.display_name or ''"/>
         </div>
         <div t-if="o.vit_transfer_type_id" class="col-auto col-3 mw-100 mb-2" name="div_vit_transfer_type">
           <strong>Transfer Type:</strong>
