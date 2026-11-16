@@ -24,6 +24,11 @@ class StockPicking(models.Model):
                                        index=True, copy=False,
                                        help='Dokumen TS Out yang menjadi dasar TS In ini. '
                                             'Wajib diisi pada dokumen TS In.')
+    vit_warehouse_id = fields.Many2one('stock.warehouse', string='Source Warehouse',
+                                        index=True, copy=False,
+                                        help='Gudang asal. Terisi otomatis kalau dokumen dibuat dari '
+                                             'Transfer Request / TS Out. Pada TS Out, memilih gudang ini '
+                                             'mengisi Source Location dengan stock location gudang.')
     vit_warehouse_dest_id = fields.Many2one('stock.warehouse', string='Destination Warehouse',
                                              index=True, copy=False,
                                              help='Gudang tujuan akhir. Pada TS Out dipakai untuk menentukan '
@@ -61,6 +66,12 @@ class StockPicking(models.Model):
     def _compute_vit_is_ts_out(self):
         for picking in self:
             picking.vit_is_ts_out = self._vit_type_matches(picking.picking_type_id, TS_OUT_NAME)
+
+    @api.onchange('vit_warehouse_id')
+    def _onchange_vit_warehouse_id(self):
+        """Sama seperti Transfer Request: Source Location TS Out diisi stock location gudang asal."""
+        if self.vit_warehouse_id and self.vit_is_ts_out:
+            self.location_id = self.vit_warehouse_id.lot_stock_id
 
     @api.onchange('vit_warehouse_dest_id')
     def _onchange_vit_warehouse_dest_id(self):
@@ -123,6 +134,7 @@ class StockPicking(models.Model):
             'company_id': self.company_id.id,
             'vit_transfer_type_id': self.vit_transfer_type_id.id,
             'transfer_out_id': self.id,
+            'vit_warehouse_id': self.vit_warehouse_id.id,
             'vit_warehouse_dest_id': self.vit_warehouse_dest_id.id,
             'move_ids_without_package': move_vals,
         }
