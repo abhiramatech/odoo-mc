@@ -17,10 +17,22 @@ class StockPicking(models.Model):
     vit_is_ts_in = fields.Boolean(string='Is TS In', compute='_compute_vit_is_ts_in',
                                    help='Technical: dokumen ini memakai operation type TS In.')
 
+    @staticmethod
+    def _vit_normalize_type_name(name):
+        """Samakan nama operation type: abaikan huruf besar/kecil dan spasi
+        berlebih/tersembunyi (termasuk non-breaking space)."""
+        return ' '.join((name or '').split()).casefold()
+
     @api.depends('picking_type_id.name')
     def _compute_vit_is_ts_in(self):
         for picking in self:
-            picking.vit_is_ts_in = picking.picking_type_id.name == 'TS In'
+            picking_type = picking.picking_type_id
+            # cek nama di bahasa user DAN en_US, karena name operation type translatable
+            names = {
+                self._vit_normalize_type_name(picking_type.name),
+                self._vit_normalize_type_name(picking_type.with_context(lang='en_US').name),
+            }
+            picking.vit_is_ts_in = 'ts in' in names
 
 
 class StockMove(models.Model):
