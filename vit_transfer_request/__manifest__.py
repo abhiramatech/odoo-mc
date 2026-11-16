@@ -23,6 +23,7 @@ Modul ini hanya menambah di sisi MC, tidak ada perubahan di POSVIT Store.
     'website': "https://www.Visi-Intech.com",
     'depends': ['base', 'stock', 'dev_pos'],
     'data': [
+        'security/security_groups.xml',
         'security/ir.model.access.csv',
         'data/sequence_transfer_request.xml',
         'views/transfer_type_view.xml',
