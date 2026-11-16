@@ -1,4 +1,4 @@
-from odoo import models, fields
+from odoo import models, fields, api
 
 
 class StockPicking(models.Model):
@@ -9,6 +9,18 @@ class StockPicking(models.Model):
                                                help='Transfer Request (MD) yang menjadi dasar Transfer Out ini.')
     vit_transfer_type_id = fields.Many2one('transfer.type', string='Transfer Type',
                                             help='Jenis transaksi untuk Transfer Out.')
+    transfer_out_id = fields.Many2one('stock.picking', string='TS Out Reference',
+                                       domain="[('picking_type_id.name', '=', 'TS Out')]",
+                                       index=True, copy=False,
+                                       help='Dokumen TS Out yang menjadi dasar TS In ini. '
+                                            'Wajib diisi pada dokumen TS In.')
+    vit_is_ts_in = fields.Boolean(string='Is TS In', compute='_compute_vit_is_ts_in',
+                                   help='Technical: dokumen ini memakai operation type TS In.')
+
+    @api.depends('picking_type_id.name')
+    def _compute_vit_is_ts_in(self):
+        for picking in self:
+            picking.vit_is_ts_in = picking.picking_type_id.name == 'TS In'
 
 
 class StockMove(models.Model):

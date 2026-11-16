@@ -8,10 +8,20 @@
       <field name="inherit_id" ref="stock.view_picking_form"/>
       <field name="arch" type="xml">
         <xpath expr="//field[@name='origin']" position="after">
+            <field name="vit_is_ts_in" invisible="1"/>
+            <field name="transfer_out_id"
+                   options="{'no_create': True, 'no_quick_create': True}"
+                   invisible="not vit_is_ts_in"
+                   required="vit_is_ts_in"
+                   readonly="state in ['done', 'cancel']"/>
             <field name="vit_transfer_request_id"/>
             <field name="vit_transfer_type_id"
                    options="{'no_quick_create': True}"
                    readonly="state in ['assigned', 'done']"/>
+        </xpath>
+        <!-- Dokumen TS In: Source Document bawaan disembunyikan, diganti TS Out Reference -->
+        <xpath expr="//field[@name='origin']" position="attributes">
+          <attribute name="invisible">vit_is_ts_in</attribute>
         </xpath>
         <xpath expr="//field[@name='vit_transfer_request_id']" position="attributes">
           <attribute name="force_save">1</attribute>
