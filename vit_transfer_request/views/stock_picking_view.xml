@@ -7,13 +7,7 @@
       <field name="model">stock.picking</field>
       <field name="inherit_id" ref="stock.view_picking_form"/>
       <field name="arch" type="xml">
-        <!-- TS Out -> TS In: tombol buat TS In (header) + smart button, hanya untuk group TS In Creator -->
-        <xpath expr="//header" position="inside">
-            <button name="action_create_ts_in" string="Create TS In" type="object"
-                    class="btn-primary"
-                    groups="vit_transfer_request.group_ts_in_creator"
-                    invisible="not vit_is_ts_out or state in ('done', 'cancel')"/>
-        </xpath>
+        <!-- TS Out -> TS In: TS In dibuat otomatis saat TS Out Done. Smart button hanya untuk group TS In Creator -->
         <xpath expr="//div[@name='button_box']" position="inside">
             <field name="vit_is_ts_out" invisible="1"/>
             <button name="action_view_ts_in" type="object" class="oe_stat_button" icon="fa-truck"
@@ -33,6 +27,12 @@
             <field name="vit_transfer_type_id"
                    options="{'no_quick_create': True}"
                    readonly="state in ['assigned', 'done']"/>
+            <!-- Gudang tujuan akhir: wajib di TS Out, dipakai buat nentuin tujuan TS In -->
+            <field name="vit_warehouse_dest_id"
+                   options="{'no_create': True, 'no_quick_create': True}"
+                   invisible="not vit_is_ts_out and not vit_is_ts_in"
+                   required="vit_is_ts_out"
+                   readonly="state in ['done', 'cancel'] or vit_is_ts_in"/>
         </xpath>
         <!-- Dokumen TS In: Source Document bawaan disembunyikan, diganti TS Out Reference -->
         <xpath expr="//field[@name='origin']" position="attributes">

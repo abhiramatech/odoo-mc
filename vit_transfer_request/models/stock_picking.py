@@ -1,6 +1,10 @@
+import logging
+
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_compare
+
+_logger = logging.getLogger(__name__)
 
 TS_IN_GROUP = 'vit_transfer_request.group_ts_in_creator'
 TS_OUT_NAME = 'TS Out'
@@ -20,6 +24,11 @@ class StockPicking(models.Model):
                                        index=True, copy=False,
                                        help='Dokumen TS Out yang menjadi dasar TS In ini. '
                                             'Wajib diisi pada dokumen TS In.')
+    vit_warehouse_dest_id = fields.Many2one('stock.warehouse', string='Destination Warehouse',
+                                             index=True, copy=False,
+                                             help='Gudang tujuan akhir. Pada TS Out dipakai untuk menentukan '
+                                                  'lokasi tujuan TS In (stock gudang ini). Terisi otomatis '
+                                                  'kalau TS Out dibuat dari Transfer Request.')
     vit_is_ts_in = fields.Boolean(string='Is TS In', compute='_compute_vit_is_ts_in',
                                    help='Technical: dokumen ini memakai operation type TS In.')
     vit_is_ts_out = fields.Boolean(string='Is TS Out', compute='_compute_vit_is_ts_out',
@@ -53,6 +62,14 @@ class StockPicking(models.Model):
         for picking in self:
             picking.vit_is_ts_out = self._vit_type_matches(picking.picking_type_id, TS_OUT_NAME)
 
+    @api.onchange('vit_warehouse_dest_id')
+    def _onchange_vit_warehouse_dest_id(self):
+        """Sama seperti Transfer Request: Destination Location TS Out diisi transit
+        location gudang tujuan (kalau ada), kalau tidak stock location gudang itu."""
+        if self.vit_warehouse_dest_id and self.vit_is_ts_out:
+            warehouse = self.vit_warehouse_dest_id
+            self.location_dest_id = warehouse.location_transit or warehouse.lot_stock_id
+
     @api.depends('ts_in_ids.state')
     def _compute_ts_in_count(self):
         for picking in self:
@@ -74,20 +91,28 @@ class StockPicking(models.Model):
             lambda t: self._vit_type_matches(t, TS_IN_NAME))
         if not types:
             raise UserError(_("Operation Type '%s' tidak ditemukan.", TS_IN_NAME))
-        dest_warehouse = self.location_dest_id.warehouse_id
+        dest_warehouse = self.vit_warehouse_dest_id or self.location_dest_id.warehouse_id
         preferred = types.filtered(lambda t: t.warehouse_id == dest_warehouse) if dest_warehouse else types.browse()
         return (preferred or types)[:1]
 
     def _prepare_ts_in_values(self, picking_type, move_vals):
         self.ensure_one()
-        dest_location = picking_type.default_location_dest_id or picking_type.warehouse_id.lot_stock_id
+        # Tujuan TS In: stock location Destination Warehouse yang diisi di TS Out.
+        # Fallback (TS Out lama / dari API yang belum punya gudang tujuan): setting operation type TS In.
+        if self.vit_warehouse_dest_id:
+            dest_location = self.vit_warehouse_dest_id.lot_stock_id
+            if not dest_location:
+                raise UserError(_("Gudang %s belum punya Location Stock.", self.vit_warehouse_dest_id.display_name))
+        else:
+            dest_location = picking_type.default_location_dest_id or picking_type.warehouse_id.lot_stock_id
         if not dest_location:
-            raise UserError(_("Operation Type %s belum punya Default Destination Location / warehouse.",
-                              picking_type.display_name))
+            raise UserError(_("Isi Destination Warehouse di TS Out, atau set Default Destination "
+                              "Location pada Operation Type %s.", picking_type.display_name))
         if dest_location == self.location_dest_id:
-            raise UserError(_("Lokasi tujuan TS In (%s) sama dengan lokasi asalnya (tujuan TS Out). "
-                              "Cek Default Destination Location pada Operation Type %s.",
-                              dest_location.display_name, picking_type.display_name))
+            raise UserError(_("Lokasi tujuan TS In (%s) sama dengan lokasi asalnya (Destination Location "
+                              "TS Out). Perpindahan antar gudang harus lewat lokasi transit: isi Transit "
+                              "Location pada gudang tujuan, lalu pakai sebagai Destination Location TS Out.",
+                              dest_location.display_name))
         for _cmd, _id, vals in move_vals:
             vals['location_dest_id'] = dest_location.id
         return {
@@ -98,54 +123,59 @@ class StockPicking(models.Model):
             'company_id': self.company_id.id,
             'vit_transfer_type_id': self.vit_transfer_type_id.id,
             'transfer_out_id': self.id,
+            'vit_warehouse_dest_id': self.vit_warehouse_dest_id.id,
             'move_ids_without_package': move_vals,
         }
 
-    def action_create_ts_in(self):
-        """Buat TS In dari TS Out (sisa qty yang belum dibuatkan TS In)."""
+    def _create_ts_in(self):
+        """Buat TS In dari TS Out yang sudah Done, sesuai qty yang BENAR-BENAR dikirim
+        (move.quantity). Kalau TS Out divalidasi sebagian, backorder-nya adalah picking
+        terpisah dan akan membuat TS In sendiri saat divalidasi."""
         self.ensure_one()
-        self._check_ts_in_access()
-        if not self.vit_is_ts_out:
-            raise UserError(_("TS In hanya bisa dibuat dari dokumen TS Out."))
-        if self.state in ('done', 'cancel'):
-            raise UserError(_("TS In hanya bisa dibuat selagi TS Out belum Done / Cancel."))
-
-        out_moves = self.move_ids.filtered(lambda m: m.state != 'cancel')
-        existing = self.env['stock.move'].search([
-            ('vit_ts_out_move_id', 'in', out_moves.ids), ('state', '!=', 'cancel')])
-        taken = {}
-        for move in existing:
-            taken[move.vit_ts_out_move_id.id] = taken.get(move.vit_ts_out_move_id.id, 0.0) + move.product_uom_qty
+        if not self.vit_is_ts_out or self.state != 'done':
+            return self.browse()
+        # idempotent: satu TS Out cuma dibuatkan satu TS In
+        if self.ts_in_ids.filtered(lambda p: p.state != 'cancel'):
+            return self.browse()
 
         move_vals = []
-        for line_number, move in enumerate(out_moves, start=1):
-            remaining = move.product_uom_qty - taken.get(move.id, 0.0)
-            if float_compare(remaining, 0.0, precision_rounding=move.product_uom.rounding) <= 0:
+        for line_number, move in enumerate(self.move_ids.filtered(lambda m: m.state == 'done'), start=1):
+            if float_compare(move.quantity, 0.0, precision_rounding=move.product_uom.rounding) <= 0:
                 continue
             move_vals.append((0, 0, {
                 'name': move.product_id.display_name,
                 'product_id': move.product_id.id,
                 'product_uom': move.product_uom.id,
-                'product_uom_qty': remaining,
+                'product_uom_qty': move.quantity,
                 'location_id': self.location_dest_id.id,
                 'location_dest_id': self.location_dest_id.id,  # ditimpa di _prepare_ts_in_values
                 'vit_line_number_sap': line_number,
                 'vit_ts_out_move_id': move.id,
             }))
         if not move_vals:
-            raise UserError(_("Semua item pada %s sudah dibuatkan TS In.", self.name))
+            return self.browse()
 
         picking_type = self._get_ts_in_picking_type()
-        ts_in = self.env['stock.picking'].create(self._prepare_ts_in_values(picking_type, move_vals))
-        self.message_post(body=_("TS In %s dibuat dari dokumen ini.", ts_in.name))
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('TS In'),
-            'res_model': 'stock.picking',
-            'res_id': ts_in.id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
+        return self.env['stock.picking'].create(self._prepare_ts_in_values(picking_type, move_vals))
+
+    def _action_done(self):
+        """Hook di picking (bukan button_validate) supaya TS In tetap terbentuk lewat
+        wizard backorder / immediate transfer maupun validasi dari kode."""
+        res = super()._action_done()
+        for picking in self.filtered(lambda p: p.state == 'done' and p.vit_is_ts_out):
+            try:
+                # savepoint: kegagalan bikin TS In tidak boleh membatalkan validasi TS Out
+                with self.env.cr.savepoint():
+                    ts_in = picking._create_ts_in()
+            except Exception as exc:  # noqa: BLE001 - dicatat di log + chatter, bukan ditelan
+                _logger.exception("Gagal membuat TS In otomatis dari %s", picking.name)
+                picking.message_post(body=_(
+                    "TS In otomatis GAGAL dibuat: %s. Cek Operation Type TS In "
+                    "(Default Destination Location) lalu buat TS In secara manual.", str(exc)))
+                continue
+            if ts_in:
+                picking.message_post(body=_("TS In %s dibuat otomatis setelah TS Out ini Done.", ts_in.name))
+        return res
 
     def action_view_ts_in(self):
         self.ensure_one()

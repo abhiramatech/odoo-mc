@@ -198,6 +198,7 @@ class TransferRequest(models.Model):
             'origin': self.doc_num,
             'company_id': self.company_id.id,
             'vit_transfer_type_id': self.transfer_type_id.id,
+            'vit_warehouse_dest_id': self.warehouse_dest_id.id,
             'vit_transfer_request_id': self.id,
             'move_ids_without_package': move_vals,
         }
