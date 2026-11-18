@@ -67,6 +67,23 @@ class StockPicking(models.Model):
         for picking in self:
             picking.vit_is_ts_out = self._vit_type_matches(picking.picking_type_id, TS_OUT_NAME)
 
+    @api.model
+    def default_get(self, fields_list):
+        """Create New dari menu TS Out / TS In: isi Operation Type otomatis, supaya
+        vit_is_ts_out / vit_is_ts_in sudah benar sejak form baru dan layout TS Out/TS In
+        langsung tampil. Penandanya context `vit_default_ts_kind` ('ts_out' / 'ts_in');
+        tanpa penanda itu (menu lain) perilaku bawaan Odoo tidak berubah."""
+        res = super().default_get(fields_list)
+        kind = self.env.context.get('vit_default_ts_kind')
+        if kind in ('ts_out', 'ts_in') and 'picking_type_id' in fields_list and not res.get('picking_type_id'):
+            target = TS_OUT_NAME if kind == 'ts_out' else TS_IN_NAME
+            types = self.env['stock.picking.type'].search(
+                [('company_id', '=', self.env.company.id)]).filtered(
+                lambda t: self._vit_type_matches(t, target))
+            if types:
+                res['picking_type_id'] = types[0].id
+        return res
+
     @api.onchange('vit_warehouse_id')
     def _onchange_vit_warehouse_id(self):
         """Sama seperti Transfer Request: Source Location TS Out diisi stock location gudang asal."""
